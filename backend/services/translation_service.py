@@ -16,6 +16,7 @@ from models.translation import (
     EntityTranslation, TranslationStatus, EntityType, 
     DictionaryTerm, TranslationJob, Language
 )
+from services.tenant_scope import scoped, scoped_job
 
 logger = logging.getLogger(__name__)
 
@@ -45,22 +46,24 @@ class TranslationService:
         self.api_key = os.environ.get("OPENAI_API_KEY")
         self.model_name = "gpt-4o-mini"  # Fast and cost-effective for translations
         
-    async def get_dictionary(self) -> Dict[str, Dict[str, str]]:
+    async def get_dictionary(self, user: Optional[dict] = None) -> Dict[str, Dict[str, str]]:
         """
         Load technical dictionary for translation validation
         Returns: {"source_term": {"nl": "translation", "de": "translation"}}
         """
         dictionary = {}
-        async for term in self.db.translation_dictionary.find({}):
+        q = scoped(user, {}) if user else scoped_job({})
+        async for term in self.db.translation_dictionary.find(q):
             source = term.get("source_term", "").lower()
             if source:
                 dictionary[source] = term.get("translations", {})
         return dictionary
     
-    async def get_active_languages(self) -> List[Language]:
+    async def get_active_languages(self, user: Optional[dict] = None) -> List[Language]:
         """Get all active languages"""
         languages = []
-        async for lang in self.db.languages.find({"active": True}):
+        q = scoped(user, {"active": True}) if user else scoped_job({"active": True})
+        async for lang in self.db.languages.find(q):
             languages.append(Language(**lang))
         return languages
     
@@ -88,6 +91,7 @@ class TranslationService:
         *,
         user_id: str = "system",
         company_id: str = "default",
+        user: Optional[dict] = None,
     ) -> Tuple[str, float]:
         """
         Translate text using AI with dictionary validation
@@ -103,7 +107,7 @@ class TranslationService:
         # Get dictionary for term enforcement
         dictionary = {}
         if use_dictionary:
-            dictionary = await self.get_dictionary()
+            dictionary = await self.get_dictionary(user=user or {"company_id": company_id})
         
         # Build translation prompt with dictionary context
         dictionary_context = ""
@@ -183,12 +187,14 @@ Respond ONLY with the translated text, nothing else."""
         fields: Optional[List[str]] = None,
         created_by: Optional[str] = None,
         source_language: Optional[str] = None,
+        user: Optional[dict] = None,
     ) -> List[EntityTranslation]:
         """
         Translate all fields of an entity to target languages
         """
         translations = []
-        
+        _scope = (lambda q: scoped(user, q)) if user else scoped_job
+
         # Determine which fields to translate
         translatable_fields = TRANSLATABLE_FIELDS.get(entity_type, ["name", "description"])
         if fields:
@@ -220,6 +226,7 @@ Respond ONLY with the translated text, nothing else."""
                         target_language=language_code,
                         context="industrial maintenance and reliability",
                         user_id=created_by or "system",
+                        user=user,
                     )
                     
                     # Create translation record
@@ -239,12 +246,12 @@ Respond ONLY with the translated text, nothing else."""
                     
                     # Upsert to database
                     await self.db.entity_translations.update_one(
-                        {
+                        _scope({
                             "entity_type": entity_type.value,
                             "entity_id": entity_id,
                             "language_code": language_code,
                             "field_name": field_name
-                        },
+                        }),
                         {"$set": translation.model_dump()},
                         upsert=True
                     )
@@ -261,7 +268,8 @@ Respond ONLY with the translated text, nothing else."""
         self,
         entity_type: EntityType,
         entity_id: str,
-        language_code: Optional[str] = None
+        language_code: Optional[str] = None,
+        user: Optional[dict] = None,
     ) -> Dict[str, Dict[str, str]]:
         """
         Get all translations for an entity
@@ -273,9 +281,10 @@ Respond ONLY with the translated text, nothing else."""
         }
         if language_code:
             query["language_code"] = language_code
-        
+
+        _scope = (lambda q: scoped(user, q)) if user else scoped_job
         result = {}
-        async for trans in self.db.entity_translations.find(query):
+        async for trans in self.db.entity_translations.find(_scope(query)):
             lang = trans.get("language_code")
             field = trans.get("field_name")
             value = trans.get("translation_value")
@@ -296,17 +305,18 @@ Respond ONLY with the translated text, nothing else."""
         entity_fetcher: async function(entity_id) -> entity_data
         """
         # Get job
-        job_data = await self.db.translation_jobs.find_one({"id": job_id})
+        job_data = await self.db.translation_jobs.find_one(scoped_job({"id": job_id}))
         if not job_data:
             raise ValueError(f"Job not found: {job_id}")
         
         job = TranslationJob(**job_data)
+        job_user = {"company_id": job_data.get("tenant_id")} if job_data.get("tenant_id") else None
         
         # Update status to processing
         job.status = "processing"
         job.started_at = datetime.utcnow().isoformat()
         job.total_items = len(job.entity_ids) * len(job.target_languages)
-        await self.db.translation_jobs.update_one({"id": job_id}, {"$set": job.model_dump()})
+        await self.db.translation_jobs.update_one(scoped_job({"id": job_id}), {"$set": job.model_dump()})
         
         try:
             for entity_id in job.entity_ids:
@@ -325,7 +335,8 @@ Respond ONLY with the translated text, nothing else."""
                         entity_data=entity_data,
                         target_languages=job.target_languages,
                         fields=job.fields_to_translate if job.fields_to_translate else None,
-                        created_by=job.created_by
+                        created_by=job.created_by,
+                        user=job_user,
                     )
                     
                     job.translations_created += len(translations)
@@ -337,7 +348,7 @@ Respond ONLY with the translated text, nothing else."""
                 
                 # Update progress
                 job.progress = int((job.completed_items + job.failed_items) / job.total_items * 100)
-                await self.db.translation_jobs.update_one({"id": job_id}, {"$set": job.model_dump()})
+                await self.db.translation_jobs.update_one(scoped_job({"id": job_id}), {"$set": job.model_dump()})
             
             # Mark as completed
             job.status = "completed"
@@ -347,7 +358,7 @@ Respond ONLY with the translated text, nothing else."""
             job.status = "failed"
             job.errors.append({"error": f"Job failed: {str(e)}"})
         
-        await self.db.translation_jobs.update_one({"id": job_id}, {"$set": job.model_dump()})
+        await self.db.translation_jobs.update_one(scoped_job({"id": job_id}), {"$set": job.model_dump()})
         return job
     
     async def get_missing_translations(
@@ -364,7 +375,8 @@ Respond ONLY with the translated text, nothing else."""
     
     async def get_translation_stats(
         self,
-        entity_type: Optional[EntityType] = None
+        entity_type: Optional[EntityType] = None,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """
         Get translation coverage statistics
@@ -381,7 +393,11 @@ Respond ONLY with the translated text, nothing else."""
         ]
         
         if entity_type:
-            pipeline.insert(0, {"$match": {"entity_type": entity_type.value}})
+            pipeline.insert(0, {"$match": scoped(user, {"entity_type": entity_type.value}) if user else scoped_job({"entity_type": entity_type.value})})
+        elif user:
+            pipeline.insert(0, {"$match": scoped(user, {})})
+        else:
+            pipeline.insert(0, {"$match": scoped_job({})})
         
         stats = {}
         async for doc in self.db.entity_translations.aggregate(pipeline):

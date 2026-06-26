@@ -9,6 +9,8 @@ from typing import List, Optional, Set
 
 from fastapi import HTTPException
 
+from services.tenant_scope import scoped, scoped_job
+
 logger = logging.getLogger(__name__)
 
 # Simple in-memory cache for installation equipment mappings
@@ -45,7 +47,7 @@ class InstallationFilterService:
             # Owner bypasses filtering - gets all installations
             if self.is_owner(user):
                 all_installations = await self.db.equipment_nodes.find(
-                    {"level": "installation"},
+                    scoped(user, {"level": "installation"}),
                     {"_id": 0, "id": 1}
                 ).to_list(500)
                 return [node["id"] for node in all_installations]
@@ -57,10 +59,10 @@ class InstallationFilterService:
             
             # Find installation nodes matching the assigned names
             installation_nodes = await self.db.equipment_nodes.find(
-                {
+                scoped(user, {
                     "level": "installation",
                     "name": {"$in": assigned_installations}
-                },
+                }),
                 {"_id": 0, "id": 1, "name": 1}
             ).to_list(100)
             
@@ -69,11 +71,12 @@ class InstallationFilterService:
             logger.error(f"Error getting user installation IDs: {e}")
             return []
     
-    async def get_all_installation_names(self) -> List[str]:
+    async def get_all_installation_names(self, user: Optional[dict] = None) -> List[str]:
         """Get all installation names (for owner role display)."""
         try:
+            q = scoped(user, {"level": "installation"}) if user else scoped_job({"level": "installation"})
             installations = await self.db.equipment_nodes.find(
-                {"level": "installation"},
+                q,
                 {"_id": 0, "name": 1}
             ).to_list(500)
             return [inst["name"] for inst in installations]
@@ -84,7 +87,8 @@ class InstallationFilterService:
     async def get_all_equipment_ids_for_installations(
         self, 
         installation_ids: List[str],
-        user_id: str = None  # user_id is no longer used for filtering
+        user_id: str = None,
+        user: Optional[dict] = None,
     ) -> Set[str]:
         """
         Get ALL equipment node IDs (at all levels) that belong to the given installations.
@@ -102,10 +106,9 @@ class InstallationFilterService:
             return cache_entry["value"]
         
         try:
-            # Use aggregation pipeline for single query instead of recursive calls
+            tenant_match = scoped(user, {"id": {"$in": installation_ids}}) if user else scoped_job({"id": {"$in": installation_ids}})
             pipeline = [
-                # Start with the installation nodes
-                {"$match": {"id": {"$in": installation_ids}}},
+                {"$match": tenant_match},
                 # Use $graphLookup to get all descendants in one query
                 {"$graphLookup": {
                     "from": "equipment_nodes",
@@ -147,9 +150,13 @@ class InstallationFilterService:
         except Exception as e:
             logger.error(f"Error getting equipment IDs for installations: {e}")
             # Fallback to recursive approach if aggregation fails
-            return await self._get_equipment_ids_recursive(installation_ids)
+            return await self._get_equipment_ids_recursive(installation_ids, user=user)
 
-    async def _get_equipment_ids_recursive(self, installation_ids: List[str]) -> Set[str]:
+    async def _get_equipment_ids_recursive(
+        self,
+        installation_ids: List[str],
+        user: Optional[dict] = None,
+    ) -> Set[str]:
         """Fallback recursive method for getting equipment IDs."""
         all_ids = set(installation_ids)
         parents_to_process = list(installation_ids)
@@ -163,8 +170,9 @@ class InstallationFilterService:
                 continue
             processed.update(batch)
             
+            q = scoped(user, {"parent_id": {"$in": batch}}) if user else scoped_job({"parent_id": {"$in": batch}})
             children = await self.db.equipment_nodes.find(
-                {"parent_id": {"$in": batch}},
+                q,
                 {"_id": 0, "id": 1}
             ).to_list(5000)
             
@@ -180,7 +188,8 @@ class InstallationFilterService:
     async def get_equipment_names_for_installations(
         self,
         installation_ids: List[str],
-        user_id: str = None  # user_id no longer used
+        user_id: str = None,
+        user: Optional[dict] = None,
     ) -> Set[str]:
         """
         Get all equipment names that belong to the given installations.
@@ -191,14 +200,15 @@ class InstallationFilterService:
             return set()
         
         all_equipment_ids = await self.get_all_equipment_ids_for_installations(
-            installation_ids, user_id
+            installation_ids, user_id, user=user
         )
         
         if not all_equipment_ids:
             return set()
         
+        q = scoped(user, {"id": {"$in": list(all_equipment_ids)}}) if user else scoped_job({"id": {"$in": list(all_equipment_ids)}})
         equipment_nodes = await self.db.equipment_nodes.find(
-            {"id": {"$in": list(all_equipment_ids)}},
+            q,
             {"_id": 0, "name": 1}
         ).to_list(5000)
         
@@ -302,7 +312,8 @@ class InstallationFilterService:
         self,
         user_id: str,
         equipment_ids: Set[str],
-        equipment_names: Set[str]
+        equipment_names: Set[str],
+        user: Optional[dict] = None,
     ) -> List[str]:
         """Get all threat IDs that belong to the user's assigned installations."""
         query_filter = self.build_threat_filter(
@@ -312,8 +323,9 @@ class InstallationFilterService:
         if query_filter.get("_impossible"):
             return []
         
+        q = scoped(user, query_filter) if user else scoped_job(query_filter)
         threats = await self.db.threats.find(
-            query_filter,
+            q,
             {"_id": 0, "id": 1}
         ).to_list(5000)
         
@@ -323,13 +335,13 @@ class InstallationFilterService:
         self,
         user_id: str,
         equipment_ids: Set[str],
-        equipment_names: Set[str]
+        equipment_names: Set[str],
+        user: Optional[dict] = None,
     ) -> List[str]:
         """Get all investigation IDs that belong to the user's assigned installations."""
-        # For now, return all investigations since they don't have direct equipment linking
-        # The filtering happens through threats that are linked to investigations
+        q = scoped(user, {}) if user else scoped_job({})
         investigations = await self.db.investigations.find(
-            {},
+            q,
             {"_id": 0, "id": 1}
         ).to_list(5000)
         
@@ -353,7 +365,7 @@ class InstallationFilterService:
         if not installation_ids:
             return False
         allowed_ids = await self.get_all_equipment_ids_for_installations(
-            installation_ids, user.get("id")
+            installation_ids, user.get("id"), user=user
         )
         return equipment_id in allowed_ids
 
@@ -365,12 +377,17 @@ class InstallationFilterService:
                 detail="Equipment not in your assigned installations",
             )
 
-    async def resolve_equipment_installation_id(self, equipment_id: str) -> Optional[str]:
+    async def resolve_equipment_installation_id(
+        self,
+        equipment_id: str,
+        user: Optional[dict] = None,
+    ) -> Optional[str]:
         """Return installation node id for an equipment node (walk parents if needed)."""
         if not equipment_id:
             return None
+        q = scoped(user, {"id": equipment_id}) if user else scoped_job({"id": equipment_id})
         node = await self.db.equipment_nodes.find_one(
-            {"id": equipment_id},
+            q,
             {"_id": 0, "id": 1, "level": 1, "parent_id": 1, "installation_id": 1},
         )
         if not node:
@@ -384,8 +401,9 @@ class InstallationFilterService:
             parent_id = current.get("parent_id")
             if not parent_id:
                 break
+            parent_q = scoped(user, {"id": parent_id}) if user else scoped_job({"id": parent_id})
             parent = await self.db.equipment_nodes.find_one(
-                {"id": parent_id},
+                parent_q,
                 {"_id": 0, "id": 1, "level": 1, "parent_id": 1},
             )
             if not parent:

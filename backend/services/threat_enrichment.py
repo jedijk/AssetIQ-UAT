@@ -7,6 +7,8 @@ from typing import Optional
 from database import db
 from models.translation import EntityType
 from services.cache_service import cache
+from services.tenant_schema import BACKFILL_TENANT_ID, prepend_tenant_match
+from services.tenant_scope import scoped, scoped_job
 from utils.mongo_regex import exact_case_insensitive_any
 from utils.workspace_localization import load_entity_fields_batch
 
@@ -19,7 +21,19 @@ THREAT_LIST_PROJECTION = {
 }
 
 
-async def enrich_with_creator_info(items: list) -> list:
+def _tenant_context(user: Optional[dict]) -> Optional[dict]:
+    if user:
+        return user
+    if BACKFILL_TENANT_ID:
+        return {"company_id": BACKFILL_TENANT_ID}
+    return None
+
+
+def _scope_query(user: Optional[dict], query: Optional[dict] = None):
+    return scoped(user, query) if user else scoped_job(query)
+
+
+async def enrich_with_creator_info(items: list, user: Optional[dict] = None) -> list:
     """Add creator name and initials to items based on created_by field."""
     if not items:
         return items
@@ -33,7 +47,7 @@ async def enrich_with_creator_info(items: list) -> list:
 
     if uncached_ids:
         creators = await db.users.find(
-            {"id": {"$in": uncached_ids}},
+            _scope_query(user, {"id": {"$in": uncached_ids}}),
             {
                 "_id": 0,
                 "id": 1,
@@ -79,7 +93,7 @@ async def enrich_with_creator_info(items: list) -> list:
     return items
 
 
-async def enrich_with_equipment_tags(items: list) -> list:
+async def enrich_with_equipment_tags(items: list, user: Optional[dict] = None) -> list:
     """Add equipment tag to items based on linked_equipment_id or asset name."""
     if not items:
         return items
@@ -101,7 +115,7 @@ async def enrich_with_equipment_tags(items: list) -> list:
             query_conditions.append({"name": name_match})
 
     equipment_nodes = await db.equipment_nodes.find(
-        {"$or": query_conditions} if query_conditions else {},
+        _scope_query(user, {"$or": query_conditions} if query_conditions else {}),
         {"_id": 0, "id": 1, "name": 1, "tag": 1},
     ).to_list(500)
 
@@ -122,7 +136,7 @@ async def enrich_with_equipment_tags(items: list) -> list:
     return items
 
 
-async def enrich_with_action_plan_counts(items: list) -> list:
+async def enrich_with_action_plan_counts(items: list, user: Optional[dict] = None) -> list:
     """
     Add action_plan_count per observation/threat: central_actions linked to the
     observation plus one when a causal investigation exists (matches workspace action plan).
@@ -175,6 +189,10 @@ async def enrich_with_action_plan_counts(items: list) -> list:
         {"$group": {"_id": "$linked_observation_id", "count": {"$sum": 1}}},
     ]
 
+    tenant_ctx = _tenant_context(user)
+    if tenant_ctx:
+        pipeline = prepend_tenant_match(pipeline, tenant_ctx)
+
     async for row in db.central_actions.aggregate(pipeline):
         linked_id = row.get("_id")
         if linked_id in action_counts:
@@ -182,7 +200,7 @@ async def enrich_with_action_plan_counts(items: list) -> list:
 
     investigation_threat_ids = set()
     async for inv in db.investigations.find(
-        {"threat_id": {"$in": threat_ids}},
+        _scope_query(user, {"threat_id": {"$in": threat_ids}}),
         {"_id": 0, "threat_id": 1},
     ):
         threat_id = inv.get("threat_id")
@@ -238,6 +256,7 @@ async def enrich_threat_list(
     language: Optional[str] = None,
     *,
     user_id: Optional[str] = None,
+    user: Optional[dict] = None,
 ) -> list:
     """Run all list enrichments with parallel DB work and fast-path localization."""
     if not items:
@@ -246,9 +265,9 @@ async def enrich_threat_list(
     from utils.observation_localization import enrich_observations_for_ui
 
     await asyncio.gather(
-        enrich_with_creator_info(items),
-        enrich_with_equipment_tags(items),
-        enrich_with_action_plan_counts(items),
+        enrich_with_creator_info(items, user=user),
+        enrich_with_equipment_tags(items, user=user),
+        enrich_with_action_plan_counts(items, user=user),
         enrich_with_display_labels(items, language),
     )
     return await enrich_observations_for_ui(

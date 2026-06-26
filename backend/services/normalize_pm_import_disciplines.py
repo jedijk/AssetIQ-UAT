@@ -45,6 +45,7 @@ async def normalize_pm_import_disciplines_backfill(
     dry_run: bool = True,
 ) -> Dict[str, Any]:
     from services.pm_import_constants import normalize_pm_import_discipline
+    from services.tenant_scope import scoped_job
 
     stats: Dict[str, Any] = {
         "dry_run": dry_run,
@@ -66,7 +67,7 @@ async def normalize_pm_import_disciplines_backfill(
             {"kind": kind, "id": doc_id, "field": field, "from": old, "to": new}
         )
 
-    async for session in db.pm_import_sessions.find({}, {"session_id": 1, "tasks_extracted": 1}):
+    async for session in db.pm_import_sessions.find(scoped_job(), {"session_id": 1, "tasks_extracted": 1}):
         stats["sessions_scanned"] += 1
         tasks = session.get("tasks_extracted") or []
         session_changed = False
@@ -83,12 +84,12 @@ async def normalize_pm_import_disciplines_backfill(
             stats["sessions_updated"] += 1
             if not dry_run:
                 await db.pm_import_sessions.update_one(
-                    {"session_id": session["session_id"]},
+                    scoped_job({"session_id": session["session_id"]}),
                     {"$set": {"tasks_extracted": tasks}},
                 )
 
     async for program in db.maintenance_programs_v2.find(
-        {},
+        scoped_job(),
         {"equipment_id": 1, "tasks": 1},
     ):
         stats["programs_scanned"] += 1
@@ -115,12 +116,12 @@ async def normalize_pm_import_disciplines_backfill(
             stats["programs_updated"] += 1
             if not dry_run:
                 await db.maintenance_programs_v2.update_one(
-                    {"equipment_id": program["equipment_id"]},
+                    scoped_job({"equipment_id": program["equipment_id"]}),
                     {"$set": {"tasks": tasks}},
                 )
 
     async for fm in db.failure_modes.find(
-        {},
+        scoped_job(),
         {"id": 1, "source": 1, "category": 1, "recommended_actions": 1},
     ):
         stats["failure_modes_scanned"] += 1
@@ -156,6 +157,6 @@ async def normalize_pm_import_disciplines_backfill(
         if updates:
             stats["failure_modes_updated"] += 1
             if not dry_run:
-                await db.failure_modes.update_one({"id": fm["id"]}, {"$set": updates})
+                await db.failure_modes.update_one(scoped_job({"id": fm["id"]}), {"$set": updates})
 
     return stats

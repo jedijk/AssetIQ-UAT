@@ -79,7 +79,7 @@ async def load_discipline_taxonomy() -> List[Dict[str, Any]]:
     """Active disciplines from Settings, falling back to built-in defaults."""
     from services.disciplines_service import list_disciplines
 
-    data = await list_disciplines(include_inactive=False)
+    data = await list_disciplines(include_inactive=False, user=None)
     items = data.get("disciplines") or []
     if items:
         return items

@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import HTTPException
 import logging
 from database import db, efm_service
+from services.tenant_scope import scoped
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +26,7 @@ async def get_equipment_efms(
     """Get all Equipment Failure Modes (EFMs) for a specific equipment."""
     # Verify equipment exists and belongs to user
     equipment = await db.equipment_nodes.find_one(
-        {"id": equipment_id, "created_by": current_user["id"]}
+        scoped(current_user, {"id": equipment_id, "created_by": current_user["id"]})
     )
     if not equipment:
         raise HTTPException(status_code=404, detail="Equipment not found")
@@ -48,7 +49,7 @@ async def get_equipment_efm_summary(
 ):
     """Get summary statistics for an equipment's EFMs."""
     equipment = await db.equipment_nodes.find_one(
-        {"id": equipment_id, "created_by": current_user["id"]}
+        scoped(current_user, {"id": equipment_id, "created_by": current_user["id"]})
     )
     if not equipment:
         raise HTTPException(status_code=404, detail="Equipment not found")
@@ -63,7 +64,7 @@ async def get_equipment_risk(
 ):
     """Calculate aggregated risk metrics for an equipment based on its EFMs."""
     equipment = await db.equipment_nodes.find_one(
-        {"id": equipment_id, "created_by": current_user["id"]}
+        scoped(current_user, {"id": equipment_id, "created_by": current_user["id"]})
     )
     if not equipment:
         raise HTTPException(status_code=404, detail="Equipment not found")
@@ -78,7 +79,7 @@ async def generate_efms_for_equipment(
 ):
     """Manually trigger EFM generation for an equipment (if not already generated)."""
     equipment = await db.equipment_nodes.find_one(
-        {"id": equipment_id, "created_by": current_user["id"]}
+        scoped(current_user, {"id": equipment_id, "created_by": current_user["id"]})
     )
     if not equipment:
         raise HTTPException(status_code=404, detail="Equipment not found")
@@ -108,7 +109,7 @@ async def get_high_risk_efms(
     """Get EFMs with high RPN values across all equipment or for specific equipment."""
     if equipment_id:
         equipment = await db.equipment_nodes.find_one(
-            {"id": equipment_id, "created_by": current_user["id"]}
+            scoped(current_user, {"id": equipment_id, "created_by": current_user["id"]})
         )
         if not equipment:
             raise HTTPException(status_code=404, detail="Equipment not found")
@@ -134,7 +135,7 @@ async def get_efm_by_id(
     
     # Verify equipment belongs to user
     equipment = await db.equipment_nodes.find_one(
-        {"id": efm["equipment_id"], "created_by": current_user["id"]}
+        scoped(current_user, {"id": efm["equipment_id"], "created_by": current_user["id"]})
     )
     if not equipment:
         raise HTTPException(status_code=404, detail="EFM not found")
@@ -152,7 +153,7 @@ async def update_efm(
         raise HTTPException(status_code=404, detail="EFM not found")
     
     equipment = await db.equipment_nodes.find_one(
-        {"id": efm["equipment_id"], "created_by": current_user["id"]}
+        scoped(current_user, {"id": efm["equipment_id"], "created_by": current_user["id"]})
     )
     if not equipment:
         raise HTTPException(status_code=404, detail="EFM not found")
@@ -188,7 +189,7 @@ async def reset_efm_to_template(
         raise HTTPException(status_code=404, detail="EFM not found")
     
     equipment = await db.equipment_nodes.find_one(
-        {"id": efm["equipment_id"], "created_by": current_user["id"]}
+        scoped(current_user, {"id": efm["equipment_id"], "created_by": current_user["id"]})
     )
     if not equipment:
         raise HTTPException(status_code=404, detail="EFM not found")

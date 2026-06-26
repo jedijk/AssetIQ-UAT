@@ -13,7 +13,8 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 from services.reliability_graph import COLLECTION as EDGES_COLLECTION, EDGE_STATUS_RETIRED
-from services.tenant_schema import merge_tenant_filter, tenant_id_from_user
+from services.tenant_schema import tenant_id_from_user, prepend_tenant_match
+from services.tenant_scope import scoped, scoped_job
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +82,13 @@ async def _active_edges_at(
     return await db[EDGES_COLLECTION].find(query, {"_id": 0}).sort("updated_at", -1).to_list(500)
 
 
-async def _telemetry_summary(equipment_id: str) -> Optional[Dict[str, Any]]:
+async def _telemetry_summary(equipment_id: str, *, tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Best-effort recent reading aggregates from ril_readings."""
     since = datetime.now(timezone.utc) - timedelta(days=7)
+    base: Dict[str, Any] = {"equipment_id": equipment_id, "timestamp": {"$gte": since}}
+    query = scoped_job(base, tenant_id=tenant_id) if tenant_id else base
     cursor = db.ril_readings.find(
-        {"equipment_id": equipment_id, "timestamp": {"$gte": since}},
+        query,
         {"_id": 0, "metric_name": 1, "value": 1, "unit": 1},
     ).sort("timestamp", -1).limit(50)
     rows = await cursor.to_list(50)
@@ -119,12 +122,11 @@ async def compute_equipment_reliability_snapshot(
     )
     tid = tenant_id or (eq or {}).get("tenant_id") or (eq or {}).get("company_id")
 
-    threat_scope: Dict[str, Any] = {
+    threat_base: Dict[str, Any] = {
         "linked_equipment_id": equipment_id,
         "status": {"$in": ["Open", "open", "In Progress", "in_progress"]},
     }
-    if tid:
-        threat_scope = merge_tenant_filter(threat_scope, {"company_id": tid})
+    threat_scope = scoped_job(threat_base, tenant_id=tid) if tid else threat_base
     open_threat_count = await db.threats.count_documents(threat_scope)
 
     high_risk_scope = {
@@ -133,16 +135,22 @@ async def compute_equipment_reliability_snapshot(
     }
     high_risk_threats = await db.threats.count_documents(high_risk_scope)
 
-    overdue_scheduled = await db.scheduled_tasks.count_documents({
+    overdue_base = {
         "equipment_id": equipment_id,
         "status": {"$nin": ["completed", "cancelled"]},
         "due_date": {"$lt": today_iso},
-    })
-    overdue_instances = await db.task_instances.count_documents({
+    }
+    overdue_scheduled = await db.scheduled_tasks.count_documents(
+        scoped_job(overdue_base, tenant_id=tid) if tid else overdue_base
+    )
+    overdue_inst_base = {
         "equipment_id": equipment_id,
         "status": {"$in": ["pending", "overdue", "scheduled"]},
         "due_date": {"$lt": now},
-    })
+    }
+    overdue_instances = await db.task_instances.count_documents(
+        scoped_job(overdue_inst_base, tenant_id=tid) if tid else overdue_inst_base
+    )
     overdue_pm_count = overdue_scheduled + overdue_instances
 
     active_failure_modes = await _active_failure_mode_ids(equipment_id, tenant_id=tid)
@@ -153,7 +161,7 @@ async def compute_equipment_reliability_snapshot(
     score = base_score - (high_risk_threats * 5) - min(overdue_pm_count * 2, 20)
     health_score = round(max(0.0, min(100.0, score)), 1)
 
-    telemetry = await _telemetry_summary(equipment_id)
+    telemetry = await _telemetry_summary(equipment_id, tenant_id=tid)
 
     doc: Dict[str, Any] = {
         "equipment_id": equipment_id,
@@ -178,11 +186,15 @@ async def refresh_reliability_snapshots(
     equipment_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Upsert reliability snapshots for all (or selected) equipment."""
+    from services.tenant_schema import BACKFILL_TENANT_ID
+
     snap_at = snapshot_at or datetime.now(timezone.utc)
     snap_iso = _to_iso(snap_at)
     query: Dict[str, Any] = {"level": {"$in": EQUIPMENT_LEVELS}}
     if equipment_ids:
         query["id"] = {"$in": list(equipment_ids)}
+    if BACKFILL_TENANT_ID:
+        query = scoped_job(query)
 
     upserted = 0
     async for eq in db.equipment_nodes.find(
@@ -226,7 +238,9 @@ async def get_snapshot_for_equipment(
     """Return snapshot at timestamp or latest for equipment."""
     tid = tenant_id_from_user(user)
     base: Dict[str, Any] = {"equipment_id": equipment_id}
-    if tid:
+    if user:
+        base = scoped(user, base)
+    elif tid:
         base["tenant_id"] = tid
 
     if at is None:

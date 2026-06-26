@@ -20,7 +20,7 @@ async def list_disciplines(
     include_inactive: bool = False,
     current_user: dict = Depends(get_current_user),
 ):
-    return await svc.list_disciplines(include_inactive=include_inactive)
+    return await svc.list_disciplines(include_inactive=include_inactive, user=current_user)
 
 
 @router.get("/normalize")
@@ -28,7 +28,7 @@ async def normalize_discipline(
     value: str,
     current_user: dict = Depends(get_current_user),
 ):
-    return await svc.normalize_discipline(value)
+    return await svc.normalize_discipline(value, user=current_user)
 
 
 @router.post("")

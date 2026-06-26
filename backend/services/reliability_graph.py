@@ -1070,6 +1070,26 @@ async def get_edges_for_node(
     return await db[COLLECTION].find(query, {"_id": 0}).sort("updated_at", -1).to_list(limit)
 
 
+async def annotate_equipment_failure_mode_risk(
+    *,
+    equipment_id: str,
+    failure_mode_id: str,
+    tenant_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Annotate equipment→failure_mode edge with twin/risk metadata (idempotent upsert)."""
+    await upsert_edge(
+        source_type="equipment",
+        source_id=equipment_id,
+        relation="has_failure_mode",
+        target_type="failure_mode",
+        target_id=str(failure_mode_id),
+        equipment_id=equipment_id,
+        tenant_id=tenant_id,
+        metadata=metadata or {},
+    )
+
+
 async def sync_prediction_edges(
     *,
     equipment_id: str,

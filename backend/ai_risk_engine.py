@@ -680,16 +680,12 @@ EQUIPMENT INFORMATION:
             return
 
         try:
-            from services.reliability_graph import upsert_edge
+            from services.reliability_graph import annotate_equipment_failure_mode_risk
 
             tenant_id = threat.get("tenant_id") or threat.get("company_id")
-            await upsert_edge(
-                source_type="equipment",
-                source_id=equipment_id,
-                relation="has_failure_mode",
-                target_type="failure_mode",
-                target_id=str(failure_mode_id),
+            await annotate_equipment_failure_mode_risk(
                 equipment_id=equipment_id,
+                failure_mode_id=str(failure_mode_id),
                 tenant_id=tenant_id,
                 metadata={
                     "twin_rul_days": rul_days,

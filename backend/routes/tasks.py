@@ -95,7 +95,8 @@ async def get_task_templates(
         search=search,
         active_only=active_only,
         skip=skip,
-        limit=limit
+        limit=limit,
+        user=current_user,
     )
     
     if cache_key:
@@ -109,7 +110,7 @@ async def get_task_template(
     current_user: dict = Depends(_tasks_read)
 ):
     """Get a specific task template."""
-    template = await task_service.get_template_by_id(template_id)
+    template = await task_service.get_template_by_id(template_id, user=current_user)
     if not template:
         raise HTTPException(status_code=404, detail="Task template not found")
     return template
@@ -121,7 +122,7 @@ async def create_task_template(
 ):
     """Create a new task template."""
     from services.query_cache import query_cache
-    result = await task_service.create_template(data.model_dump(), current_user["id"])
+    result = await task_service.create_template(data.model_dump(), current_user["id"], user=current_user)
     query_cache.invalidate_all()
     return result
 
@@ -133,7 +134,7 @@ async def update_task_template(
 ):
     """Update a task template."""
     from services.query_cache import query_cache
-    result = await task_service.update_template(template_id, data.model_dump(exclude_unset=True))
+    result = await task_service.update_template(template_id, data.model_dump(exclude_unset=True), user=current_user)
     if not result:
         raise HTTPException(status_code=404, detail="Task template not found")
     query_cache.invalidate_all()
@@ -147,7 +148,7 @@ async def delete_task_template(
     """Delete (deactivate) a task template."""
     from services.query_cache import query_cache
     try:
-        deleted = await task_service.delete_template(template_id)
+        deleted = await task_service.delete_template(template_id, user=current_user)
         if not deleted:
             raise HTTPException(status_code=404, detail="Task template not found")
         query_cache.invalidate_all()
@@ -172,7 +173,8 @@ async def get_task_plans(
         template_id=template_id,
         active_only=active_only,
         skip=skip,
-        limit=limit
+        limit=limit,
+        user=current_user,
     )
 
 @router.get("/task-plans/due")
@@ -182,7 +184,7 @@ async def get_due_task_plans(
 ):
     """Get task plans due within specified days."""
     due_before = datetime.now(timezone.utc) + timedelta(days=days)
-    return await task_service.get_plans(due_before=due_before, active_only=True)
+    return await task_service.get_plans(due_before=due_before, active_only=True, user=current_user)
 
 @router.get("/task-plans/{plan_id}")
 async def get_task_plan(
@@ -190,7 +192,7 @@ async def get_task_plan(
     current_user: dict = Depends(_tasks_read)
 ):
     """Get a specific task plan."""
-    plan = await task_service.get_plan_by_id(plan_id)
+    plan = await task_service.get_plan_by_id(plan_id, user=current_user)
     if not plan:
         raise HTTPException(status_code=404, detail="Task plan not found")
     return plan
@@ -202,7 +204,7 @@ async def create_task_plan(
 ):
     """Create a task plan for specific equipment."""
     try:
-        return await task_service.create_plan(data.model_dump(), current_user["id"])
+        return await task_service.create_plan(data.model_dump(), current_user["id"], user=current_user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -213,7 +215,7 @@ async def update_task_plan(
     current_user: dict = Depends(_tasks_write)
 ):
     """Update a task plan."""
-    result = await task_service.update_plan(plan_id, data.model_dump(exclude_unset=True))
+    result = await task_service.update_plan(plan_id, data.model_dump(exclude_unset=True), user=current_user)
     if not result:
         raise HTTPException(status_code=404, detail="Task plan not found")
     return result
@@ -224,7 +226,7 @@ async def delete_task_plan(
     current_user: dict = Depends(_tasks_delete)
 ):
     """Delete (deactivate) a task plan."""
-    deleted = await task_service.delete_plan(plan_id)
+    deleted = await task_service.delete_plan(plan_id, user=current_user)
     if not deleted:
         raise HTTPException(status_code=404, detail="Task plan not found")
     return {"message": "Task plan deactivated"}
@@ -267,7 +269,8 @@ async def get_task_instances(
                 from_date=from_dt,
                 to_date=to_dt,
                 skip=skip,
-                limit=min(limit, 100)  # Cap at 100 max
+                limit=min(limit, 100),
+                user=current_user,
             )
         
         try:
@@ -314,7 +317,7 @@ async def get_task_calendar(
     from_dt = datetime.fromisoformat(from_date)
     to_dt = datetime.fromisoformat(to_date)
     
-    return await task_service.get_calendar_view(from_dt, to_dt, equipment_id)
+    return await task_service.get_calendar_view(from_dt, to_dt, equipment_id, user=current_user)
 
 @router.get("/task-instances/{instance_id}")
 async def get_task_instance(
@@ -334,7 +337,7 @@ async def create_task_instance(
 ):
     """Manually create a task instance."""
     try:
-        return await task_service.create_instance(data.model_dump(), current_user["id"])
+        return await task_service.create_instance(data.model_dump(), current_user["id"], user=current_user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -345,7 +348,7 @@ async def create_adhoc_task(
 ):
     """Create an ad-hoc task instance directly from a template (no plan/schedule required)."""
     try:
-        return await task_service.create_adhoc_instance(data.model_dump(), current_user["id"])
+        return await task_service.create_adhoc_instance(data.model_dump(), current_user["id"], user=current_user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -356,7 +359,7 @@ async def update_task_instance(
     current_user: dict = Depends(_tasks_write)
 ):
     """Update a task instance."""
-    result = await task_service.update_instance(instance_id, data.model_dump(exclude_unset=True))
+    result = await task_service.update_instance(instance_id, data.model_dump(exclude_unset=True), user=current_user)
     if not result:
         raise HTTPException(status_code=404, detail="Task instance not found")
     return result
@@ -367,7 +370,7 @@ async def start_task_instance(
     current_user: dict = Depends(_tasks_write)
 ):
     """Mark a task as started."""
-    result = await task_service.start_task(instance_id, current_user["id"])
+    result = await task_service.start_task(instance_id, current_user["id"], user=current_user)
     if not result:
         raise HTTPException(status_code=404, detail="Task instance not found")
     return result
@@ -383,7 +386,8 @@ async def complete_task_instance(
         instance_id, 
         data.model_dump(),
         completed_by_id=current_user["id"],
-        completed_by_name=current_user.get("name", "Unknown")
+        completed_by_name=current_user.get("name", "Unknown"),
+        user=current_user,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Task instance not found")
@@ -395,7 +399,7 @@ async def delete_task_instance(
     current_user: dict = Depends(_tasks_delete)
 ):
     """Delete a task instance."""
-    result = await task_service.delete_instance(instance_id)
+    result = await task_service.delete_instance(instance_id, user=current_user)
     if not result:
         raise HTTPException(status_code=404, detail="Task instance not found")
     return {"message": "Task instance deleted successfully"}
@@ -410,7 +414,7 @@ async def generate_instances_for_plan(
 ):
     """Generate task instances for a specific plan."""
     instances = await task_service.generate_instances_for_plan(
-        plan_id, horizon_days, current_user["id"]
+        plan_id, horizon_days, current_user["id"], user=current_user
     )
     return {
         "plan_id": plan_id,
@@ -443,7 +447,7 @@ async def get_task_stats(
     current_user: dict = Depends(_tasks_read)
 ):
     """Get task statistics."""
-    return await task_service.get_task_stats(current_user["id"])
+    return await task_service.get_task_stats(current_user["id"], user=current_user)
 
 # ============= FORM DESIGNER ENDPOINTS =============
 

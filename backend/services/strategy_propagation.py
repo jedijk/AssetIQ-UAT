@@ -5,6 +5,7 @@ from typing import Dict, List
 from database import db
 from services.scheduler_config import should_sync_legacy_maintenance_programs
 from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active, program_is_strategy_backed
+from services.tenant_scope import scoped_job
 
 async def resync_programs_with_strategy(equipment_type_id: str):
     """
@@ -17,7 +18,7 @@ async def resync_programs_with_strategy(equipment_type_id: str):
     from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active
 
     strategy = await db.equipment_type_strategies.find_one(
-        {"equipment_type_id": equipment_type_id}
+        scoped_job({"equipment_type_id": equipment_type_id})
     )
     if not strategy:
         return {"programs_activated": 0, "programs_deactivated": 0, "scheduled_tasks_cancelled": 0}
@@ -39,7 +40,7 @@ async def resync_programs_with_strategy(equipment_type_id: str):
     program_ids_to_cancel_tasks: List[str] = []
 
     v2_programs = await db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id}
+        scoped_job({"equipment_type_id": equipment_type_id})
     ).to_list(5000)
 
     for prog in v2_programs:
@@ -59,7 +60,7 @@ async def resync_programs_with_strategy(equipment_type_id: str):
                 continue
 
             await db.maintenance_programs_v2.update_one(
-                {"_id": prog["_id"]},
+                scoped_job({"_id": prog["_id"]}),
                 {
                     "$set": {
                         "tasks.$[t].is_active": new_active,
@@ -76,7 +77,7 @@ async def resync_programs_with_strategy(equipment_type_id: str):
 
     if should_sync_legacy_maintenance_programs():
         programs = await db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id}
+            scoped_job({"equipment_type_id": equipment_type_id})
         ).to_list(5000)
 
         programs_to_activate = []
@@ -99,14 +100,14 @@ async def resync_programs_with_strategy(equipment_type_id: str):
 
         if programs_to_activate:
             result = await db.maintenance_programs.update_many(
-                {"_id": {"$in": programs_to_activate}},
+                scoped_job({"_id": {"$in": programs_to_activate}}),
                 {"$set": {"is_active": True, "updated_at": now}},
             )
             activated += result.modified_count
 
         if programs_to_deactivate:
             result = await db.maintenance_programs.update_many(
-                {"_id": {"$in": programs_to_deactivate}},
+                scoped_job({"_id": {"$in": programs_to_deactivate}}),
                 {"$set": {"is_active": False, "updated_at": now}},
             )
             deactivated += result.modified_count
@@ -115,10 +116,10 @@ async def resync_programs_with_strategy(equipment_type_id: str):
     unique_cancel_ids = list(dict.fromkeys(program_ids_to_cancel_tasks))
     if unique_cancel_ids:
         result = await db.scheduled_tasks.update_many(
-            {
+            scoped_job({
                 "maintenance_program_id": {"$in": unique_cancel_ids},
                 "status": {"$nin": ["completed", "cancelled"]},
-            },
+            }),
             {"$set": {
                 "status": "cancelled",
                 "notes": "Auto-cancelled: source task or failure mode disabled",

@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 from database import db
 from services.production_exposure import PRODUCTION_DOWNTIME_RANGES, production_exposure_monetary_value
 from services.threat_score_service import fmea_score_from_failure_mode
+from services.tenant_scope import scoped_job
 
 _prod_loss_config_cache: Dict[str, tuple] = {}
 _PROD_LOSS_CACHE_TTL_SEC = 300
@@ -30,7 +31,7 @@ async def resolve_installation_id(equipment_node: Optional[dict]) -> Optional[st
         if not parent_id:
             break
         node = await db.equipment_nodes.find_one(
-            {"id": parent_id},
+            scoped_job({"id": parent_id}),
             {"_id": 0, "id": 1, "level": 1, "parent_id": 1, "installation_id": 1},
         )
         if not node:
@@ -48,7 +49,9 @@ async def get_production_loss_config(user_id: str) -> dict:
     cached = _prod_loss_config_cache.get(user_id)
     if cached and cached[1] > now:
         return cached[0]
-    doc = await db.production_loss_config.find_one({"created_by": user_id}, {"_id": 0}) or {}
+    doc = await db.production_loss_config.find_one(
+        scoped_job({"created_by": user_id}), {"_id": 0}
+    ) or {}
     _prod_loss_config_cache[user_id] = (doc, now + _PROD_LOSS_CACHE_TTL_SEC)
     return doc
 
@@ -209,12 +212,12 @@ async def get_criticality_definitions_for_equipment(equipment_node: dict, user_i
         return DEFAULT_CRITICALITY
 
     custom = await db.definitions.find_one(
-        {"equipment_id": installation_id, "created_by": user_id},
+        scoped_job({"equipment_id": installation_id, "created_by": user_id}),
         {"_id": 0, "criticality": 1},
     )
     if not custom:
         custom = await db.definitions.find_one(
-            {"equipment_id": installation_id},
+            scoped_job({"equipment_id": installation_id}),
             {"_id": 0, "criticality": 1},
         )
 

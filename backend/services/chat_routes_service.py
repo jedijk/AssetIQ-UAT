@@ -21,6 +21,7 @@ from ai_helpers import (
     generate_observation_description,
 )
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
+from services.tenant_scope import scoped
 from chat_handler_v2 import process_chat_message, ChatState, _chat_ui
 from services.equipment_search_service import search_equipment_hierarchy
 from failure_modes import FAILURE_MODES_LIBRARY
@@ -111,13 +112,24 @@ async def get_failure_modes_from_db():
 # ---------------------------------------------------------------------------
 async def _read_conv(user_id: str) -> dict:
     """Read conversation state. Returns empty-ish dict if none exists."""
-    doc = await db.chat_conversations.find_one({"user_id": user_id}, {"_id": 0})
+    tenant_user = await _tenant_ctx_for_user(user_id)
+    conv_q = scoped(tenant_user, {"user_id": user_id}) if tenant_user else {"user_id": user_id}
+    doc = await db.chat_conversations.find_one(conv_q, {"_id": 0})
     if doc:
         return doc
 
     # Migration fallback: check chat_messages for state from old system
+    msg_q = scoped(tenant_user, {
+        "user_id": user_id,
+        "role": "assistant",
+        "chat_state": {"$exists": True, "$ne": None},
+    }) if tenant_user else {
+        "user_id": user_id,
+        "role": "assistant",
+        "chat_state": {"$exists": True, "$ne": None},
+    }
     msgs = await db.chat_messages.find(
-        {"user_id": user_id, "role": "assistant", "chat_state": {"$exists": True, "$ne": None}},
+        msg_q,
         {"_id": 0, "chat_state": 1, "equipment_suggestions": 1,
          "failure_mode_suggestions": 1, "pending_data": 1,
          "original_message": 1, "awaiting_context_for_threat": 1}
@@ -407,7 +419,10 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     # Run rank update in background (non-blocking)
     asyncio.create_task(update_all_ranks(user_id, user=tenant_user))
 
-    updated = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+    updated = await db.threats.find_one(
+        scoped(tenant_user, {"id": threat_id}) if tenant_user else {"id": threat_id},
+        {"_id": 0},
+    )
     if isinstance(updated.get("risk_score"), float):
         updated["risk_score"] = int(updated["risk_score"])
 
@@ -712,6 +727,8 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             # Neither store the user message nor reply — keep the UI clean.
             return ChatResponse(message="", detected_language=detected_lang, is_mixed_language=None)
 
+    tenant_user = await _tenant_ctx_for_user(user_id)
+
     # 1. Store user message
     user_msg = {
         "id": str(uuid.uuid4()),
@@ -929,7 +946,10 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 await db.threats.update_one({"id": threat_id}, {"$set": ctx, "$push": {"attachments": att}})
 
                 # AI image analysis — analyze photo and update threat with findings
-                threat_doc = await db.threats.find_one({"id": threat_id}, {"_id": 0, "title": 1, "asset": 1, "failure_mode": 1})
+                threat_doc = await db.threats.find_one(
+                    scoped(tenant_user, {"id": threat_id}) if tenant_user else {"id": threat_id},
+                    {"_id": 0, "title": 1, "asset": 1, "failure_mode": 1},
+                )
                 threat_context = f"{threat_doc.get('title', '')} — {threat_doc.get('asset', '')} — {threat_doc.get('failure_mode', '')}" if threat_doc else content
                 analysis = await analyze_attachment_image(image_thumbnail, threat_context)
                 if analysis:
@@ -955,7 +975,10 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                     if ai_analysis_parts:
                         ai_analysis_text = "\n".join(ai_analysis_parts)
                         # Get current description and append AI analysis
-                        current_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0, "description": 1})
+                        current_threat = await db.threats.find_one(
+                            scoped(tenant_user, {"id": threat_id}) if tenant_user else {"id": threat_id},
+                            {"_id": 0, "description": 1},
+                        )
                         current_desc = (current_threat or {}).get("description", "") or ""
                         if current_desc:
                             new_desc = f"{current_desc}\n\n{ai_analysis_text}"
@@ -969,7 +992,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                     ai_actions = analysis.get("recommended_actions", [])
                     created_action_ids = []
                     threat_full = await db.threats.find_one(
-                        {"id": threat_id},
+                        scoped(tenant_user, {"id": threat_id}) if tenant_user else {"id": threat_id},
                         {
                             "_id": 0,
                             "title": 1,
@@ -1246,7 +1269,10 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             logger.info(f"Chat: Auto-selected equipment with {selected_equipment.get('confidence')}% confidence: {selected_equipment.get('name')} ({selected_equipment.get('tag')})")
             
             # Get failure modes library and auto-select failure mode
-            fm_library = await db.failure_modes.find({}, {"_id": 0}).to_list(1000)
+            fm_library = await db.failure_modes.find(
+                scoped(tenant_user, {}) if tenant_user else {},
+                {"_id": 0},
+            ).to_list(1000)
             
             # Use chat_handler_v2 to process and auto-select failure mode
             result = await process_chat_message(
@@ -1318,7 +1344,7 @@ async def send_chat_message(
 
 async def get_chat_history(current_user: dict, limit: int = 50):
     messages = await db.chat_messages.find(
-        merge_tenant_filter({"user_id": current_user["id"]}, current_user),
+        scoped(current_user, {"user_id": current_user["id"]}),
         {"_id": 0},
     ).sort("created_at", -1).limit(limit).to_list(limit)
     return list(reversed(messages))

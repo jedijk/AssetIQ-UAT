@@ -68,6 +68,7 @@ DOMAINS: Dict[str, DomainDefinition] = {
         ),
         services=(
             "services/maintenance_program_service.py",
+            "services/maintenance_program_ai_recommendations.py",
             "services/maintenance_scheduling.py",
             "services/maintenance_scheduler_sync.py",
             "services/pm_import/",
@@ -116,6 +117,7 @@ DOMAINS: Dict[str, DomainDefinition] = {
         name="investigations",
         routes=("routes/investigations.py",),
         services=(
+            "services/investigation_service.py",
             "services/investigation_action_sync.py",
             "services/investigation_action_bridge.py",
         ),
@@ -236,6 +238,40 @@ DOMAINS: Dict[str, DomainDefinition] = {
             "threats", "observations", "work_execution", "production",
             "reliability_graph", "reliability_intelligence", "equipment",
         }),
+    ),
+    "spare_parts": DomainDefinition(
+        name="spare_parts",
+        routes=("routes/spare_parts.py",),
+        services=(
+            "services/spare_parts_service.py",
+            "services/spare_parts_graph_sync.py",
+            "services/spare_part_requirements_service.py",
+        ),
+        collections=("spare_parts", "spare_categories", "spare_part_files"),
+        public_api=("spare_parts_service", "spare_parts_graph_sync"),
+        may_import_domains=frozenset({"equipment", "maintenance_programs", "actions", "reliability_graph"}),
+    ),
+    "visual_boards": DomainDefinition(
+        name="visual_boards",
+        routes=("routes/visual_boards.py",),
+        services=(
+            "services/visual_board_service.py",
+            "services/visual_board_data_service.py",
+            "services/visual_board_snapshot_service.py",
+        ),
+        collections=(
+            "visual_boards",
+            "visual_board_versions",
+            "visual_board_tokens",
+            "visual_board_screens",
+            "visual_board_templates",
+            "visual_board_analytics",
+            "visual_display_devices",
+            "visual_display_pairings",
+            "visual_display_events",
+        ),
+        public_api=("visual_board_service",),
+        may_import_domains=frozenset({"equipment", "analytics"}),
     ),
     "platform": DomainDefinition(
         name="platform",

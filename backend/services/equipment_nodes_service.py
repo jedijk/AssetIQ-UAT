@@ -15,7 +15,8 @@ from iso14224_models import (
 from services.query_cache import query_cache
 from services.cache_service import invalidate_equipment_related
 from services.background_jobs import schedule_tracked_job
-from services.tenant_schema import merge_tenant_filter, with_tenant_id
+from services.tenant_schema import with_tenant_id
+from services.tenant_scope import scoped
 from utils.auto_translate import translate_equipment_node
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ async def get_equipment_nodes(user: dict,
     
     # Get all equipment IDs under assigned installations (shared equipment - no created_by filter)
     equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, user["id"]
+        installation_ids, user["id"], user=user
     )
     
     if not equipment_ids:
@@ -71,7 +72,7 @@ async def get_equipment_nodes(user: dict,
     
     # Get all nodes that belong to assigned installations (no created_by filter)
     nodes_cursor = await db.equipment_nodes.find(
-        merge_tenant_filter({"id": {"$in": list(equipment_ids)}}, user),
+        scoped(user, {"id": {"$in": list(equipment_ids)}}),
         {"_id": 0}
     ).to_list(5000)
     
@@ -96,7 +97,7 @@ async def get_all_installations(user: dict,
     """Get all installation-level nodes across all users (for admin assignment)."""
     # Get nodes that are ONLY installations (top-level per ISO 14224)
     nodes = await db.equipment_nodes.find(
-        merge_tenant_filter({"level": "installation"}, user),
+        scoped(user, {"level": "installation"}),
         {"_id": 0, "id": 1, "name": 1, "level": 1, "created_by": 1}
     ).sort("name", 1).to_list(500)
     
@@ -140,21 +141,18 @@ async def export_equipment_hierarchy_excel(user: dict,
     
     # Get all equipment IDs under assigned installations
     equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, user["id"]
+        installation_ids, user["id"], user=user
     )
     
     # Fetch nodes using installation filter (same as hierarchy view)
     nodes = await db.equipment_nodes.find(
-        merge_tenant_filter(
-            {"id": {"$in": list(equipment_ids)}} if equipment_ids else {},
-            user,
-        ),
+        scoped(user, {"id": {"$in": list(equipment_ids)}} if equipment_ids else {}),
         {"_id": 0}
     ).sort("sort_order", 1).to_list(5000)
     
     # Fetch equipment types for lookup (both user's custom and defaults)
     equipment_types = await db.custom_equipment_types.find(
-        {},
+        scoped(user, {}),
         {"_id": 0}
     ).to_list(100)
     
@@ -320,7 +318,7 @@ async def get_equipment_node(user: dict,
 ):
     """Get a specific equipment node."""
     node = await db.equipment_nodes.find_one(
-        {"id": node_id},
+        scoped(user, {"id": node_id}),
         {"_id": 0}
     )
     if not node:
@@ -342,10 +340,10 @@ async def create_equipment_node(user: dict,
             )
     
     # Check for duplicate name under the same parent
-    existing = await db.equipment_nodes.find_one({
+    existing = await db.equipment_nodes.find_one(scoped(user, {
         "name": node_data.name,
         "parent_id": node_data.parent_id
-    })
+    }))
     if existing:
         parent_info = f"under parent '{node_data.parent_id}'" if node_data.parent_id else "at root level"
         raise HTTPException(
@@ -356,7 +354,7 @@ async def create_equipment_node(user: dict,
     # Validate parent-child relationship if parent specified
     if node_data.parent_id:
         parent = await db.equipment_nodes.find_one(
-            {"id": node_data.parent_id},
+            scoped(user, {"id": node_data.parent_id}),
             {"_id": 0}
         )
         if not parent:
@@ -379,7 +377,7 @@ async def create_equipment_node(user: dict,
     node_id = str(uuid.uuid4())
     
     max_sort = await db.equipment_nodes.find_one(
-        {"parent_id": node_data.parent_id},
+        scoped(user, {"parent_id": node_data.parent_id}),
         sort=[("sort_order", -1)],
         projection={"sort_order": 1}
     )
@@ -389,7 +387,7 @@ async def create_equipment_node(user: dict,
     inherited_process_step = node_data.process_step
     if not inherited_process_step and node_data.parent_id and node_data.level in [ISOLevel.SUBUNIT, ISOLevel.MAINTAINABLE_ITEM]:
         parent = await db.equipment_nodes.find_one(
-            {"id": node_data.parent_id},
+            scoped(user, {"id": node_data.parent_id}),
             {"process_step": 1}
         )
         if parent and parent.get("process_step"):
@@ -450,7 +448,7 @@ async def update_equipment_node(user: dict,
     background_tasks: BackgroundTasks,
 ):
     """Update an equipment hierarchy node."""
-    node = await db.equipment_nodes.find_one({"id": node_id})
+    node = await db.equipment_nodes.find_one(scoped(user, {"id": node_id}))
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
@@ -458,7 +456,7 @@ async def update_equipment_node(user: dict,
     if update.parent_id is not None and update.parent_id != node.get("parent_id"):
         if update.parent_id:
             new_parent = await db.equipment_nodes.find_one(
-                {"id": update.parent_id},
+                scoped(user, {"id": update.parent_id}),
                 {"_id": 0}
             )
             if not new_parent:
@@ -477,7 +475,7 @@ async def update_equipment_node(user: dict,
             while current_parent:
                 if current_parent == node_id:
                     raise HTTPException(status_code=400, detail="Circular reference detected")
-                parent_node = await db.equipment_nodes.find_one({"id": current_parent})
+                parent_node = await db.equipment_nodes.find_one(scoped(user, {"id": current_parent}))
                 current_parent = parent_node.get("parent_id") if parent_node else None
         else:
             if node["level"] != ISOLevel.INSTALLATION.value:
@@ -490,7 +488,7 @@ async def update_equipment_node(user: dict,
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.equipment_nodes.update_one(
-            {"id": node_id},
+            scoped(user, {"id": node_id}),
             {"$set": update_data}
         )
         
@@ -513,7 +511,7 @@ async def update_equipment_node(user: dict,
     # Invalidate cache after update
     invalidate_equipment_cache(user["id"])
     
-    updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    updated = await db.equipment_nodes.find_one(scoped(user, {"id": node_id}), {"_id": 0})
     
     # Auto-translate if name or description changed
     if update.name or update.description:
@@ -533,13 +531,13 @@ async def get_deletion_impact(user: dict,
     node_id: str,
 ):
     """Get impact analysis for deleting an equipment node."""
-    node = await db.equipment_nodes.find_one({"id": node_id})
+    node = await db.equipment_nodes.find_one(scoped(user, {"id": node_id}))
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
     async def get_children_ids(parent_id):
         children = await db.equipment_nodes.find(
-            {"parent_id": parent_id},
+            scoped(user, {"parent_id": parent_id}),
             {"_id": 0, "id": 1, "name": 1}
         ).to_list(1000)
         all_items = [{"id": c["id"], "name": c["name"]} for c in children]
@@ -551,22 +549,22 @@ async def get_deletion_impact(user: dict,
     all_equipment_ids = [node_id] + [c["id"] for c in children]
     
     impacted_tasks = await db.task_instances.find(
-        {"equipment_id": {"$in": all_equipment_ids}, "status": {"$ne": "completed"}},
+        scoped(user, {"equipment_id": {"$in": all_equipment_ids}, "status": {"$ne": "completed"}}),
         {"_id": 0, "id": 1, "title": 1, "status": 1, "equipment_name": 1}
     ).to_list(100)
     
     impacted_actions = await db.central_actions.find(
-        {"equipment_id": {"$in": all_equipment_ids}, "status": {"$nin": ["completed", "closed"]}},
+        scoped(user, {"equipment_id": {"$in": all_equipment_ids}, "status": {"$nin": ["completed", "closed"]}}),
         {"_id": 0, "id": 1, "title": 1, "status": 1, "equipment_name": 1}
     ).to_list(100)
     
     impacted_investigations = await db.threats.find(
-        {"asset_id": {"$in": all_equipment_ids}, "status": {"$nin": ["closed", "mitigated"]}},
+        scoped(user, {"asset_id": {"$in": all_equipment_ids}, "status": {"$nin": ["closed", "mitigated"]}}),
         {"_id": 0, "id": 1, "title": 1, "status": 1, "asset": 1}
     ).to_list(100)
     
     impacted_plans = await db.task_plans.find(
-        {"equipment_id": {"$in": all_equipment_ids}, "is_active": True},
+        scoped(user, {"equipment_id": {"$in": all_equipment_ids}, "is_active": True}),
         {"_id": 0, "id": 1, "task_template_name": 1, "equipment_name": 1}
     ).to_list(100)
     
@@ -589,7 +587,7 @@ async def delete_equipment_node(user: dict,
     cascade: bool = False,
 ):
     """Delete an equipment node and optionally cascade to related items."""
-    node = await db.equipment_nodes.find_one({"id": node_id})
+    node = await db.equipment_nodes.find_one(scoped(user, {"id": node_id}))
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
@@ -603,7 +601,7 @@ async def delete_equipment_node(user: dict,
     
     async def get_children_ids(parent_id):
         children = await db.equipment_nodes.find(
-            {"parent_id": parent_id},
+            scoped(user, {"parent_id": parent_id}),
             {"_id": 0, "id": 1}
         ).to_list(1000)
         all_ids = [c["id"] for c in children]
@@ -616,26 +614,26 @@ async def delete_equipment_node(user: dict,
     
     # Orphan related items
     orphaned_tasks = await db.task_instances.update_many(
-        {"equipment_id": {"$in": all_ids}},
+        scoped(user, {"equipment_id": {"$in": all_ids}}),
         {"$set": {"equipment_id": None, "equipment_name": f"[Deleted: {node.get('name')}]"}}
     )
     
     orphaned_actions = await db.central_actions.update_many(
-        {"equipment_id": {"$in": all_ids}},
+        scoped(user, {"equipment_id": {"$in": all_ids}}),
         {"$set": {"equipment_id": None, "equipment_name": f"[Deleted: {node.get('name')}]"}}
     )
     
     orphaned_investigations = await db.threats.update_many(
-        {"asset_id": {"$in": all_ids}},
+        scoped(user, {"asset_id": {"$in": all_ids}}),
         {"$set": {"asset_id": None, "asset": f"[Deleted: {node.get('name')}]"}}
     )
     
     deactivated_plans = await db.task_plans.update_many(
-        {"equipment_id": {"$in": all_ids}},
+        scoped(user, {"equipment_id": {"$in": all_ids}}),
         {"$set": {"is_active": False, "deactivation_reason": f"Equipment deleted: {node.get('name')}"}}
     )
     
-    result = await db.equipment_nodes.delete_many({"id": {"$in": all_ids}})
+    result = await db.equipment_nodes.delete_many(scoped(user, {"id": {"$in": all_ids}}))
     
     # Invalidate cache after delete
     invalidate_equipment_cache(user["id"])

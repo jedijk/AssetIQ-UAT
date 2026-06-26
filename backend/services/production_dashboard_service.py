@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from bson import ObjectId
 from database import db
-from services.tenant_schema import merge_tenant_filter
+from services.tenant_schema import merge_tenant_filter, prepend_tenant_match
+from services.tenant_scope import scoped
 from services.production_helpers import (
     SHIFTS,
     EQUIPMENT_NAME,
@@ -110,11 +111,11 @@ async def build_production_dashboard(
         # Line-90 id were dropped from the dashboard query.
         _line90_pat = {"$regex": r"line\s*[-–]?\s*90", "$options": "i"}
         line90_roots = await db.equipment_nodes.find(
-            {"$or": [
+            scoped(current_user, {"$or": [
                 {"name": _line90_pat},
                 {"tag": _line90_pat},
                 {"tag_number": _line90_pat},
-            ]},
+            ]}),
             {"_id": 0, "id": 1, "parent_id": 1},
         ).limit(40).to_list(40)
         line90 = line90_roots[0] if line90_roots else None
@@ -134,13 +135,13 @@ async def build_production_dashboard(
             if root.get("parent_id"):
                 _add_eq_id(root["parent_id"])
                 parent = await db.equipment_nodes.find_one(
-                    {"id": root["parent_id"]}, {"_id": 0, "parent_id": 1}
+                    scoped(current_user, {"id": root["parent_id"]}), {"_id": 0, "parent_id": 1}
                 )
                 if parent and parent.get("parent_id"):
                     _add_eq_id(parent["parent_id"])
 
             children = await db.equipment_nodes.find(
-                {"parent_id": rid}, {"_id": 0, "id": 1}
+                scoped(current_user, {"parent_id": rid}), {"_id": 0, "id": 1}
             ).to_list(80)
             child_ids = [c["id"] for c in children if c.get("id")]
             for cid in child_ids:
@@ -148,7 +149,7 @@ async def build_production_dashboard(
 
             if child_ids:
                 grandchildren = await db.equipment_nodes.find(
-                    {"parent_id": {"$in": child_ids}}, {"_id": 0, "id": 1}
+                    scoped(current_user, {"parent_id": {"$in": child_ids}}), {"_id": 0, "id": 1}
                 ).to_list(300)
                 for gc in grandchildren:
                     _add_eq_id(gc.get("id"))
@@ -158,7 +159,7 @@ async def build_production_dashboard(
         line90_subtree_asset_tokens = set()
         if equipment_ids:
             subtree_nodes = await db.equipment_nodes.find(
-                {"id": {"$in": list(dict.fromkeys(equipment_ids))}},
+                scoped(current_user, {"id": {"$in": list(dict.fromkeys(equipment_ids))}}),
                 {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1},
             ).to_list(500)
             for n in subtree_nodes:
@@ -289,7 +290,7 @@ async def build_production_dashboard(
         prod_tpl_id_values = []
         try:
             tpl_rows = await db.form_templates.find(
-                {"$or": flex_production_template["$or"]},
+                scoped(current_user, {"$or": flex_production_template["$or"]}),
                 {"_id": 1, "id": 1, "name": 1},
             ).to_list(400)
             seen = set()
@@ -828,7 +829,7 @@ async def build_production_dashboard(
 
         actions_query = {**event_date_query, "type": "action"}
         actions = await db.production_events.find(
-            actions_query, {"_id": 0}
+            scoped(current_user, actions_query), {"_id": 0}
         ).sort("created_at", -1).to_list(50)
 
         # Dashboard "Information" panel uses form submissions (information_entries), not production_events insights.
@@ -882,7 +883,7 @@ async def build_production_dashboard(
             ]
         }
         # Deduplicate: prefer entries with mooney_viscosity
-        pipeline = [
+        pipeline = prepend_tenant_match([
             {"$match": ingested_query},
             {"$addFields": {"_has_visc": {"$cond": [{"$gt": [{"$ifNull": ["$mooney_viscosity", ""]}, ""]}, 1, 0]}}},
             {"$sort": {"timestamp": 1, "_has_visc": -1}},
@@ -890,7 +891,7 @@ async def build_production_dashboard(
             {"$replaceRoot": {"newRoot": "$doc"}},
             {"$sort": {"timestamp": 1}},
             {"$project": {"_id": 0, "_has_visc": 0}},
-        ]
+        ], current_user)
         ingested = await db.production_logs.aggregate(pipeline).to_list(5000)
 
         if ingested:

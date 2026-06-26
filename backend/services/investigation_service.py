@@ -30,7 +30,8 @@ from services.investigation_action_bridge import (
     upsert_central_from_action_item,
 )
 from services.storage_service import APP_NAME, MIME_TYPES, get_object_async, put_object_async
-from services.tenant_schema import merge_tenant_filter, with_tenant_id
+from services.tenant_schema import with_tenant_id
+from services.tenant_scope import scoped
 from utils.mongo_regex import exact_case_insensitive
 
 logger = logging.getLogger(__name__)
@@ -46,17 +47,25 @@ def investigation_query(user: dict, *, inv_id: Optional[str] = None, extra: Opti
         q["id"] = inv_id
     if extra:
         q.update(extra)
-    return merge_tenant_filter(q, user)
+    return scoped(user, q)
 
 
-async def _lead_enrichment(inv: dict) -> None:
+def inv_child_query(user: dict, inv_id: str, extra: Optional[dict] = None) -> dict:
+    q: Dict[str, Any] = {"investigation_id": inv_id}
+    if extra:
+        q.update(extra)
+    return scoped(user, q)
+
+
+async def _lead_enrichment(inv: dict, user: dict) -> None:
     lead_picture = None
     lead_name = inv.get("investigation_leader")
     lead_position = "Investigation Lead"
 
     if inv.get("investigation_leader"):
-        user = await _user_repo.find_one(
+        user_doc = await _user_repo.find_one(
             {"name": inv["investigation_leader"]},
+            user=user,
             projection={
                 "_id": 0,
                 "id": 1,
@@ -68,17 +77,18 @@ async def _lead_enrichment(inv: dict) -> None:
                 "role": 1,
             },
         )
-        if user:
-            if user.get("photo_url"):
-                lead_picture = user.get("photo_url")
-            elif user.get("avatar_path") or user.get("avatar_data"):
-                lead_picture = f"/api/users/{user['id']}/avatar"
-            lead_name = user.get("name", lead_name)
-            lead_position = user.get("position") or user.get("role") or "Investigation Lead"
+        if user_doc:
+            if user_doc.get("photo_url"):
+                lead_picture = user_doc.get("photo_url")
+            elif user_doc.get("avatar_path") or user_doc.get("avatar_data"):
+                lead_picture = f"/api/users/{user_doc['id']}/avatar"
+            lead_name = user_doc.get("name", lead_name)
+            lead_position = user_doc.get("position") or user_doc.get("role") or "Investigation Lead"
 
     if not lead_picture and inv.get("created_by"):
-        user = await _user_repo.find_one(
+        user_doc = await _user_repo.find_one(
             {"id": inv["created_by"]},
+            user=user,
             projection={
                 "_id": 0,
                 "photo_url": 1,
@@ -89,26 +99,27 @@ async def _lead_enrichment(inv: dict) -> None:
                 "role": 1,
             },
         )
-        if user:
-            if user.get("photo_url"):
-                lead_picture = user.get("photo_url")
-            elif user.get("avatar_path") or user.get("avatar_data"):
+        if user_doc:
+            if user_doc.get("photo_url"):
+                lead_picture = user_doc.get("photo_url")
+            elif user_doc.get("avatar_path") or user_doc.get("avatar_data"):
                 lead_picture = f"/api/users/{inv['created_by']}/avatar"
             if not lead_name:
-                lead_name = user.get("name")
+                lead_name = user_doc.get("name")
             if lead_position == "Investigation Lead":
-                lead_position = user.get("position") or user.get("role") or "Investigation Lead"
+                lead_position = user_doc.get("position") or user_doc.get("role") or "Investigation Lead"
 
     inv["lead_picture"] = lead_picture
     inv["lead_name"] = lead_name
     inv["lead_position"] = lead_position
 
 
-async def _equipment_tag_for_asset(asset_name: Optional[str]) -> Optional[str]:
+async def _equipment_tag_for_asset(asset_name: Optional[str], user: dict) -> Optional[str]:
     if not asset_name:
         return None
     equipment = await _equipment_repo.find_one(
         {"name": exact_case_insensitive(asset_name)},
+        user=user,
         projection={"_id": 0, "tag": 1},
     )
     return equipment.get("tag") if equipment else None
@@ -132,9 +143,9 @@ async def list_investigations(
     )
 
     for inv in investigations:
-        await _lead_enrichment(inv)
+        await _lead_enrichment(inv, user)
         if inv.get("asset_name"):
-            inv["equipment_tag"] = await _equipment_tag_for_asset(inv["asset_name"])
+            inv["equipment_tag"] = await _equipment_tag_for_asset(inv["asset_name"], user)
 
     return {"investigations": investigations}
 
@@ -149,22 +160,22 @@ async def get_investigation_detail(user: dict, inv_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="Investigation not found")
 
     if inv.get("asset_name"):
-        inv["equipment_tag"] = await _equipment_tag_for_asset(inv["asset_name"])
+        inv["equipment_tag"] = await _equipment_tag_for_asset(inv["asset_name"], user)
 
     events = await db.timeline_events.find(
-        {"investigation_id": inv_id}, {"_id": 0}
+        inv_child_query(user, inv_id), {"_id": 0}
     ).sort("event_time", 1).to_list(500)
     failures = await db.failure_identifications.find(
-        {"investigation_id": inv_id}, {"_id": 0}
+        inv_child_query(user, inv_id), {"_id": 0}
     ).to_list(100)
     causes = await db.cause_nodes.find(
-        {"investigation_id": inv_id}, {"_id": 0}
+        inv_child_query(user, inv_id), {"_id": 0}
     ).to_list(500)
     actions = await db.action_items.find(
-        {"investigation_id": inv_id}, {"_id": 0}
+        inv_child_query(user, inv_id), {"_id": 0}
     ).sort("created_at", 1).to_list(100)
     evidence = await db.evidence_items.find(
-        {"investigation_id": inv_id}, {"_id": 0}
+        inv_child_query(user, inv_id), {"_id": 0}
     ).to_list(100)
 
     return {
@@ -178,7 +189,7 @@ async def get_investigation_detail(user: dict, inv_id: str) -> Dict[str, Any]:
 
 
 async def check_for_similar_incidents(
-    user_id: str,
+    user: dict,
     asset_name: str,
     description: str,
     exclude_id: Optional[str] = None,
@@ -187,7 +198,7 @@ async def check_for_similar_incidents(
         return {"found": False, "similar_incidents": []}
 
     query: Dict[str, Any] = {
-        "created_by": user_id,
+        "created_by": user["id"],
         "asset_name": exact_case_insensitive(asset_name),
         "status": {"$in": ["completed", "closed"]},
     }
@@ -196,6 +207,7 @@ async def check_for_similar_incidents(
 
     past_investigations = await _inv_repo.find_many(
         query,
+        user=user,
         projection={"_id": 0, "id": 1, "title": 1, "description": 1, "incident_date": 1, "case_number": 1},
         sort=[("incident_date", -1)],
         limit=10,
@@ -234,23 +246,23 @@ async def check_for_similar_incidents(
     return {"found": len(similar) > 0, "similar_incidents": similar[:5]}
 
 
-async def generate_case_number(user_id: str) -> str:
-    count = await _inv_repo.count({"created_by": user_id})
+async def generate_case_number(user: dict) -> str:
+    count = await _inv_repo.count({"created_by": user["id"]}, user=user)
     year = datetime.now(timezone.utc).strftime("%Y")
     return f"INV-{year}-{count + 1:04d}"
 
 
-async def generate_action_number(investigation_id: str) -> str:
-    count = await db.action_items.count_documents({"investigation_id": investigation_id})
+async def generate_action_number(user: dict, investigation_id: str) -> str:
+    count = await db.action_items.count_documents(inv_child_query(user, investigation_id))
     return f"ACT-{count + 1:03d}"
 
 
 async def create_investigation(user: dict, data: dict) -> dict:
     inv_id = str(uuid.uuid4())
-    case_number = await generate_case_number(user["id"])
+    case_number = await generate_case_number(user)
 
     similar_check = await check_for_similar_incidents(
-        user["id"], data.get("asset_name", ""), data.get("description", "")
+        user, data.get("asset_name", ""), data.get("description", "")
     )
     is_recurring = data.get("is_recurring")
     linked_incident_id = data.get("linked_incident_id")
@@ -377,7 +389,7 @@ async def update_timeline_event(user: dict, inv_id: str,
     update: TimelineEventUpdate,
 ):
     """Update a timeline event."""
-    event = await db.timeline_events.find_one({"id": event_id, "investigation_id": inv_id})
+    event = await db.timeline_events.find_one(inv_child_query(user, inv_id, {"id": event_id}))
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     
@@ -388,9 +400,14 @@ async def update_timeline_event(user: dict, inv_id: str,
         update_data["confidence"] = update_data["confidence"].value
     
     if update_data:
-        await db.timeline_events.update_one({"id": event_id}, {"$set": update_data})
+        await db.timeline_events.update_one(
+            inv_child_query(user, inv_id, {"id": event_id}),
+            {"$set": update_data},
+        )
     
-    updated = await db.timeline_events.find_one({"id": event_id}, {"_id": 0})
+    updated = await db.timeline_events.find_one(
+        inv_child_query(user, inv_id, {"id": event_id}), {"_id": 0}
+    )
     return updated
 
 
@@ -398,7 +415,7 @@ async def delete_timeline_event(user: dict, inv_id: str,
     event_id: str,
 ):
     """Delete a timeline event."""
-    result = await db.timeline_events.delete_one({"id": event_id, "investigation_id": inv_id})
+    result = await db.timeline_events.delete_one(inv_child_query(user, inv_id, {"id": event_id}))
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Event not found")
     return {"message": "Event deleted"}
@@ -438,15 +455,22 @@ async def update_failure_identification(user: dict, inv_id: str,
     update: FailureIdentificationUpdate,
 ):
     """Update a failure identification."""
-    failure = await db.failure_identifications.find_one({"id": failure_id, "investigation_id": inv_id})
+    failure = await db.failure_identifications.find_one(
+        inv_child_query(user, inv_id, {"id": failure_id})
+    )
     if not failure:
         raise HTTPException(status_code=404, detail="Failure identification not found")
     
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     if update_data:
-        await db.failure_identifications.update_one({"id": failure_id}, {"$set": update_data})
+        await db.failure_identifications.update_one(
+            inv_child_query(user, inv_id, {"id": failure_id}),
+            {"$set": update_data},
+        )
     
-    updated = await db.failure_identifications.find_one({"id": failure_id}, {"_id": 0})
+    updated = await db.failure_identifications.find_one(
+        inv_child_query(user, inv_id, {"id": failure_id}), {"_id": 0}
+    )
     return updated
 
 
@@ -454,7 +478,9 @@ async def delete_failure_identification(user: dict, inv_id: str,
     failure_id: str,
 ):
     """Delete a failure identification."""
-    result = await db.failure_identifications.delete_one({"id": failure_id, "investigation_id": inv_id})
+    result = await db.failure_identifications.delete_one(
+        inv_child_query(user, inv_id, {"id": failure_id})
+    )
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Failure identification not found")
     return {"message": "Failure identification deleted"}
@@ -471,7 +497,9 @@ async def create_cause_node(user: dict, inv_id: str,
     
     # Validate parent exists if specified
     if data.parent_id:
-        parent = await db.cause_nodes.find_one({"id": data.parent_id, "investigation_id": inv_id})
+        parent = await db.cause_nodes.find_one(
+            inv_child_query(user, inv_id, {"id": data.parent_id})
+        )
         if not parent:
             raise HTTPException(status_code=400, detail="Parent cause node not found")
     
@@ -511,7 +539,7 @@ async def update_cause_node(user: dict, inv_id: str,
     update: CauseNodeUpdate,
 ):
     """Update a cause node."""
-    cause = await db.cause_nodes.find_one({"id": cause_id, "investigation_id": inv_id})
+    cause = await db.cause_nodes.find_one(inv_child_query(user, inv_id, {"id": cause_id}))
     if not cause:
         raise HTTPException(status_code=404, detail="Cause node not found")
     
@@ -520,9 +548,14 @@ async def update_cause_node(user: dict, inv_id: str,
         update_data["category"] = update_data["category"].value
     
     if update_data:
-        await db.cause_nodes.update_one({"id": cause_id}, {"$set": update_data})
+        await db.cause_nodes.update_one(
+            inv_child_query(user, inv_id, {"id": cause_id}),
+            {"$set": update_data},
+        )
     
-    updated = await db.cause_nodes.find_one({"id": cause_id}, {"_id": 0})
+    updated = await db.cause_nodes.find_one(
+        inv_child_query(user, inv_id, {"id": cause_id}), {"_id": 0}
+    )
     return updated
 
 
@@ -533,7 +566,7 @@ async def delete_cause_node(user: dict, inv_id: str,
     # Get all children recursively
     async def get_children_ids(parent_id):
         children = await db.cause_nodes.find(
-            {"parent_id": parent_id, "investigation_id": inv_id},
+            inv_child_query(user, inv_id, {"parent_id": parent_id}),
             {"_id": 0, "id": 1}
         ).to_list(100)
         all_ids = [c["id"] for c in children]
@@ -544,7 +577,9 @@ async def delete_cause_node(user: dict, inv_id: str,
     children_ids = await get_children_ids(cause_id)
     all_ids = [cause_id] + children_ids
     
-    result = await db.cause_nodes.delete_many({"id": {"$in": all_ids}})
+    result = await db.cause_nodes.delete_many(
+        scoped(user, {"id": {"$in": all_ids}, "investigation_id": inv_id})
+    )
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Cause node not found")
     
@@ -563,7 +598,7 @@ async def create_action_item(user: dict, inv_id: str,
         raise HTTPException(status_code=404, detail="Investigation not found")
     
     action_id = str(uuid.uuid4())
-    action_number = await generate_action_number(inv_id)
+    action_number = await generate_action_number(user, inv_id)
     
     action_doc = with_tenant_id({
         "id": action_id,
@@ -598,7 +633,7 @@ async def update_action_item(user: dict, inv_id: str,
     update: ActionItemUpdate,
 ):
     """Update an action item."""
-    action = await db.action_items.find_one({"id": action_id, "investigation_id": inv_id})
+    action = await db.action_items.find_one(inv_child_query(user, inv_id, {"id": action_id}))
     if not action:
         raise HTTPException(status_code=404, detail="Action item not found")
     
@@ -616,11 +651,16 @@ async def update_action_item(user: dict, inv_id: str,
     
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        await db.action_items.update_one({"id": action_id}, {"$set": update_data})
+        await db.action_items.update_one(
+            inv_child_query(user, inv_id, {"id": action_id}),
+            {"$set": update_data},
+        )
     
-    updated = await db.action_items.find_one({"id": action_id}, {"_id": 0})
+    updated = await db.action_items.find_one(
+        inv_child_query(user, inv_id, {"id": action_id}), {"_id": 0}
+    )
     if updated:
-        inv = await db.investigations.find_one({"id": inv_id}, {"_id": 0})
+        inv = await db.investigations.find_one(investigation_query(user, inv_id=inv_id), {"_id": 0})
         if inv:
             await upsert_central_from_action_item(
                 updated,
@@ -632,19 +672,18 @@ async def update_action_item(user: dict, inv_id: str,
     completion_notification = None
     if status_changed_to_completed:
         # Count remaining open actions for this investigation
-        remaining_open = await db.action_items.count_documents({
-            "investigation_id": inv_id,
-            "status": {"$ne": "completed"}
-        })
+        remaining_open = await db.action_items.count_documents(
+            inv_child_query(user, inv_id, {"status": {"$ne": "completed"}})
+        )
         
         if remaining_open == 0:
             # All actions completed - prepare notification
-            total_actions = await db.action_items.count_documents({
-                "investigation_id": inv_id
-            })
+            total_actions = await db.action_items.count_documents(inv_child_query(user, inv_id))
             
             # Get investigation details
-            inv = await db.investigations.find_one({"id": inv_id}, {"_id": 0, "title": 1, "status": 1})
+            inv = await db.investigations.find_one(
+                investigation_query(user, inv_id=inv_id), {"_id": 0, "title": 1, "status": 1}
+            )
             inv_name = inv.get("title", "Investigation") if inv else "Investigation"
             inv_status = inv.get("status") if inv else None
             
@@ -671,7 +710,7 @@ async def delete_action_item(user: dict, inv_id: str,
     action_id: str,
 ):
     """Delete an action item."""
-    result = await db.action_items.delete_one({"id": action_id, "investigation_id": inv_id})
+    result = await db.action_items.delete_one(inv_child_query(user, inv_id, {"id": action_id}))
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Action item not found")
     await delete_central_for_action_item(action_id)
@@ -711,7 +750,7 @@ async def delete_evidence(user: dict, inv_id: str,
     evidence_id: str,
 ):
     """Delete evidence."""
-    result = await db.evidence_items.delete_one({"id": evidence_id, "investigation_id": inv_id})
+    result = await db.evidence_items.delete_one(inv_child_query(user, inv_id, {"id": evidence_id}))
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Evidence not found")
     return {"message": "Evidence deleted"}
@@ -730,7 +769,7 @@ async def get_similar_incidents(user: dict, inv_id: str,
         raise HTTPException(status_code=404, detail="Investigation not found")
     
     similar = await check_for_similar_incidents(
-        user["id"],
+        user,
         inv.get("asset_name"),
         inv.get("description"),
         exclude_id=inv_id
@@ -756,7 +795,7 @@ async def get_linked_incident(user: dict, inv_id: str,
         return {"linked_incident": None}
     
     linked_inv = await db.investigations.find_one(
-        {"id": linked_id, "created_by": user["id"]},
+        investigation_query(user, inv_id=linked_id),
         {"_id": 0, "id": 1, "case_number": 1, "title": 1, "description": 1, 
          "asset_name": 1, "incident_date": 1, "status": 1, "recurring_quadrant": 1}
     )
@@ -786,7 +825,7 @@ async def update_recurring_quadrant(user: dict, inv_id: str,
     }
     
     await db.investigations.update_one(
-        {"id": inv_id},
+        investigation_query(user, inv_id=inv_id),
         {"$set": update_data}
     )
     
@@ -805,7 +844,7 @@ async def link_incident(user: dict, inv_id: str, linked_incident_id: str):
     
     # Verify linked incident exists
     linked_inv = await db.investigations.find_one(
-        {"id": linked_incident_id, "created_by": user["id"]}
+        investigation_query(user, inv_id=linked_incident_id)
     )
     if not linked_inv:
         raise HTTPException(status_code=404, detail="Linked incident not found")
@@ -821,7 +860,7 @@ async def link_incident(user: dict, inv_id: str, linked_incident_id: str):
     }
     
     await db.investigations.update_one(
-        {"id": inv_id},
+        investigation_query(user, inv_id=inv_id),
         {"$set": update_data}
     )
     
@@ -851,7 +890,7 @@ async def unlink_incident(user: dict, inv_id: str,
     }
     
     await db.investigations.update_one(
-        {"id": inv_id},
+        investigation_query(user, inv_id=inv_id),
         {"$set": update_data}
     )
 
@@ -909,7 +948,7 @@ async def upload_investigation_file(
 
     try:
         result = await put_object_async(storage_path, file_data, resolved_content_type)
-        evidence_doc = {
+        evidence_doc = with_tenant_id({
             "id": file_id,
             "investigation_id": inv_id,
             "name": filename,
@@ -921,7 +960,7 @@ async def upload_investigation_file(
             "original_filename": filename,
             "is_deleted": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
-        }
+        }, user)
         await db.evidence_items.insert_one(evidence_doc)
         evidence_doc.pop("_id", None)
         return evidence_doc
@@ -932,7 +971,9 @@ async def upload_investigation_file(
 
 async def download_file(user: dict, path: str) -> Tuple[bytes, str, str]:
     """Return file bytes, content type, and original filename for a storage path."""
-    record = await db.evidence_items.find_one({"storage_path": path, "is_deleted": {"$ne": True}})
+    record = await db.evidence_items.find_one(
+        scoped(user, {"storage_path": path, "is_deleted": {"$ne": True}})
+    )
     if not record:
         raise HTTPException(status_code=404, detail="File not found")
 

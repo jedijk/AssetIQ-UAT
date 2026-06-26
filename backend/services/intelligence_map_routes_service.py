@@ -22,7 +22,8 @@ from services.reliability_graph_query import (
     count_active_reliability_edges,
     count_edges_by_relation,
 )
-from services.tenant_schema import tenant_id_from_user
+from services.tenant_schema import tenant_id_from_user, prepend_tenant_match
+from services.tenant_scope import scoped
 
 logger = logging.getLogger(__name__)
 
@@ -34,15 +35,11 @@ _pm_import_task_match = pm_import_task_match
 
 def _scope_query(base: dict, user: dict) -> dict:
     """Apply migration-safe tenant filter to intelligence map aggregations."""
-    from services.tenant_schema import merge_tenant_filter as _merge_tenant_filter
-
-    return _merge_tenant_filter(base or {}, user)
+    return scoped(user, base or {})
 
 
 def _scope_pipeline(pipeline: list, user: dict) -> list:
-    from services.tenant_schema import prepend_tenant_match as _prepend_tenant_match
-
-    return _prepend_tenant_match(pipeline, user)
+    return prepend_tenant_match(pipeline, user)
 
 
 def _current_user_id(current_user: dict) -> str:
@@ -247,8 +244,6 @@ async def get_intelligence_map_stats(
         return cached
     
     try:
-        scope = lambda q: _scope_query(q, current_user)
-
         # Get user's installation filter data (for future use with permissions)
         _ = await installation_filter.get_user_installation_ids(current_user)
         
@@ -257,10 +252,10 @@ async def get_intelligence_map_stats(
         if equipment_type_id:
             et_query["id"] = equipment_type_id
             
-        equipment_types_count = await count_equipment_types(db, et_query)
+        equipment_types_count = await count_equipment_types(db, et_query, user=current_user)
         
         # Get equipment types that are actually used in equipment
-        equipment_types_in_use = await db.equipment_nodes.distinct("equipment_type_id", scope({
+        equipment_types_in_use = await db.equipment_nodes.distinct("equipment_type_id", scoped(current_user,{
             "equipment_type_id": {"$ne": None, "$exists": True}
         }))
         equipment_types_in_use_set = set([et for et in equipment_types_in_use if et])
@@ -276,7 +271,7 @@ async def get_intelligence_map_stats(
         else:
             fm_query = {}
         
-        failure_modes_count = await db.failure_modes.count_documents(scope(fm_query))
+        failure_modes_count = await db.failure_modes.count_documents(scoped(current_user,fm_query))
         
         # Get unique equipment types with failure modes (that are in use)
         # Use aggregation to unwind equipment_type_ids and find intersection
@@ -302,11 +297,11 @@ async def get_intelligence_map_stats(
         if equipment_type_id:
             strategy_query["equipment_type_id"] = equipment_type_id
             
-        strategies_count = await db.equipment_type_strategies.count_documents(scope(strategy_query))
+        strategies_count = await db.equipment_type_strategies.count_documents(scoped(current_user,strategy_query))
         
         # Count task templates from equipment type strategies
         strategy_pipeline = [
-            {"$match": scope(strategy_query)},
+            {"$match": scoped(current_user,strategy_query)},
             {"$group": {
                 "_id": None,
                 "total_task_templates": {"$sum": {"$size": {"$ifNull": ["$task_templates", []]}}}
@@ -334,7 +329,7 @@ async def get_intelligence_map_stats(
         else:
             equipment_query["level"] = {"$in": equipment_levels}
         
-        equipment_count = await db.equipment_nodes.count_documents(scope(equipment_query))
+        equipment_count = await db.equipment_nodes.count_documents(scoped(current_user,equipment_query))
 
         pm_import_equipment_ids = None
         pm_import_equipment_tags = None
@@ -343,12 +338,12 @@ async def get_intelligence_map_stats(
         elif equipment_type_id or plant_id or system_id:
             pm_import_equipment_ids = await db.equipment_nodes.distinct(
                 "id",
-                scope(equipment_query),
+                scoped(current_user,equipment_query),
             )
         if pm_import_equipment_ids is not None:
             raw_tags = await db.equipment_nodes.distinct(
                 "tag",
-                scope({
+                scoped(current_user,{
                     **equipment_query,
                     "tag": {"$exists": True, "$nin": [None, ""]},
                 }),
@@ -357,15 +352,18 @@ async def get_intelligence_map_stats(
         
         # Count equipment with assigned equipment types
         equipment_with_type_query = {**equipment_query, "equipment_type_id": {"$ne": None, "$exists": True}}
-        equipment_with_type_count = await db.equipment_nodes.count_documents(scope(equipment_with_type_query))
+        equipment_with_type_count = await db.equipment_nodes.count_documents(scoped(current_user,equipment_with_type_query))
         
         # Get equipment types that have strategies (from equipment_type_strategies)
-        strategy_equipment_types = await db.equipment_type_strategies.distinct("equipment_type_id")
+        strategy_equipment_types = await db.equipment_type_strategies.distinct(
+            "equipment_type_id",
+            scoped(current_user,{}),
+        )
         strategy_equipment_types_set = set([et for et in strategy_equipment_types if et])
         
         # Count equipment affected by strategies (equipment with equipment_type that has a strategy)
         if strategy_equipment_types_set:
-            equipment_with_strategy_count = await db.equipment_nodes.count_documents(scope({
+            equipment_with_strategy_count = await db.equipment_nodes.count_documents(scoped(current_user,{
                 **equipment_query,
                 "equipment_type_id": {"$in": list(strategy_equipment_types_set)}
             }))
@@ -374,7 +372,7 @@ async def get_intelligence_map_stats(
         
         # Count equipment that have strategy APPLIED (have maintenance program with strategy tasks)
         programs_with_strategy = await db.maintenance_programs_v2.find(
-            scope({"strategy_tasks": {"$gt": 0}}),
+            scoped(current_user,{"strategy_tasks": {"$gt": 0}}),
             {"equipment_id": 1}
         ).to_list(1000)
         equipment_ids_with_strategy_applied = set([p.get("equipment_id") for p in programs_with_strategy if p.get("equipment_id")])
@@ -409,17 +407,17 @@ async def get_intelligence_map_stats(
         if equipment_id:
             program_query["equipment_id"] = equipment_id
             
-        programs_count = await db.maintenance_programs_v2.count_documents(scope(program_query))
+        programs_count = await db.maintenance_programs_v2.count_documents(scoped(current_user,program_query))
 
         active_program_query = _active_v2_program_match(program_query)
         active_v2_program_count = await db.maintenance_programs_v2.count_documents(
-            scope(active_program_query),
+            scoped(current_user,active_program_query),
         )
         equipment_ids_with_active_v2_program = {
             eid
             for eid in await db.maintenance_programs_v2.distinct(
                 "equipment_id",
-                scope(active_program_query),
+                scoped(current_user,active_program_query),
             )
             if eid
         }
@@ -435,7 +433,7 @@ async def get_intelligence_map_stats(
         
         # Get program task statistics
         program_pipeline = [
-            {"$match": scope(program_query)},
+            {"$match": scoped(current_user,program_query)},
             {"$group": {
                 "_id": None,
                 "total_tasks": {"$sum": "$total_tasks"},
@@ -461,10 +459,10 @@ async def get_intelligence_map_stats(
         elif plant_id or system_id or equipment_type_id:
             scoped_equipment_ids = await db.equipment_nodes.distinct(
                 "id",
-                scope(equipment_query),
+                scoped(current_user,equipment_query),
             )
             
-        schedules_count = await db.scheduled_tasks.count_documents(scope(schedule_query))
+        schedules_count = await db.scheduled_tasks.count_documents(scoped(current_user,schedule_query))
 
         # Active frequencies: schedulable program task templates (matches maintenance scheduler).
         (
@@ -479,7 +477,7 @@ async def get_intelligence_map_stats(
         
         # Count schedules by status
         schedule_status_pipeline = [
-            {"$match": scope(schedule_query)},
+            {"$match": scoped(current_user,schedule_query)},
             {"$group": {"_id": "$status", "count": {"$sum": 1}}}
         ]
         schedule_status = await timed_aggregate(db.scheduled_tasks, schedule_status_pipeline)
@@ -487,7 +485,7 @@ async def get_intelligence_map_stats(
         
         # Count schedules missing frequency
         schedules_missing_freq = await db.scheduled_tasks.count_documents(
-            scope(_schedules_missing_frequency_filter(schedule_query))
+            scoped(current_user,_schedules_missing_frequency_filter(schedule_query))
         )
 
         # Actual scheduled_tasks record count scoped to equipment with an active program.
@@ -495,7 +493,7 @@ async def get_intelligence_map_stats(
         # data lineage record count (not the conceptual count of task templates with
         # a frequency).
         if equipment_ids_with_active_program:
-            schedules_actual_for_applied = await db.scheduled_tasks.count_documents(scope({
+            schedules_actual_for_applied = await db.scheduled_tasks.count_documents(scoped(current_user,{
                 **schedule_query,
                 "equipment_id": {"$in": list(equipment_ids_with_active_program)},
             }))
@@ -532,14 +530,14 @@ async def get_intelligence_map_stats(
         pm_accepted_no_fm_total = pm_accepted_result[0]["count"] if pm_accepted_result else 0
         
         # Also get session count for reference
-        pm_sessions_count = await db.pm_import_sessions.count_documents(scope({}))
+        pm_sessions_count = await db.pm_import_sessions.count_documents(scoped(current_user,{}))
         
         # ========== CALCULATE KPIs ==========
         
         # Failure Mode Coverage: Equipment with linked failure modes / Total equipment
         # This requires checking equipment that have equipment_type_id that has failure modes
         if fm_equipment_types_set and equipment_count > 0:
-            covered_equipment = await db.equipment_nodes.count_documents(scope({
+            covered_equipment = await db.equipment_nodes.count_documents(scoped(current_user,{
                 **equipment_query,
                 "equipment_type_id": {"$in": list(fm_equipment_types_set)}
             }))
@@ -872,6 +870,7 @@ async def get_intelligence_map_filters(*, current_user: dict):
             db,
             projection={"id": 1, "name": 1, "category": 1, "_id": 0},
             limit=500,
+            user=current_user,
         )
         
         return {

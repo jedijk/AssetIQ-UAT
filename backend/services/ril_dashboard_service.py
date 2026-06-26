@@ -8,6 +8,7 @@ from database import db
 from services.reliability_graph_query import count_active_reliability_edges
 from services.ril_dashboard_materializer import get_or_compute_ril_dashboard
 from services.ril_service import RILService
+from services.tenant_scope import scoped
 
 
 async def get_dashboard_stats(user: dict, owner_id: Optional[str] = None) -> Dict[str, Any]:
@@ -32,22 +33,22 @@ async def get_executive_dashboard(user: dict, owner_id: Optional[str] = None) ->
     alert_penalty = min(stats.get("alerts_7d", 0) * 0.5, 10)
     reliability_score = max(0, min(100, base_score - case_penalty - alert_penalty))
 
-    at_risk_count = await db.ril_predictions.count_documents({
+    at_risk_count = await db.ril_predictions.count_documents(scoped(user, {
         "owner_id": oid,
         "overall_health_score": {"$lt": 70},
-    })
+    }))
 
     open_threats = reliability_kpis.get("open_threats", 0)
     equipment_levels = ["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"]
-    total_equipment = await db.equipment_nodes.count_documents({"level": {"$in": equipment_levels}})
+    total_equipment = await db.equipment_nodes.count_documents(scoped(user, {"level": {"$in": equipment_levels}}))
     strategy_equipment_types = [
-        et for et in await db.equipment_type_strategies.distinct("equipment_type_id") if et
+        et for et in await db.equipment_type_strategies.distinct("equipment_type_id", scoped(user, {})) if et
     ]
     if strategy_equipment_types:
-        equipment_with_strategy = await db.equipment_nodes.count_documents({
+        equipment_with_strategy = await db.equipment_nodes.count_documents(scoped(user, {
             "level": {"$in": equipment_levels},
             "equipment_type_id": {"$in": strategy_equipment_types},
-        })
+        }))
     else:
         equipment_with_strategy = 0
     strategy_coverage_pct = round(
@@ -58,26 +59,26 @@ async def get_executive_dashboard(user: dict, owner_id: Optional[str] = None) ->
 
     cases_by_status = {}
     for status in ["open", "in_progress", "under_investigation", "resolved", "closed"]:
-        cases_by_status[status] = await db.ril_cases.count_documents({
+        cases_by_status[status] = await db.ril_cases.count_documents(scoped(user, {
             "owner_id": oid,
             "status": status,
-        })
+        }))
 
     now = datetime.now(timezone.utc)
     two_weeks_ago = now - timedelta(days=14)
     seven_days_ago = now - timedelta(days=7)
 
-    obs_previous = await db.ril_observations.count_documents({
+    obs_previous = await db.ril_observations.count_documents(scoped(user, {
         "owner_id": oid,
         "created_at": {"$gte": two_weeks_ago, "$lt": seven_days_ago},
-    })
+    }))
     obs_current = stats.get("observations_7d", 0)
     obs_trend = "up" if obs_current > obs_previous else ("down" if obs_current < obs_previous else "stable")
 
-    alerts_previous = await db.ril_alerts.count_documents({
+    alerts_previous = await db.ril_alerts.count_documents(scoped(user, {
         "owner_id": oid,
         "alert_time": {"$gte": two_weeks_ago, "$lt": seven_days_ago},
-    })
+    }))
     alerts_current = stats.get("alerts_7d", 0)
     alerts_trend = "up" if alerts_current > alerts_previous else ("down" if alerts_current < alerts_previous else "stable")
 
@@ -144,22 +145,22 @@ async def get_intelligence_dashboard(user: dict, owner_id: Optional[str] = None)
 
     correlations = []
     async for doc in db.ril_correlations.find(
-        {"owner_id": oid, "is_active": True}
+        scoped(user, {"owner_id": oid, "is_active": True})
     ).sort("created_at", -1).limit(5):
         doc.pop("_id", None)
         correlations.append(doc)
 
     emerging_risks = []
-    async for doc in db.ril_observations.find({
+    async for doc in db.ril_observations.find(scoped(user, {
         "owner_id": oid,
         "severity": {"$in": ["critical", "high"]},
         "created_at": {"$gte": seven_days_ago},
-    }).sort("risk_score", -1).limit(5):
+    })).sort("risk_score", -1).limit(5):
         doc.pop("_id", None)
         emerging_risks.append(doc)
 
     pipeline = [
-        {"$match": {"owner_id": oid}},
+        {"$match": scoped(user, {"owner_id": oid})},
         {"$group": {
             "_id": "$equipment_type_id",
             "count": {"$sum": 1},
@@ -173,10 +174,10 @@ async def get_intelligence_dashboard(user: dict, owner_id: Optional[str] = None)
         fleet_insights.append(doc)
 
     recommendations = []
-    async for doc in db.ril_recommendations.find({
+    async for doc in db.ril_recommendations.find(scoped(user, {
         "owner_id": oid,
         "status": "pending",
-    }).sort("created_at", -1).limit(5):
+    })).sort("created_at", -1).limit(5):
         doc.pop("_id", None)
         recommendations.append(doc)
 
@@ -193,7 +194,7 @@ async def get_data_quality_dashboard(user: dict, owner_id: Optional[str] = None)
     oid = owner_id or user.get("owner_id") or user.get("id")
 
     pipeline = [
-        {"$match": {"owner_id": oid}},
+        {"$match": scoped(user, {"owner_id": oid})},
         {"$group": {
             "_id": "$source",
             "count": {"$sum": 1},
@@ -209,19 +210,19 @@ async def get_data_quality_dashboard(user: dict, owner_id: Optional[str] = None)
         })
 
     last_observation = await db.ril_observations.find_one(
-        {"owner_id": oid}, sort=[("created_at", -1)]
+        scoped(user, {"owner_id": oid}), sort=[("created_at", -1)]
     )
     last_reading = await db.ril_readings.find_one(
-        {"owner_id": oid}, sort=[("received_at", -1)]
+        scoped(user, {"owner_id": oid}), sort=[("received_at", -1)]
     )
     last_alert = await db.ril_alerts.find_one(
-        {"owner_id": oid}, sort=[("received_at", -1)]
+        scoped(user, {"owner_id": oid}), sort=[("received_at", -1)]
     )
 
-    total_equipment = await db.equipment_nodes.count_documents({"owner_id": oid})
+    total_equipment = await db.equipment_nodes.count_documents(scoped(user, {"owner_id": oid}))
     equipment_with_observations = await db.ril_observations.distinct(
         "equipment_id",
-        {"owner_id": oid, "equipment_id": {"$ne": None}},
+        scoped(user, {"owner_id": oid, "equipment_id": {"$ne": None}}),
     )
 
     return {

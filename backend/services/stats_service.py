@@ -138,7 +138,7 @@ async def get_reliability_scores(
         {"_id": 0, "equipment_type_id": 1, "task_templates": 1, "status": 1},
     ).to_list(1000)
 
-    eq_type_ids = await equipment_type_id_set(db)
+    eq_type_ids = await equipment_type_id_set(db, user=current_user)
 
     def calculate_node_scores(node):
         nid = node["id"]

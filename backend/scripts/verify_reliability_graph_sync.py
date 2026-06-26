@@ -27,6 +27,32 @@ def _static_path_checks() -> list[str]:
     """Return list of static check failures."""
     failures: list[str] = []
 
+    from services.reliability_graph import GRAPH_SYNC_HANDLERS
+    from services.reliability_graph_ownership import (
+        APPROVED_UPSERT_MODULES,
+        scan_unapproved_upsert_callers,
+        validate_ontology_relations,
+        validate_ownership_covers_handlers,
+    )
+    from services.reliability_ontology import RELATIONS
+
+    handler_gaps = validate_ownership_covers_handlers(frozenset(GRAPH_SYNC_HANDLERS.keys()))
+    for msg in handler_gaps:
+        failures.append(f"ownership matrix: {msg}")
+
+    ontology_gaps = validate_ontology_relations(RELATIONS)
+    for msg in ontology_gaps:
+        failures.append(f"ownership matrix: {msg}")
+
+    upsert_violations = scan_unapproved_upsert_callers(BACKEND_ROOT / "services")
+    for rel in upsert_violations:
+        if rel not in APPROVED_UPSERT_MODULES:
+            failures.append(f"unapproved upsert_edge caller: {rel}")
+
+    ownership_module = BACKEND_ROOT / "services" / "reliability_graph_ownership.py"
+    if not ownership_module.is_file():
+        failures.append("reliability_graph_ownership.py not found")
+
     checks = [
         (
             BACKEND_ROOT / "services" / "task_service_completion.py",
@@ -75,7 +101,7 @@ def _static_path_checks() -> list[str]:
         ),
         (
             BACKEND_ROOT / "services" / "reliability_graph.py",
-            ["tenant_id", "retire_edges_for_entity", "sync_outcome_edges"],
+            ["tenant_id", "retire_edges_for_entity", "sync_outcome_edges", "dispatch_graph_sync"],
             "reliability_graph platform",
         ),
         (

@@ -14,6 +14,7 @@ from database import db
 from services.reliability_graph import COLLECTION, EDGE_STATUS_ACTIVE
 from services.program_task_resolution import resolve_program_task_id
 from services.tenant_schema import tenant_read_filter
+from services.tenant_scope import scoped_job
 
 logger = logging.getLogger(__name__)
 
@@ -336,13 +337,7 @@ async def sample_db_audit(
         "tenant_edges_missing_id": 0,
     }
 
-    program_query: Dict[str, Any] = {}
-    if tenant_id:
-        program_query = tenant_read_filter({"tenant_id": tenant_id}) or {}
-        if tenant_id and not program_query:
-            program_query = {
-                "$or": [{"tenant_id": tenant_id}, {"tenant_id": {"$exists": False}}]
-            }
+    program_query: Dict[str, Any] = scoped_job({}, tenant_id=tenant_id) if tenant_id else {}
 
     programs = await db.maintenance_programs_v2.find(
         program_query, {"_id": 0}
@@ -353,13 +348,15 @@ async def sample_db_audit(
         if gaps:
             result["apply_strategy"]["gaps"].extend(gaps[:3])
 
-    edge_query: Dict[str, Any] = {
+    edge_query: Dict[str, Any] = scoped_job({
+        "source_type": "pm_import_task",
+        "relation": "applied_to",
+        "status": EDGE_STATUS_ACTIVE,
+    }, tenant_id=tenant_id) if tenant_id else {
         "source_type": "pm_import_task",
         "relation": "applied_to",
         "status": EDGE_STATUS_ACTIVE,
     }
-    if tenant_id:
-        edge_query["$or"] = [{"tenant_id": tenant_id}, {"tenant_id": {"$exists": False}}]
     pm_cursor = db[COLLECTION].find(
         edge_query,
         {"_id": 0, "source_id": 1, "target_id": 1},
@@ -371,7 +368,7 @@ async def sample_db_audit(
             result["pm_import"]["gaps"].append(gap)
 
     completed = await db.scheduled_tasks.find(
-        {"status": "completed"},
+        scoped_job({"status": "completed"}, tenant_id=tenant_id) if tenant_id else {"status": "completed"},
         {"_id": 0},
     ).sort("completed_at", -1).limit(limit).to_list(limit)
 
@@ -382,7 +379,9 @@ async def sample_db_audit(
             result["task_complete"]["gaps"].extend(gaps[:2])
 
     scheduled_open = await db.scheduled_tasks.find(
-        {"status": {"$nin": ["completed", "cancelled"]}},
+        scoped_job({"status": {"$nin": ["completed", "cancelled"]}}, tenant_id=tenant_id)
+        if tenant_id
+        else {"status": {"$nin": ["completed", "cancelled"]}},
         {"_id": 0},
     ).sort("due_date", -1).limit(limit).to_list(limit)
     for task in scheduled_open:
@@ -391,7 +390,8 @@ async def sample_db_audit(
         if gaps:
             result["scheduled_created"]["gaps"].extend(gaps[:2])
 
-    obs_cursor = db.observations.find({}, {"_id": 0}).sort("created_at", -1).limit(limit)
+    obs_query = scoped_job({}, tenant_id=tenant_id) if tenant_id else {}
+    obs_cursor = db.observations.find(obs_query, {"_id": 0}).sort("created_at", -1).limit(limit)
     async for obs in obs_cursor:
         obs_id = obs.get("id") or str(obs.get("_id", ""))
         if not obs_id:
@@ -407,7 +407,12 @@ async def sample_db_audit(
             result["observation"]["gaps"].extend(gaps[:2])
 
     inv_cursor = db.investigations.find(
-        {"threat_id": {"$exists": True, "$ne": None}},
+        scoped_job(
+            {"threat_id": {"$exists": True, "$ne": None}},
+            tenant_id=tenant_id,
+        )
+        if tenant_id
+        else {"threat_id": {"$exists": True, "$ne": None}},
         {"_id": 0},
     ).sort("created_at", -1).limit(limit)
     async for inv in inv_cursor:

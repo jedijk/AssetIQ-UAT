@@ -19,6 +19,7 @@ import uuid
 
 from database import db
 from services.action_number_service import allocate_central_action_number
+from services.tenant_scope import scoped, scoped_job
 
 INVESTIGATION_ACTION_TITLE = "Complete causal investigation"
 
@@ -34,7 +35,7 @@ async def create_investigation_action(
     (or pre-existing) action dict.
     """
     existing = await db.central_actions.find_one(
-        {"source_type": "investigation", "source_id": investigation_id},
+        scoped(user, {"source_type": "investigation", "source_id": investigation_id}),
         {"_id": 0}
     )
     if existing:
@@ -43,10 +44,10 @@ async def create_investigation_action(
     # Resolve the parent observation to attach the action to (if available)
     observation = None
     if threat_id:
-        observation = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+        observation = await db.threats.find_one(scoped(user, {"id": threat_id}), {"_id": 0})
 
     investigation = await db.investigations.find_one(
-        {"id": investigation_id},
+        scoped(user, {"id": investigation_id}),
         {"_id": 0, "title": 1, "case_number": 1},
     )
     investigation_title = (
@@ -98,11 +99,11 @@ async def sync_action_to_investigation_status(
     target_status = "completed" if new_status in ("completed", "closed") else "in_progress"
 
     await db.central_actions.update_many(
-        {
+        scoped_job({
             "source_type": "investigation",
             "source_id": investigation_id,
             "status": {"$ne": target_status},
-        },
+        }),
         {
             "$set": {
                 "status": target_status,
@@ -114,8 +115,8 @@ async def sync_action_to_investigation_status(
 
 async def delete_investigation_action(investigation_id: str) -> int:
     """Delete the action linked to a (now deleted) investigation."""
-    result = await db.central_actions.delete_many({
+    result = await db.central_actions.delete_many(scoped_job({
         "source_type": "investigation",
         "source_id": investigation_id,
-    })
+    }))
     return result.deleted_count

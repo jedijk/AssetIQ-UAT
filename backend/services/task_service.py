@@ -15,6 +15,9 @@ from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
 
+from services.tenant_scope import scoped, scoped_job
+from services.tenant_schema import BACKFILL_TENANT_ID, with_tenant_id
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,6 +45,18 @@ def _safe_isoformat(value):
 
 class TaskService:
     """Service for task management operations."""
+
+    @staticmethod
+    def _scope(user: Optional[dict], query: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return scoped(user, query) if user else scoped_job(query)
+
+    @staticmethod
+    def _stamp_user(user: Optional[dict]) -> Optional[dict]:
+        if user:
+            return user
+        if BACKFILL_TENANT_ID:
+            return {"company_id": BACKFILL_TENANT_ID}
+        return None
     
     def __init__(self, db):
         """Initialize with a database proxy (supports dynamic per-request switching)."""
@@ -54,7 +69,9 @@ class TaskService:
     
     # ==================== TASK TEMPLATES ====================
     
-    async def create_template(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+    async def create_template(
+        self, data: Dict[str, Any], created_by: str, user: Optional[dict] = None
+    ) -> Dict[str, Any]:
         """Create a new task template."""
         import uuid
         now = datetime.now(timezone.utc)
@@ -88,7 +105,7 @@ class TaskService:
             "updated_at": now,
         }
         
-        result = await self.templates.insert_one(doc)
+        result = await self.templates.insert_one(with_tenant_id(doc, self._stamp_user(user)))
         doc["_id"] = result.inserted_id
         
         return self._serialize_template(doc)
@@ -101,7 +118,8 @@ class TaskService:
         search: Optional[str] = None,
         active_only: bool = True,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get task templates with filters."""
         
@@ -126,32 +144,34 @@ class TaskService:
             if search_clause:
                 query.update(search_clause)
         
-        cursor = self.templates.find(query).sort("name", 1).skip(skip).limit(limit)
+        scoped_query = self._scope(user, query)
+        cursor = self.templates.find(scoped_query).sort("name", 1).skip(skip).limit(limit)
         
         templates = []
         async for doc in cursor:
             templates.append(self._serialize_template(doc))
         
-        total = await self.templates.count_documents(query)
+        total = await self.templates.count_documents(scoped_query)
         
         return {"total": total, "templates": templates}
     
-    async def get_template_by_id(self, template_id: str) -> Optional[Dict[str, Any]]:
+    async def get_template_by_id(
+        self, template_id: str, user: Optional[dict] = None
+    ) -> Optional[Dict[str, Any]]:
         """Get a specific template by id (string UUID) or _id (ObjectId)."""
-        # First try to find by string 'id' field
-        doc = await self.templates.find_one({"id": template_id})
+        doc = await self.templates.find_one(self._scope(user, {"id": template_id}))
         if doc:
             return self._serialize_template(doc)
-        
-        # Fallback to ObjectId lookup
         if ObjectId.is_valid(template_id):
-            doc = await self.templates.find_one({"_id": ObjectId(template_id)})
+            doc = await self.templates.find_one(self._scope(user, {"_id": ObjectId(template_id)}))
             if doc:
                 return self._serialize_template(doc)
         
         return None
     
-    async def update_template(self, template_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_template(
+        self, template_id: str, data: Dict[str, Any], user: Optional[dict] = None
+    ) -> Optional[Dict[str, Any]]:
         """Update a task template."""
         update = {"updated_at": datetime.now(timezone.utc)}
         
@@ -167,17 +187,14 @@ class TaskService:
             if field in data and data[field] is not None:
                 update[field] = data[field]
         
-        # Try to find by string 'id' field first
         result = await self.templates.find_one_and_update(
-            {"id": template_id},
+            self._scope(user, {"id": template_id}),
             {"$set": update},
             return_document=True
         )
-        
-        # Fallback to ObjectId lookup
         if not result and ObjectId.is_valid(template_id):
             result = await self.templates.find_one_and_update(
-                {"_id": ObjectId(template_id)},
+                self._scope(user, {"_id": ObjectId(template_id)}),
                 {"$set": update},
                 return_document=True
             )
@@ -186,30 +203,25 @@ class TaskService:
             return self._serialize_template(result)
         return None
     
-    async def delete_template(self, template_id: str) -> bool:
+    async def delete_template(self, template_id: str, user: Optional[dict] = None) -> bool:
         """Delete a task template (soft delete by deactivating)."""
-        # Check if any active plans use this template
-        plans_count = await self.plans.count_documents({
+        plans_count = await self.plans.count_documents(self._scope(user, {
             "task_template_id": template_id,
             "is_active": True
-        })
+        }))
         
         if plans_count > 0:
             raise ValueError(f"Cannot delete template: {plans_count} active plans use it")
         
-        # Try to find by string 'id' field first
         result = await self.templates.update_one(
-            {"id": template_id},
+            self._scope(user, {"id": template_id}),
             {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
         )
-        
         if result.modified_count > 0:
             return True
-        
-        # Fallback to ObjectId lookup
         if ObjectId.is_valid(template_id):
             result = await self.templates.update_one(
-                {"_id": ObjectId(template_id)},
+                self._scope(user, {"_id": ObjectId(template_id)}),
                 {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
             )
             return result.modified_count > 0
@@ -218,17 +230,17 @@ class TaskService:
     
     # ==================== TASK PLANS ====================
     
-    async def create_plan(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+    async def create_plan(
+        self, data: Dict[str, Any], created_by: str, user: Optional[dict] = None
+    ) -> Dict[str, Any]:
         """Create a task plan for specific equipment."""
         now = datetime.now(timezone.utc)
         
-        # Validate equipment exists
-        equipment = await self.equipment.find_one({"id": data["equipment_id"]})
+        equipment = await self.equipment.find_one(self._scope(user, {"id": data["equipment_id"]}))
         if not equipment:
             raise ValueError("Equipment not found")
         
-        # Validate template exists
-        template = await self.get_template_by_id(data["task_template_id"])
+        template = await self.get_template_by_id(data["task_template_id"], user=user)
         if not template:
             raise ValueError("Task template not found")
         
@@ -276,11 +288,12 @@ class TaskService:
         form_template_name = None
         if form_template_id:
             # Try finding by 'id' field first (string ID)
-            form_template = await self.db.form_templates.find_one({"id": form_template_id})
-            # If not found, try by ObjectId
+            form_template = await self.db.form_templates.find_one(self._scope(user, {"id": form_template_id}))
             if not form_template:
                 try:
-                    form_template = await self.db.form_templates.find_one({"_id": ObjectId(form_template_id)})
+                    form_template = await self.db.form_templates.find_one(
+                        self._scope(user, {"_id": ObjectId(form_template_id)})
+                    )
                 except Exception:
                     pass
             if form_template:
@@ -338,17 +351,16 @@ class TaskService:
             "updated_at": now,
         }
         
-        result = await self.plans.insert_one(doc)
+        result = await self.plans.insert_one(with_tenant_id(doc, self._stamp_user(user)))
         doc["_id"] = result.inserted_id
         
-        # Increment template usage count - try by string id first, then ObjectId
         update_result = await self.templates.update_one(
-            {"id": data["task_template_id"]},
+            self._scope(user, {"id": data["task_template_id"]}),
             {"$inc": {"usage_count": 1}}
         )
         if update_result.modified_count == 0 and ObjectId.is_valid(data["task_template_id"]):
             await self.templates.update_one(
-                {"_id": ObjectId(data["task_template_id"])},
+                self._scope(user, {"_id": ObjectId(data["task_template_id"])}),
                 {"$inc": {"usage_count": 1}}
             )
         
@@ -361,7 +373,8 @@ class TaskService:
         active_only: bool = True,
         due_before: Optional[datetime] = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get task plans with filters."""
         
@@ -379,40 +392,41 @@ class TaskService:
         if due_before:
             query["next_due_date"] = {"$lte": due_before}
         
-        cursor = self.plans.find(query).sort("next_due_date", 1).skip(skip).limit(limit)
+        scoped_query = self._scope(user, query)
+        cursor = self.plans.find(scoped_query).sort("next_due_date", 1).skip(skip).limit(limit)
         
         plans = []
         async for doc in cursor:
             plans.append(self._serialize_plan(doc))
         
-        total = await self.plans.count_documents(query)
+        total = await self.plans.count_documents(scoped_query)
         
         return {"total": total, "plans": plans}
     
-    async def get_plan_by_id(self, plan_id: str) -> Optional[Dict[str, Any]]:
+    async def get_plan_by_id(
+        self, plan_id: str, user: Optional[dict] = None
+    ) -> Optional[Dict[str, Any]]:
         """Get a specific plan by id (string UUID) or _id (ObjectId)."""
-        # First try to find by string 'id' field
-        doc = await self.plans.find_one({"id": plan_id})
+        doc = await self.plans.find_one(self._scope(user, {"id": plan_id}))
         if doc:
             return self._serialize_plan(doc)
-        
-        # Fallback to ObjectId lookup
         if ObjectId.is_valid(plan_id):
-            doc = await self.plans.find_one({"_id": ObjectId(plan_id)})
+            doc = await self.plans.find_one(self._scope(user, {"_id": ObjectId(plan_id)}))
             if doc:
                 return self._serialize_plan(doc)
         
         return None
     
-    async def update_plan(self, plan_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_plan(
+        self, plan_id: str, data: Dict[str, Any], user: Optional[dict] = None
+    ) -> Optional[Dict[str, Any]]:
         """Update a task plan."""
-        # First try to find by string 'id' field
-        existing = await self.plans.find_one({"id": plan_id})
+        existing = await self.plans.find_one(self._scope(user, {"id": plan_id}))
         query_field = "id" if existing else "_id"
         query_value = plan_id if existing else (ObjectId(plan_id) if ObjectId.is_valid(plan_id) else None)
         
         if not existing and query_value:
-            existing = await self.plans.find_one({"_id": query_value})
+            existing = await self.plans.find_one(self._scope(user, {"_id": query_value}))
         
         if not existing:
             return None
@@ -437,7 +451,7 @@ class TaskService:
             update["next_due_date"] = self._calculate_next_due(base_date, interval_value, interval_unit)
         
         result = await self.plans.find_one_and_update(
-            {query_field: query_value},
+            self._scope(user, {query_field: query_value}),
             {"$set": update},
             return_document=True
         )
@@ -446,35 +460,32 @@ class TaskService:
             return self._serialize_plan(result)
         return None
     
-    async def delete_plan(self, plan_id: str) -> bool:
+    async def delete_plan(self, plan_id: str, user: Optional[dict] = None) -> bool:
         """Deactivate a task plan."""
-        # First try to find by string 'id' field
-        plan = await self.plans.find_one({"id": plan_id})
+        plan = await self.plans.find_one(self._scope(user, {"id": plan_id}))
         query_field = "id" if plan else "_id"
         query_value = plan_id if plan else (ObjectId(plan_id) if ObjectId.is_valid(plan_id) else None)
         
         if not plan and query_value:
-            plan = await self.plans.find_one({"_id": query_value})
+            plan = await self.plans.find_one(self._scope(user, {"_id": query_value}))
         
         if not plan:
             return False
         
         result = await self.plans.update_one(
-            {query_field: query_value},
+            self._scope(user, {query_field: query_value}),
             {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
         )
         
-        # Decrement template usage count
         if result.modified_count > 0 and plan.get("task_template_id"):
-            # Try by string id first, then ObjectId
             template_id = plan["task_template_id"]
             update_result = await self.templates.update_one(
-                {"id": template_id},
+                self._scope(user, {"id": template_id}),
                 {"$inc": {"usage_count": -1}}
             )
             if update_result.modified_count == 0 and ObjectId.is_valid(template_id):
                 await self.templates.update_one(
-                    {"_id": ObjectId(template_id)},
+                    self._scope(user, {"_id": ObjectId(template_id)}),
                     {"$inc": {"usage_count": -1}}
                 )
         
@@ -482,17 +493,17 @@ class TaskService:
     
     # ==================== TASK INSTANCES ====================
     
-    async def create_instance(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+    async def create_instance(
+        self, data: Dict[str, Any], created_by: str, user: Optional[dict] = None
+    ) -> Dict[str, Any]:
         """Create a task instance."""
         now = datetime.now(timezone.utc)
         
-        # Get plan details
-        plan = await self.get_plan_by_id(data["task_plan_id"])
+        plan = await self.get_plan_by_id(data["task_plan_id"], user=user)
         if not plan:
             raise ValueError("Task plan not found")
         
-        # Get template for additional info
-        template = await self.get_template_by_id(plan["task_template_id"])
+        template = await self.get_template_by_id(plan["task_template_id"], user=user)
         
         doc = {
             "id": str(uuid.uuid4()),
@@ -524,17 +535,19 @@ class TaskService:
             "updated_at": now,
         }
         
-        result = await self.instances.insert_one(doc)
+        result = await self.instances.insert_one(with_tenant_id(doc, self._stamp_user(user)))
         doc["_id"] = result.inserted_id
         
         return self._serialize_instance(doc)
     
-    async def create_adhoc_instance(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+    async def create_adhoc_instance(
+        self, data: Dict[str, Any], created_by: str, user: Optional[dict] = None
+    ) -> Dict[str, Any]:
         """Create an ad-hoc task instance directly from a template (no plan required)."""
         now = datetime.now(timezone.utc)
         
         # Get template details
-        template = await self.get_template_by_id(data["task_template_id"])
+        template = await self.get_template_by_id(data["task_template_id"], user=user)
         if not template:
             raise ValueError("Task template not found")
         
@@ -554,7 +567,7 @@ class TaskService:
         # Get equipment name if equipment_id provided
         equipment_name = data.get("equipment_name")
         if data.get("equipment_id") and not equipment_name:
-            equipment = await self.equipment.find_one({"id": data["equipment_id"]})
+            equipment = await self.equipment.find_one(self._scope(user, {"id": data["equipment_id"]}))
             if equipment:
                 equipment_name = equipment.get("name", "Unknown")
         
@@ -563,7 +576,9 @@ class TaskService:
         form_template_name = None
         if template.get("form_template_id"):
             try:
-                form_template = await self.db.form_templates.find_one({"_id": ObjectId(str(template["form_template_id"]))})
+                form_template = await self.db.form_templates.find_one(
+                    self._scope(user, {"_id": ObjectId(str(template["form_template_id"]))})
+                )
                 if form_template:
                     form_fields = form_template.get("fields", [])
                     form_template_name = form_template.get("name", "")
@@ -606,7 +621,7 @@ class TaskService:
             "updated_at": now,
         }
         
-        result = await self.instances.insert_one(doc)
+        result = await self.instances.insert_one(with_tenant_id(doc, self._stamp_user(user)))
         doc["_id"] = result.inserted_id
         
         return self._serialize_instance(doc)
@@ -621,7 +636,8 @@ class TaskService:
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get task instances with filters."""
         import asyncio
@@ -672,18 +688,16 @@ class TaskService:
         }
         
         # Run count and fetch in parallel for better performance
+        scoped_query = self._scope(user, query)
+        
         async def fetch_instances():
-            cursor = self.instances.find(query, projection).sort("scheduled_date", 1).skip(skip).limit(limit)
+            cursor = self.instances.find(scoped_query, projection).sort("scheduled_date", 1).skip(skip).limit(limit)
             instances = []
             async for doc in cursor:
                 instances.append(self._serialize_instance(doc))
             return instances
         
-        # Use estimated count for unfiltered queries (much faster)
-        if query:
-            count_task = self.instances.count_documents(query)
-        else:
-            count_task = self.instances.estimated_document_count()
+        count_task = self.instances.count_documents(scoped_query)
         
         fetch_task = fetch_instances()
         
@@ -700,7 +714,9 @@ class TaskService:
             return self._serialize_instance(doc)
         return None
     
-    async def update_instance(self, instance_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_instance(
+        self, instance_id: str, data: Dict[str, Any], user: Optional[dict] = None
+    ) -> Optional[Dict[str, Any]]:
         """Update a task instance."""
         from services.task_instance_bridge import resolve_task_instance
 
@@ -721,7 +737,7 @@ class TaskService:
                 update[field] = data[field]
         
         result = await self.instances.find_one_and_update(
-            {"_id": instance["_id"]},
+            self._scope(user, {"_id": instance["_id"]}),
             {"$set": update},
             return_document=True
         )
@@ -730,7 +746,9 @@ class TaskService:
             return self._serialize_instance(result)
         return None
     
-    async def start_task(self, instance_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    async def start_task(
+        self, instance_id: str, user_id: str, user: Optional[dict] = None
+    ) -> Optional[Dict[str, Any]]:
         """Mark a task as started."""
         from services.task_instance_bridge import resolve_task_instance
 
@@ -739,7 +757,7 @@ class TaskService:
             return None
 
         result = await self.instances.find_one_and_update(
-            {"_id": instance["_id"]},
+            self._scope(user, {"_id": instance["_id"]}),
             {"$set": {
                 "status": "in_progress",
                 "started_at": datetime.now(timezone.utc),
@@ -753,7 +771,14 @@ class TaskService:
             return self._serialize_instance(result)
         return None
     
-    async def complete_task(self, instance_id: str, data: Dict[str, Any], completed_by_id: str = None, completed_by_name: str = None) -> Optional[Dict[str, Any]]:
+    async def complete_task(
+        self,
+        instance_id: str,
+        data: Dict[str, Any],
+        completed_by_id: str = None,
+        completed_by_name: str = None,
+        user: Optional[dict] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Mark a task as completed and update plan."""
         from services.task_instance_bridge import resolve_task_instance
 
@@ -808,7 +833,7 @@ class TaskService:
         
         # Use _id from the found instance for the update query
         result = await self.instances.find_one_and_update(
-            {"_id": instance["_id"]},
+            self._scope(user, {"_id": instance["_id"]}),
             {"$set": update},
             return_document=True
         )
@@ -833,12 +858,12 @@ class TaskService:
                     if ftid:
                         if _OID.is_valid(str(ftid)):
                             ft = await self.db.form_templates.find_one(
-                                {"_id": _OID(str(ftid))},
+                                self._scope(user, {"_id": _OID(str(ftid))}),
                                 {"_id": 0, "label_print_config": 1},
                             )
                         if not ft:
                             ft = await self.db.form_templates.find_one(
-                                {"id": str(ftid)},
+                                self._scope(user, {"id": str(ftid)}),
                                 {"_id": 0, "label_print_config": 1},
                             )
                     if ft:
@@ -852,7 +877,7 @@ class TaskService:
                 # Handle both ObjectId string and UUID formats
                 plan = None
                 try:
-                    plan = await self.plans.find_one({"_id": ObjectId(plan_id)})
+                    plan = await self.plans.find_one(self._scope(user, {"_id": ObjectId(plan_id)}))
                 except Exception:
                     # If ObjectId conversion fails, the plan_id might be a UUID
                     # which means there's no valid plan to update
@@ -865,7 +890,7 @@ class TaskService:
                         plan["interval_unit"]
                     )
                     await self.plans.update_one(
-                        {"_id": plan["_id"]},
+                        self._scope(user, {"_id": plan["_id"]}),
                         {"$set": {
                             "last_executed_at": now,
                             "next_due_date": next_due,
@@ -899,7 +924,7 @@ class TaskService:
             return serialized
         return None
 
-    async def delete_instance(self, instance_id: str) -> bool:
+    async def delete_instance(self, instance_id: str, user: Optional[dict] = None) -> bool:
         """Delete a task instance."""
         from services.task_instance_bridge import resolve_task_instance
 
@@ -907,7 +932,7 @@ class TaskService:
             instance = await resolve_task_instance(instance_id)
             if not instance:
                 return False
-            result = await self.instances.delete_one({"_id": instance["_id"]})
+            result = await self.instances.delete_one(self._scope(user, {"_id": instance["_id"]}))
             return result.deleted_count > 0
         except Exception:
             return False
@@ -918,11 +943,12 @@ class TaskService:
         self,
         plan_id: str,
         horizon_days: int = 30,
-        created_by: str = "system"
+        created_by: str = "system",
+        user: Optional[dict] = None,
     ) -> List[Dict[str, Any]]:
         """Generate task instances for a plan within the horizon and date range."""
         
-        plan = await self.get_plan_by_id(plan_id)
+        plan = await self.get_plan_by_id(plan_id, user=user)
         if not plan or not plan["is_active"]:
             return []
         
@@ -967,11 +993,11 @@ class TaskService:
             return []
         
         # Get existing instances to avoid duplicates
-        existing = await self.instances.find({
+        existing = await self.instances.find(self._scope(user, {
             "task_plan_id": plan_id,
             "scheduled_date": {"$gte": generation_start, "$lte": generation_end},
             "status": {"$in": ["planned", "scheduled"]}
-        }).to_list(100)
+        })).to_list(100)
         
         existing_dates = set()
         for inst in existing:
@@ -1010,7 +1036,7 @@ class TaskService:
                         "scheduled_date": current_date,
                         "due_date": current_date + timedelta(days=1),  # 1 day grace period
                         "priority": "medium",
-                    }, created_by)
+                    }, created_by, user=user)
                     generated.append(instance)
             
             # Calculate next occurrence
@@ -1033,9 +1059,9 @@ class TaskService:
         horizon_end = now + timedelta(days=horizon_days)
         
         # Get all active plans - we'll filter dates in Python since dates might be stored as strings
-        all_active_plans = await self.plans.find({
+        all_active_plans = await self.plans.find(self._scope(None, {
             "is_active": True
-        }).to_list(1000)
+        })).to_list(1000)
         
         # Filter plans based on next_due_date and effective_until
         plans = []
@@ -1083,7 +1109,7 @@ class TaskService:
         for plan in plans:
             plan_id = plan.get("id") or str(plan["_id"])
             instances = await self.generate_instances_for_plan(
-                plan_id, horizon_days, created_by
+                plan_id, horizon_days, created_by, user=None
             )
             total_generated += len(instances)
             plans_processed += 1
@@ -1099,10 +1125,10 @@ class TaskService:
         now = datetime.now(timezone.utc)
         
         result = await self.instances.update_many(
-            {
+            scoped_job({
                 "status": {"$in": ["planned", "scheduled"]},
                 "due_date": {"$lt": now}
-            },
+            }),
             {"$set": {"status": "overdue", "updated_at": now}}
         )
         
@@ -1110,41 +1136,37 @@ class TaskService:
     
     # ==================== DASHBOARD / STATS ====================
     
-    async def get_task_stats(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_task_stats(
+        self, user_id: Optional[str] = None, user: Optional[dict] = None
+    ) -> Dict[str, Any]:
         """Get task statistics."""
         
         now = datetime.now(timezone.utc)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         week_end = today_start + timedelta(days=7)
         
-        # Don't filter by user for overall stats
-        base_query = {}
-        
-        # Count by status
         status_counts = {}
         for status in ["planned", "scheduled", "in_progress", "completed", "overdue"]:
-            query = {**base_query, "status": status}
-            status_counts[status] = await self.instances.count_documents(query)
+            status_counts[status] = await self.instances.count_documents(
+                self._scope(user, {"status": status})
+            )
         
-        # Due this week
-        due_this_week = await self.instances.count_documents({
-            **base_query,
-            "status": {"$in": ["planned", "scheduled"]},
-            "due_date": {"$gte": today_start, "$lte": week_end}
-        })
+        due_this_week = await self.instances.count_documents(
+            self._scope(user, {
+                "status": {"$in": ["planned", "scheduled"]},
+                "due_date": {"$gte": today_start, "$lte": week_end}
+            })
+        )
         
-        # Completed this week
-        completed_this_week = await self.instances.count_documents({
-            **base_query,
-            "status": "completed",
-            "completed_at": {"$gte": today_start}
-        })
+        completed_this_week = await self.instances.count_documents(
+            self._scope(user, {
+                "status": "completed",
+                "completed_at": {"$gte": today_start}
+            })
+        )
         
-        # Active plans count
-        active_plans = await self.plans.count_documents({"is_active": True})
-        
-        # Active templates count
-        active_templates = await self.templates.count_documents({"is_active": True})
+        active_plans = await self.plans.count_documents(self._scope(user, {"is_active": True}))
+        active_templates = await self.templates.count_documents(self._scope(user, {"is_active": True}))
         
         return {
             "by_status": status_counts,
@@ -1159,7 +1181,8 @@ class TaskService:
         self,
         from_date: datetime,
         to_date: datetime,
-        equipment_id: Optional[str] = None
+        equipment_id: Optional[str] = None,
+        user: Optional[dict] = None,
     ) -> List[Dict[str, Any]]:
         """Get tasks for calendar view."""
         
@@ -1170,7 +1193,7 @@ class TaskService:
         if equipment_id:
             query["equipment_id"] = equipment_id
         
-        cursor = self.instances.find(query).sort("scheduled_date", 1)
+        cursor = self.instances.find(self._scope(user, query)).sort("scheduled_date", 1)
         
         events = []
         async for doc in cursor:

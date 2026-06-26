@@ -19,6 +19,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import HTTPException, UploadFile, File, Form, BackgroundTasks
 from pydantic import BaseModel
 from database import db
+from services.tenant_scope import scoped
 from services.production_logs_parsing import (
     ColumnMapping,
     ParseTemplate,
@@ -191,7 +192,7 @@ async def detect_columns(user: dict,
     skip_rows: int = Form(0),
 ):
     """Read the first file in a job and return detected columns/sample rows."""
-    job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+    job = await db.log_ingestion_jobs.find_one(scoped(user, {"id": job_id}), {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -301,7 +302,7 @@ async def parse_preview(user: dict,
     template_json: str = Form(...),
 ):
     """Parse files using a template and return a preview of the first 100 records."""
-    job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+    job = await db.log_ingestion_jobs.find_one(scoped(user, {"id": job_id}), {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -384,7 +385,7 @@ async def ingest_logs(user: dict,
     background_tasks: BackgroundTasks,
 ):
     """Confirm and start async ingestion of parsed logs into production_logs collection."""
-    job = await db.log_ingestion_jobs.find_one({"id": request.job_id}, {"_id": 0})
+    job = await db.log_ingestion_jobs.find_one(scoped(user, {"id": request.job_id}), {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if job.get("status") == "completed":
@@ -428,7 +429,7 @@ async def batch_ingest_logs(user: dict,
     started = []
 
     for job_id in request.job_ids:
-        job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+        job = await db.log_ingestion_jobs.find_one(scoped(user, {"id": job_id}), {"_id": 0})
         if not job:
             continue
         if job.get("status") == "completed":
@@ -546,12 +547,12 @@ async def list_jobs(user: dict,
     """List all ingestion jobs. Auto-reconciles uploaded jobs whose files are already ingested."""
     # Auto-reconcile: check if any "uploaded" jobs have files already in production_logs
     uploaded_jobs = await db.log_ingestion_jobs.find(
-        {"status": "uploaded"}, {"_id": 1, "id": 1, "files": 1}
+        scoped(user, {"status": "uploaded"}), {"_id": 1, "id": 1, "files": 1}
     ).to_list(200)
 
     if uploaded_jobs:
         # Get all ingested filenames in one query
-        ingested_filenames = set(await db.production_logs.distinct("source.filename"))
+        ingested_filenames = set(await db.production_logs.distinct("source.filename", scoped(user, {})))
 
         for job in uploaded_jobs:
             fnames = [f.get("filename", "") for f in job.get("files", [])]
@@ -559,7 +560,7 @@ async def list_jobs(user: dict,
             if matched > 0:
                 # Count actual ingested records for this job's files
                 count = await db.production_logs.count_documents(
-                    {"source.filename": {"$in": fnames}}
+                    scoped(user, {"source.filename": {"$in": fnames}})
                 )
                 if count > 0:
                     await db.log_ingestion_jobs.update_one(
@@ -568,7 +569,7 @@ async def list_jobs(user: dict,
                     )
 
     jobs = await db.log_ingestion_jobs.find(
-        {}, {"_id": 0}
+        scoped(user, {}), {"_id": 0}
     ).sort("created_at", -1).to_list(200)
 
     return {"jobs": jobs}
@@ -578,7 +579,7 @@ async def get_job(user: dict,
     job_id: str,
 ):
     """Get details of a specific ingestion job."""
-    job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+    job = await db.log_ingestion_jobs.find_one(scoped(user, {"id": job_id}), {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -589,7 +590,7 @@ async def delete_job(user: dict,
     job_id: str,
 ):
     """Delete a job and its ingested data."""
-    job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+    job = await db.log_ingestion_jobs.find_one(scoped(user, {"id": job_id}), {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -615,7 +616,7 @@ async def save_template(user: dict,
 ):
     """Save a parse template for reuse."""
     # Check for duplicate name
-    existing = await db.log_parse_templates.find_one({"name": request.name})
+    existing = await db.log_parse_templates.find_one(scoped(user, {"name": request.name}))
     if existing:
         raise HTTPException(status_code=400, detail="Template with this name already exists")
     
@@ -642,7 +643,7 @@ async def list_templates(user: dict,
 ):
     """List all saved parse templates."""
     templates = await db.log_parse_templates.find(
-        {}, {"_id": 0}
+        scoped(user, {}), {"_id": 0}
     ).sort("created_at", -1).to_list(100)
     
     return {"templates": templates}
@@ -652,7 +653,7 @@ async def get_template(user: dict,
     template_id: str,
 ):
     """Get a specific template."""
-    template = await db.log_parse_templates.find_one({"id": template_id}, {"_id": 0})
+    template = await db.log_parse_templates.find_one(scoped(user, {"id": template_id}), {"_id": 0})
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     
@@ -664,13 +665,13 @@ async def update_template(user: dict,
     request: SaveTemplateRequest,
 ):
     """Update an existing template."""
-    template = await db.log_parse_templates.find_one({"id": template_id})
+    template = await db.log_parse_templates.find_one(scoped(user, {"id": template_id}))
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     
     # Check for duplicate name (if changed)
     if request.name != template.get("name"):
-        existing = await db.log_parse_templates.find_one({"name": request.name, "id": {"$ne": template_id}})
+        existing = await db.log_parse_templates.find_one(scoped(user, {"name": request.name, "id": {"$ne": template_id}}))
         if existing:
             raise HTTPException(status_code=400, detail="Template with this name already exists")
     
@@ -713,7 +714,7 @@ async def batch_ingest_with_saved_template(user: dict,
         raise HTTPException(status_code=400, detail="No jobs selected")
     
     # Get the saved template
-    saved_template = await db.log_parse_templates.find_one({"id": request.template_id}, {"_id": 0})
+    saved_template = await db.log_parse_templates.find_one(scoped(user, {"id": request.template_id}), {"_id": 0})
     if not saved_template:
         raise HTTPException(status_code=404, detail="Template not found")
     
@@ -727,7 +728,7 @@ async def batch_ingest_with_saved_template(user: dict,
     match_reports = []
     
     for job_id in request.job_ids:
-        job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+        job = await db.log_ingestion_jobs.find_one(scoped(user, {"id": job_id}), {"_id": 0})
         if not job:
             continue
         if job.get("status") == "completed":
@@ -849,12 +850,12 @@ async def preview_template_match(user: dict,
     Useful for verifying the fuzzy matching before batch processing.
     """
     # Get job
-    job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+    job = await db.log_ingestion_jobs.find_one(scoped(user, {"id": job_id}), {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
     # Get template
-    saved_template = await db.log_parse_templates.find_one({"id": template_id}, {"_id": 0})
+    saved_template = await db.log_parse_templates.find_one(scoped(user, {"id": template_id}), {"_id": 0})
     if not saved_template:
         raise HTTPException(status_code=404, detail="Template not found")
     
@@ -995,8 +996,9 @@ async def query_entries(user: dict,
             ts_filter["$lte"] = end
         match_stage["timestamp"] = ts_filter
 
+    scoped_match = scoped(user, match_stage)
     pipeline = [
-        {"$match": match_stage} if match_stage else {"$match": {}},
+        {"$match": scoped_match},
         # Sort so entries WITH mooney_viscosity come first (non-empty string > empty)
         {"$addFields": {
             "_has_visc": {"$cond": [
@@ -1021,7 +1023,7 @@ async def query_entries(user: dict,
 
     # Count deduplicated total
     count_pipeline = [
-        {"$match": match_stage} if match_stage else {"$match": {}},
+        {"$match": scoped_match},
         {"$group": {"_id": {"timestamp": "$timestamp", "asset_id": "$asset_id"}}},
         {"$count": "total"},
     ]
@@ -1039,7 +1041,7 @@ async def get_available_dates(user: dict,
     if asset_id:
         match["asset_id"] = asset_id
     pipeline = [
-        {"$match": match} if match else {"$match": {}},
+        {"$match": scoped(user, match)},
         {"$addFields": {"_date": {"$substr": ["$timestamp", 0, 10]}}},
         {"$group": {"_id": "$_date"}},
         {"$sort": {"_id": -1}},
@@ -1053,27 +1055,29 @@ async def get_available_dates(user: dict,
 async def get_log_stats(user: dict,
 ):
     """Get overall production log statistics."""
-    total = await db.production_logs.count_documents({})
+    total = await db.production_logs.count_documents(scoped(user, {}))
 
     # Event type counts
     event_pipeline = [
+        {"$match": scoped(user, {})},
         {"$group": {"_id": "$event_type", "count": {"$sum": 1}}}
     ]
     events = await db.production_logs.aggregate(event_pipeline).to_list(10)
 
     # Unique assets
     asset_pipeline = [
+        {"$match": scoped(user, {})},
         {"$group": {"_id": "$asset_id"}},
         {"$count": "total"}
     ]
     assets = await db.production_logs.aggregate(asset_pipeline).to_list(1)
 
     # Jobs summary
-    jobs_total = await db.log_ingestion_jobs.count_documents({})
-    jobs_completed = await db.log_ingestion_jobs.count_documents({"status": "completed"})
-    jobs_pending = await db.log_ingestion_jobs.count_documents({"status": {"$in": ["uploaded", "previewed", "processing"]}})
+    jobs_total = await db.log_ingestion_jobs.count_documents(scoped(user, {}))
+    jobs_completed = await db.log_ingestion_jobs.count_documents(scoped(user, {"status": "completed"}))
+    jobs_pending = await db.log_ingestion_jobs.count_documents(scoped(user, {"status": {"$in": ["uploaded", "previewed", "processing"]}}))
     total_files = 0
-    async for j in db.log_ingestion_jobs.find({}, {"total_files": 1, "_id": 0}):
+    async for j in db.log_ingestion_jobs.find(scoped(user, {}), {"total_files": 1, "_id": 0}):
         total_files += j.get("total_files", 0)
 
     return {
@@ -1093,7 +1097,7 @@ async def run_aggregation(user: dict,
     background_tasks: BackgroundTasks,
 ):
     """Build/rebuild asset_history aggregations from production_logs."""
-    total = await db.production_logs.count_documents({})
+    total = await db.production_logs.count_documents(scoped(user, {}))
     if total == 0:
         raise HTTPException(status_code=400, detail="No production logs to aggregate")
 
@@ -1134,7 +1138,7 @@ async def get_asset_history(user: dict,
             hour_filter["$lte"] = end
         query["hour"] = hour_filter
 
-    docs = await db.asset_history.find(query, {"_id": 0}).sort("hour", 1).limit(limit).to_list(limit)
+    docs = await db.asset_history.find(scoped(user, query), {"_id": 0}).sort("hour", 1).limit(limit).to_list(limit)
     return {"history": docs, "total": len(docs)}
 
 
@@ -1142,6 +1146,7 @@ async def list_log_assets(user: dict,
 ):
     """List all unique asset_ids in production logs."""
     pipeline = [
+        {"$match": scoped(user, {})},
         {"$group": {"_id": "$asset_id", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
     ]
@@ -1165,7 +1170,7 @@ async def get_timeseries(user: dict,
             hour_filter["$lte"] = end
         query["hour"] = hour_filter
 
-    docs = await db.asset_history.find(query, {"_id": 0}).sort("hour", 1).limit(2000).to_list(2000)
+    docs = await db.asset_history.find(scoped(user, query), {"_id": 0}).sort("hour", 1).limit(2000).to_list(2000)
 
     # Build time series
     timestamps = []
@@ -1207,7 +1212,7 @@ async def ai_parse_file(user: dict,
 
     uid, cid = user_context(user)
 
-    job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
+    job = await db.log_ingestion_jobs.find_one(scoped(user, {"id": job_id}), {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 

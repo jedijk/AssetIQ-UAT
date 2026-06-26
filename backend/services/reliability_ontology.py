@@ -103,12 +103,12 @@ RELATIONS: List[Dict[str, Any]] = [
     {"id": "executed_on", "label": "executed on", "source": "task_instance", "target": "equipment", "domain": "maintenance"},
     {"id": "completed_on", "label": "completed on", "source": "scheduled_task", "target": "equipment", "domain": "maintenance"},
     {"id": "cancelled_for", "label": "cancelled for", "source": "scheduled_task", "target": "program_task", "domain": "maintenance"},
-    {"id": "yielded_finding", "label": "yielded observation", "source": "task_completion", "target": "observation", "domain": "reactive"},
-    {"id": "found_on", "label": "found on", "source": "observation", "target": "equipment", "domain": "reactive"},
+    {"id": "yielded_finding", "label": "yielded finding", "source": "task_completion", "target": "finding", "domain": "reactive"},
+    {"id": "found_on", "label": "found on", "source": "finding", "target": "equipment", "domain": "reactive"},
     {"id": "observed_on", "label": "observed on", "source": "observation", "target": "equipment", "domain": "reactive"},
     {"id": "indicates_failure_mode", "label": "indicates failure mode", "source": "observation", "target": "failure_mode", "domain": "reactive"},
-    {"id": "linked_to_equipment", "label": "linked to equipment", "source": "observation", "target": "equipment", "domain": "reactive"},
-    {"id": "triggered_investigation", "label": "triggered investigation", "source": "observation", "target": "investigation", "domain": "reactive"},
+    {"id": "linked_to_equipment", "label": "linked to equipment", "source": "threat", "target": "equipment", "domain": "reactive"},
+    {"id": "triggered_investigation", "label": "triggered investigation", "source": "threat", "target": "investigation", "domain": "reactive"},
     {"id": "identified_cause", "label": "identified cause", "source": "investigation", "target": "cause", "domain": "reactive"},
     {"id": "generated_action", "label": "generated action", "source": "investigation", "target": "action", "domain": "reactive"},
     {"id": "assigned_to_equipment", "label": "assigned to equipment", "source": "action", "target": "equipment", "domain": "reactive"},
@@ -116,8 +116,8 @@ RELATIONS: List[Dict[str, Any]] = [
     {"id": "impacted_reliability", "label": "impacted reliability", "source": "outcome", "target": "reliability_impact", "domain": "reactive"},
     {"id": "affects_equipment", "label": "affects equipment", "source": "reliability_impact", "target": "equipment", "domain": "reactive"},
     {"id": "used_on", "label": "used on", "source": "spare_part", "target": "equipment", "domain": "maintenance"},
-    {"id": "program_task_requires", "label": "requires", "source": "program_task", "target": "spare_part", "domain": "maintenance"},
-    {"id": "action_requires", "label": "requires", "source": "action", "target": "spare_part", "domain": "maintenance"},
+    {"id": "requires", "label": "requires spare part", "source": "program_task", "target": "spare_part", "domain": "maintenance"},
+    {"id": "requires", "label": "requires spare part", "source": "action", "target": "spare_part", "domain": "maintenance"},
 ]
 
 RELATION_LABELS: Dict[str, str] = {rel["id"]: rel["label"] for rel in RELATIONS}

@@ -13,6 +13,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from services.tenant_scope import scoped, scoped_job
 from services.pm_import_constants import (
     PM_IMPORT_DISPLAY_STATUSES,
     ACTION_TYPES,
@@ -50,7 +51,9 @@ class PMImportMixin:
         - equipment_impact_summary
         - equipment_impact_updated_at
         """
-        session = await self.sessions_collection.find_one({"session_id": session_id})
+        session = await self.sessions_collection.find_one(
+            scoped(current_user, {"session_id": session_id})
+        )
         if not session:
             return None
 
@@ -66,7 +69,7 @@ class PMImportMixin:
             return session
 
         # Use the SAME matchers as the upload pipeline so review and listing stay in sync.
-        tasks = await self._match_equipment_to_hierarchy(tasks)
+        tasks = await self._match_equipment_to_hierarchy(tasks, current_user=current_user)
 
         matched_task_count = 0
         for task in tasks:
@@ -80,7 +83,7 @@ class PMImportMixin:
         }
 
         await self.sessions_collection.update_one(
-            {"session_id": session_id},
+            scoped(current_user, {"session_id": session_id}),
             {"$set": {
                 "tasks_extracted": tasks,
                 "equipment_impact_summary": summary,
@@ -111,7 +114,7 @@ class PMImportMixin:
             if not equipment_ids:
                 return []
             return await self.db.equipment_nodes.find(
-                {"id": {"$in": list(equipment_ids)}},
+                scoped(current_user, {"id": {"$in": list(equipment_ids)}}),
                 {"_id": 0, "id": 1, "tag": 1, "name": 1, "level": 1},
             ).to_list(20000)
         except Exception as e:
@@ -252,7 +255,12 @@ class PMImportMixin:
             reason = "Weak match — not confirmed"
 
         return {"action": "skip", "target_failure_mode": None, "changes": [], "action_preview": None, "reason": reason}
-    async def _match_equipment_to_hierarchy(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _match_equipment_to_hierarchy(
+        self,
+        tasks: List[Dict[str, Any]],
+        *,
+        current_user: Optional[dict] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Match each task to ONE equipment node per the refactor spec.
         
@@ -261,7 +269,8 @@ class PMImportMixin:
         
         Stores a single `equipment_match` object (or None) per task.
         """
-        nodes_cursor = self.db.equipment_nodes.find({})
+        scope = (lambda q: scoped(current_user, q)) if current_user else scoped_job
+        nodes_cursor = self.db.equipment_nodes.find(scope({}))
         nodes = await nodes_cursor.to_list(20000)
         
         by_tag = {}
@@ -397,7 +406,7 @@ class PMImportMixin:
             task["equipment_tag"] = task.get("equipment_tag") or task.get("asset") or ""
             task["equipment_description"] = task.get("equipment_description") or task.get("component") or ""
 
-        type_map = await self._load_equipment_type_name_map()
+        type_map = await self._load_equipment_type_name_map(current_user)
         node_by_id = {n.get("id"): n for n in nodes if n.get("id")}
         for task in tasks:
             em = task.get("equipment_match")
@@ -407,9 +416,10 @@ class PMImportMixin:
         
         return tasks
 
-    async def _load_equipment_type_name_map(self) -> Dict[str, str]:
+    async def _load_equipment_type_name_map(self, current_user: Optional[dict] = None) -> Dict[str, str]:
         """Map equipment_type_id -> display name (ISO + custom types)."""
         type_map: Dict[str, str] = {}
+        scope = (lambda q: scoped(current_user, q)) if current_user else scoped_job
         try:
             from iso14224_models import EQUIPMENT_TYPES
             for t in EQUIPMENT_TYPES:
@@ -419,7 +429,9 @@ class PMImportMixin:
         except Exception as e:
             logger.warning("Could not load ISO equipment types for map: %s", e)
 
-        cursor = self.db.custom_equipment_types.find({}, {"_id": 0, "id": 1, "name": 1})
+        cursor = self.db.custom_equipment_types.find(
+            scope({}), {"_id": 0, "id": 1, "name": 1}
+        )
         async for doc in cursor:
             tid = doc.get("id")
             if tid:
@@ -456,7 +468,7 @@ class PMImportMixin:
             return
 
         nodes = await self.db.equipment_nodes.find(
-            {"id": {"$in": list(equipment_ids)}},
+            scoped_job({"id": {"$in": list(equipment_ids)}}),
             {"_id": 0, "id": 1, "equipment_type_id": 1},
         ).to_list(length=len(equipment_ids))
         type_map = await self._load_equipment_type_name_map()

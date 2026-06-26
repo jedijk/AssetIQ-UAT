@@ -7,6 +7,8 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from database import db
+from services.tenant_scope import scoped, scoped_job
+from services.tenant_schema import with_tenant_id
 
 DISCIPLINE_BEARING_COLLECTIONS = [
     ("form_templates", "discipline"),
@@ -17,6 +19,10 @@ DISCIPLINE_BEARING_COLLECTIONS = [
     ("maintenance_programs", "discipline"),
     ("maintenance_programs_v2", "discipline"),
 ]
+
+
+def _q(user: Optional[dict], query: Optional[dict] = None) -> dict:
+    return scoped(user, query) if user else scoped_job(query)
 
 
 class DisciplineCreate(BaseModel):
@@ -55,17 +61,20 @@ def _admin_only(user: dict) -> None:
         raise HTTPException(status_code=403, detail="Admin role required")
 
 
-async def list_disciplines(include_inactive: bool = False) -> dict:
+async def list_disciplines(
+    include_inactive: bool = False,
+    user: Optional[dict] = None,
+) -> dict:
     query = {} if include_inactive else {"is_active": True}
-    items = await db.disciplines.find(query, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    items = await db.disciplines.find(_q(user, query), {"_id": 0}).sort("sort_order", 1).to_list(200)
     return {"disciplines": items, "total": len(items)}
 
 
-async def normalize_discipline(value: str) -> dict:
+async def normalize_discipline(value: str, user: Optional[dict] = None) -> dict:
     if not value:
         return {"input": value, "normalized": None, "matched": False}
     lower = value.strip().lower()
-    items = await db.disciplines.find({}, {"_id": 0}).to_list(200)
+    items = await db.disciplines.find(_q(user, {}), {"_id": 0}).to_list(200)
     for d in items:
         if d["value"].lower() == lower or d["label"].lower() == lower:
             return {"input": value, "normalized": d["value"], "matched": True, "via": "direct"}
@@ -77,11 +86,13 @@ async def normalize_discipline(value: str) -> dict:
 async def create_discipline(user: dict, payload: DisciplineCreate) -> dict:
     _admin_only(user)
     value = payload.value.strip().lower().replace(" ", "_")
-    existing = await db.disciplines.find_one({"value": value}, {"_id": 0})
+    existing = await db.disciplines.find_one(scoped(user, {"value": value}), {"_id": 0})
     if existing:
         raise HTTPException(status_code=409, detail=f"Discipline '{value}' already exists")
     if payload.sort_order is None:
-        max_doc = await db.disciplines.find_one({}, {"_id": 0, "sort_order": 1}, sort=[("sort_order", -1)])
+        max_doc = await db.disciplines.find_one(
+            scoped(user, {}), {"_id": 0, "sort_order": 1}, sort=[("sort_order", -1)]
+        )
         sort_order = (max_doc.get("sort_order", 0) if max_doc else 0) + 1
     else:
         sort_order = payload.sort_order
@@ -98,14 +109,14 @@ async def create_discipline(user: dict, payload: DisciplineCreate) -> dict:
         "created_at": now,
         "updated_at": now,
     }
-    await db.disciplines.insert_one(doc)
+    await db.disciplines.insert_one(with_tenant_id(doc, user))
     doc.pop("_id", None)
     return doc
 
 
 async def update_discipline(user: dict, discipline_id: str, payload: DisciplineUpdate) -> dict:
     _admin_only(user)
-    existing = await db.disciplines.find_one({"id": discipline_id}, {"_id": 0})
+    existing = await db.disciplines.find_one(scoped(user, {"id": discipline_id}), {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Discipline not found")
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
@@ -114,7 +125,7 @@ async def update_discipline(user: dict, discipline_id: str, payload: DisciplineU
     if "label" in updates:
         updates["label"] = updates["label"].strip()
     updates["updated_at"] = datetime.now(timezone.utc)
-    await db.disciplines.update_one({"id": discipline_id}, {"$set": updates})
+    await db.disciplines.update_one(scoped(user, {"id": discipline_id}), {"$set": updates})
     return {**existing, **updates}
 
 
@@ -123,7 +134,7 @@ async def reorder_disciplines(user: dict, items: List[ReorderItem]) -> dict:
     now = datetime.now(timezone.utc)
     for item in items:
         await db.disciplines.update_one(
-            {"id": item.id},
+            scoped(user, {"id": item.id}),
             {"$set": {"sort_order": item.sort_order, "updated_at": now}},
         )
     return {"updated": len(items)}
@@ -131,29 +142,29 @@ async def reorder_disciplines(user: dict, items: List[ReorderItem]) -> dict:
 
 async def delete_discipline(user: dict, discipline_id: str) -> dict:
     _admin_only(user)
-    existing = await db.disciplines.find_one({"id": discipline_id}, {"_id": 0})
+    existing = await db.disciplines.find_one(scoped(user, {"id": discipline_id}), {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Discipline not found")
     value = existing["value"]
     label = existing["label"]
     ref_count = 0
     for col, _ in DISCIPLINE_BEARING_COLLECTIONS:
-        ref_count += await db[col].count_documents({
+        ref_count += await db[col].count_documents(scoped(user, {
             "$or": [{"discipline": value}, {"discipline": label}],
-        })
+        }))
     if ref_count > 0:
         await db.disciplines.update_one(
-            {"id": discipline_id},
+            scoped(user, {"id": discipline_id}),
             {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}},
         )
         return {"id": discipline_id, "soft_deleted": True, "references": ref_count}
-    await db.disciplines.delete_one({"id": discipline_id})
+    await db.disciplines.delete_one(scoped(user, {"id": discipline_id}))
     return {"id": discipline_id, "soft_deleted": False, "references": 0}
 
 
 async def cleanup_suggestions(user: dict) -> dict:
     _admin_only(user)
-    canonical = await db.disciplines.find({}, {"_id": 0}).to_list(200)
+    canonical = await db.disciplines.find(scoped(user, {}), {"_id": 0}).to_list(200)
     known = set()
     for d in canonical:
         known.add(d["value"].lower())
@@ -164,7 +175,7 @@ async def cleanup_suggestions(user: dict) -> dict:
     findings = {}
     for col, field in DISCIPLINE_BEARING_COLLECTIONS:
         try:
-            distinct = await db[col].distinct(field)
+            distinct = await db[col].distinct(field, scoped(user, {}))
         except Exception:
             continue
         for raw in distinct:
@@ -173,7 +184,7 @@ async def cleanup_suggestions(user: dict) -> dict:
             lo = str(raw).strip().lower()
             if not lo or lo in known:
                 continue
-            count = await db[col].count_documents({field: raw})
+            count = await db[col].count_documents(scoped(user, {field: raw}))
             entry = findings.setdefault(lo, {"variant": raw, "total": 0, "by_collection": {}})
             entry["total"] += count
             entry["by_collection"][col] = entry["by_collection"].get(col, 0) + count
@@ -200,7 +211,7 @@ async def cleanup_suggestions(user: dict) -> dict:
 
 async def merge_discipline_variants(user: dict, payload: MergePayload) -> dict:
     _admin_only(user)
-    target = await db.disciplines.find_one({"id": payload.target_discipline_id}, {"_id": 0})
+    target = await db.disciplines.find_one(scoped(user, {"id": payload.target_discipline_id}), {"_id": 0})
     if not target:
         raise HTTPException(status_code=404, detail="Target discipline not found")
     if not payload.variants:
@@ -212,7 +223,7 @@ async def merge_discipline_variants(user: dict, payload: MergePayload) -> dict:
     new_aliases = sorted(set([*(target.get("aliases") or []), *variants_lower]))
     if not payload.dry_run:
         await db.disciplines.update_one(
-            {"id": payload.target_discipline_id},
+            scoped(user, {"id": payload.target_discipline_id}),
             {"$set": {"aliases": new_aliases, "updated_at": datetime.now(timezone.utc)}},
         )
 
@@ -235,14 +246,14 @@ async def merge_discipline_variants(user: dict, payload: MergePayload) -> dict:
                 ]
             }
         }
-        count = await db[col].count_documents(match)
+        count = await db[col].count_documents(scoped(user, match))
         if count == 0:
             rewrites[col] = 0
             continue
         if payload.dry_run:
             rewrites[col] = count
         else:
-            res = await db[col].update_many(match, {"$set": {field: target_value}})
+            res = await db[col].update_many(scoped(user, match), {"$set": {field: target_value}})
             rewrites[col] = res.modified_count
 
     return {

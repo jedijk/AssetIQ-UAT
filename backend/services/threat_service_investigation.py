@@ -52,7 +52,7 @@ async def create_investigation_from_threat(user: dict, threat_id: str):
         return {"investigation": existing, "message": "Investigation already exists for this threat"}
     
     inv_id = str(uuid.uuid4())
-    case_number = await inv_svc.generate_case_number(user["id"])
+    case_number = await inv_svc.generate_case_number(user)
     now = datetime.now(timezone.utc).isoformat()
     
     inv_doc = {

@@ -13,6 +13,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from services.tenant_scope import scoped_job
 from services.pm_import_constants import normalize_pm_import_discipline
 
 from services.pm_import_constants import (
@@ -48,7 +49,9 @@ class PMImportMixin:
         Returns suggestions for each accepted task.
         """
         # Get session
-        session = await self.sessions_collection.find_one({"session_id": session_id})
+        session = await self.sessions_collection.find_one(
+            scoped_job({"session_id": session_id})
+        )
         if not session:
             raise ValueError(f"Session {session_id} not found")
         
@@ -96,7 +99,7 @@ class PMImportMixin:
         # Store suggestions in session
         try:
             await self.sessions_collection.update_one(
-                {"session_id": session_id},
+                scoped_job({"session_id": session_id}),
                 {"$set": {
                     "ai_review_suggestions": suggestions,
                     "ai_review_status": "completed",
@@ -181,11 +184,13 @@ class PMImportMixin:
         
         # Try exact match first on tag field
         equipment_node = await self.db.equipment_nodes.find_one(
-            {"$or": [
-                {"tag": {"$regex": f"^{tag_escaped}$", "$options": "i"}},
-                {"id": {"$regex": f"^{tag_escaped}$", "$options": "i"}},
-                {"name": {"$regex": f"^{tag_escaped}$", "$options": "i"}}
-            ]},
+            scoped_job({
+                "$or": [
+                    {"tag": {"$regex": f"^{tag_escaped}$", "$options": "i"}},
+                    {"id": {"$regex": f"^{tag_escaped}$", "$options": "i"}},
+                    {"name": {"$regex": f"^{tag_escaped}$", "$options": "i"}}
+                ]
+            }),
             {"_id": 0, "id": 1, "tag": 1, "name": 1, "equipment_type_id": 1, "level": 1}
         )
         
@@ -197,7 +202,7 @@ class PMImportMixin:
         # This handles cases like "1F3001-0122" matching "1F-3001-0122"
         logger.info(f"_match_equipment_by_tag: trying normalized match for '{tag_no_hyphens}'")
         cursor = self.db.equipment_nodes.find(
-            {},
+            scoped_job({}),
             {"_id": 0, "id": 1, "tag": 1, "name": 1, "equipment_type_id": 1, "level": 1}
         )
         async for node in cursor:
@@ -211,10 +216,12 @@ class PMImportMixin:
         logger.info(f"_match_equipment_by_tag: no normalized match, trying partial")
         # Try partial/prefix match - tag might be a parent (e.g., "1F-3001" should match "1F-3001-0128")
         equipment_node = await self.db.equipment_nodes.find_one(
-            {"$or": [
-                {"tag": {"$regex": f"^{tag_normalized}", "$options": "i"}},
-                {"tag": {"$regex": tag_normalized, "$options": "i"}}
-            ]},
+            scoped_job({
+                "$or": [
+                    {"tag": {"$regex": f"^{tag_normalized}", "$options": "i"}},
+                    {"tag": {"$regex": tag_normalized, "$options": "i"}}
+                ]
+            }),
             {"_id": 0, "id": 1, "tag": 1, "name": 1, "equipment_type_id": 1, "level": 1}
         )
         
@@ -225,7 +232,7 @@ class PMImportMixin:
         # Try matching where the stored tag starts with our tag (parent equipment)
         # Or our tag contains the stored tag
         cursor = self.db.equipment_nodes.find(
-            {"tag": {"$exists": True, "$ne": None, "$ne": "None"}},
+            scoped_job({"tag": {"$exists": True, "$ne": None, "$ne": "None"}}),
             {"_id": 0, "id": 1, "tag": 1, "name": 1, "equipment_type_id": 1, "level": 1}
         ).limit(500)
         
@@ -268,7 +275,7 @@ class PMImportMixin:
         if equipment_type_id:
             # First try custom_equipment_types collection
             equipment_type = await self.db.custom_equipment_types.find_one(
-                {"id": equipment_type_id},
+                scoped_job({"id": equipment_type_id}),
                 {"_id": 0, "id": 1, "name": 1, "category": 1}
             )
             
@@ -316,7 +323,7 @@ class PMImportMixin:
         # Get all failure modes (we'll score them all)
         # Include _id since some failure modes use it as identifier
         cursor = self.failure_modes_collection.find(
-            {},
+            scoped_job({}),
             {"_id": 1, "id": 1, "failure_mode": 1, "equipment": 1, "category": 1, 
              "mechanism": 1, "detection_methods": 1, "severity": 1, "occurrence": 1,
              "detectability": 1, "rpn": 1, "recommended_actions": 1, "equipment_type_ids": 1}

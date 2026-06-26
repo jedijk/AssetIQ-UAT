@@ -16,9 +16,10 @@
 |------|--------|
 | UAT verification gates | **Pass** — `verify_uat_gates.py`, `phase1_data_integrity_report.py` |
 | Maintenance domain tenant scoping (B1) | **Done** — `maintenance_tenant_scope.py` cluster + `77d97602` |
-| Broader tenant audit | **Open** — 26 services flagged (`tenant_service_filter_audit.py`) |
+| Broader tenant audit | **Done (WS1)** — `tenant_service_filter_audit.py` reports zero flagged services |
 | Reliability graph sync (UAT) | **Pass** — `verify_reliability_graph_sync.py` |
-| Graph ownership / dedup | **Open** — no ownership matrix yet |
+| Graph ownership / dedup | **Done (WS2)** — `reliability_graph_ownership.py`, architecture doc |
+| Canonical data models | **Done (WS3)** — `canonical_models.py`, `CANONICAL_DATA_MODELS.md` |
 | AI gateway | **Partial** — `ai_gateway.py` in use; not full Platform 1.0 AI stack |
 | Executive read models | **Partial** — some materializers exist; dashboards still mix operational reads |
 | Large-file modularization | **In progress** — Waves 4–8 splits started |
@@ -47,14 +48,14 @@ Platform 1.0 is complete when:
 
 | Task | Status |
 |------|--------|
-| Complete tenant scoping for all services flagged by `tenant_service_filter_audit.py` | **Open** (26 files) |
-| Every DB read/write uses canonical tenant scope helper | **Partial** — `maintenance_scoped*`, `merge_tenant_filter`, `scheduler_scoped` |
-| Remove direct MongoDB access without tenant filtering | **Open** |
-| Background jobs tenant-aware | **Partial** — `maintenance_scoped_job`, `BACKFILL_TENANT_ID` |
+| Complete tenant scoping for all services flagged by `tenant_service_filter_audit.py` | **Done** |
+| Every DB read/write uses canonical tenant scope helper | **Done** — `scoped` / `scoped_job` in `tenant_scope.py` |
+| Remove direct MongoDB access without tenant filtering | **Done** (heuristic audit clean) |
+| Background jobs tenant-aware | **Done** — `scoped_job`, `BACKFILL_TENANT_ID` |
 | Graph operations tenant scoped | **Done** (reads/upserts) |
-| Import/export tenant scoped | **Open** |
+| Import/export tenant scoped | **Partial** — PM import cluster done; export paths not re-audited |
 
-**Deliverables:** Zero audit findings · updated tenant audit report · canonical tenant scope doc
+**Deliverables:** Zero audit findings · `docs/platform/TENANT_SCOPE.md` · run `phase2_tenancy_report.py` on UAT before prod
 
 **Definition of done:** Zero unsafe services · zero unscoped DB access · 100% tenant isolation coverage
 
@@ -73,11 +74,11 @@ cd backend && MONGO_URL=... DB_NAME=assetiq-UAT python3 scripts/phase2_tenancy_r
 
 | Task | Status |
 |------|--------|
-| Document every node type | **Open** |
-| Document every edge type | **Partial** — `reliability_ontology.py` |
-| Ownership matrix (one creator per relationship) | **Open** |
-| Remove duplicate graph creation logic | **Open** |
-| Validate graph after every workflow | **Partial** — `verify_reliability_graph_sync.py`, `reliability_graph_audit.py` |
+| Document every node type | **Done** — `reliability_ontology.py` + `RELIABILITY_GRAPH_ARCHITECTURE.md` |
+| Document every edge type | **Done** — ontology aligned with storage types |
+| Ownership matrix (one creator per relationship) | **Done** — `reliability_graph_ownership.py` |
+| Remove duplicate graph creation logic | **Done** — upsert caller guard; AI twin via `annotate_equipment_failure_mode_risk` |
+| Validate graph after every workflow | **Done** — extended `verify_reliability_graph_sync.py` + audit (0 UAT gaps) |
 
 **Core lifecycle**
 
@@ -87,7 +88,7 @@ Observation → Investigation → Action → Failure Mode → Strategy
   → Execution → Evidence → Observation
 ```
 
-**Deliverables:** Graph Architecture doc · ownership matrix · validation report
+**Deliverables:** `docs/platform/RELIABILITY_GRAPH_ARCHITECTURE.md` · ownership matrix · validation gate
 
 **Definition of done:** One owner per node/edge · no duplicate relationships · graph validation passes
 
@@ -106,11 +107,15 @@ cd backend && MONGO_URL=... python3 scripts/backfill_reliability_graph_history.p
 
 For each domain: canonical collection · API · service · ownership · legacy compatibility
 
-**Status:** **Open** — Phase 1 removed dual-write paths for maintenance/work items; full canonical map not documented.
+**Status:** **Done** — registry + docs + verify gate for all 13 WS3 domains.
 
-**Deliverable:** Canonical Data Model documentation
+**Deliverable:** `docs/platform/CANONICAL_DATA_MODELS.md` · `architecture/canonical_models.py`
 
-**Definition of done:** Exactly one authoritative data model per domain
+```bash
+cd backend && python3 scripts/verify_canonical_models.py
+```
+
+**Definition of done:** Exactly one authoritative data model per domain (documented; legacy paths flag-gated)
 
 ---
 

@@ -6,6 +6,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from utils.mongo_regex import case_insensitive_contains
+from services.tenant_scope import scoped_job
 from utils.equipment_search_i18n import (
     expand_equipment_keywords,
     find_entity_ids_by_translation,
@@ -136,7 +137,7 @@ async def search_equipment_hierarchy(
     }
 
     equipment_list = await db.equipment_nodes.find(
-        {"$and": [{"level": {"$in": operational_levels}}, {"$or": search_conditions}]},
+        scoped_job({"$and": [{"level": {"$in": operational_levels}}, {"$or": search_conditions}]}),
         equipment_projection,
     ).limit(30).to_list(30)
 
@@ -145,12 +146,12 @@ async def search_equipment_hierarchy(
         missing_node_ids = [eid for eid in translation_node_ids if eid not in seen_ids]
         if missing_node_ids:
             extra_rows = await db.equipment_nodes.find(
-                {
+                scoped_job({
                     "$and": [
                         {"level": {"$in": operational_levels}},
                         {"id": {"$in": missing_node_ids}},
                     ]
-                },
+                }),
                 equipment_projection,
             ).limit(20).to_list(20)
             for row in extra_rows:
@@ -170,7 +171,7 @@ async def search_equipment_hierarchy(
     parent_map = {}
     if parent_ids:
         parents = await db.equipment_nodes.find(
-            {"id": {"$in": list(parent_ids)}}, {"_id": 0, "id": 1, "name": 1}
+            scoped_job({"id": {"$in": list(parent_ids)}}), {"_id": 0, "id": 1, "name": 1}
         ).to_list(100)
         parent_map = {p["id"]: p for p in parents}
 
@@ -287,7 +288,7 @@ async def search_equipment_hierarchy(
 async def lookup_equipment_by_tag(db, tag: str) -> Dict[str, Any] | None:
     """Find a single equipment node by exact tag."""
     doc = await db.equipment_nodes.find_one(
-        {"tag": tag},
+        scoped_job({"tag": tag}),
         {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1,
          "equipment_type": 1, "equipment_type_name": 1, "description": 1,
          "level": 1, "criticality": 1, "parent_id": 1, "installation_id": 1}

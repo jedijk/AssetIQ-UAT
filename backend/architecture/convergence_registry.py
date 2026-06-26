@@ -65,6 +65,8 @@ GREEN_ROUTES: FrozenSet[str] = frozenset({
     "routes/failure_modes_routes.py",
     "routes/chat.py",
     "routes/maintenance_program.py",
+    "routes/spare_parts.py",
+    "routes/visual_boards.py",
     "routes/intelligence_map.py",
     "routes/efms.py",
     "routes/maintenance.py",

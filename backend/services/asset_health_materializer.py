@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from database import db
+from services.tenant_scope import scoped_job
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +22,11 @@ EQUIPMENT_LEVELS = ["equipment_unit", "equipment", "subunit", "maintainable_item
 
 async def _equipment_mtbf_proxy_days(equipment_id: str, since: datetime) -> Optional[float]:
     """Mean days between resolved threats for one equipment (90d window)."""
-    match = {
+    match = scoped_job({
         "linked_equipment_id": equipment_id,
         "status": {"$in": ["Resolved", "resolved", "Closed", "closed"]},
         "created_at": {"$gte": since},
-    }
+    })
     cursor = db.threats.find(match, {"_id": 0, "created_at": 1}).sort("created_at", 1)
     dates: List[datetime] = []
     async for row in cursor:
@@ -56,30 +57,31 @@ async def compute_equipment_snapshot(
     today_iso = snap_date
 
     eq = equipment_doc or await db.equipment_nodes.find_one(
-        {"id": equipment_id},
+        scoped_job({"id": equipment_id}),
         {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type_id": 1},
     )
 
-    threat_scope = {
+    threat_scope = scoped_job({
         "linked_equipment_id": equipment_id,
         "status": {"$in": ["Open", "open", "In Progress", "in_progress"]},
-    }
-    open_threats = await db.threats.count_documents(threat_scope)
-    high_risk_threats = await db.threats.count_documents({
-        **threat_scope,
-        "risk_level": {"$in": ["High", "high", "Critical", "critical"]},
     })
+    open_threats = await db.threats.count_documents(threat_scope)
+    high_risk_threats = await db.threats.count_documents(scoped_job({
+        "linked_equipment_id": equipment_id,
+        "status": {"$in": ["Open", "open", "In Progress", "in_progress"]},
+        "risk_level": {"$in": ["High", "high", "Critical", "critical"]},
+    }))
 
-    overdue_scheduled = await db.scheduled_tasks.count_documents({
+    overdue_scheduled = await db.scheduled_tasks.count_documents(scoped_job({
         "equipment_id": equipment_id,
         "status": {"$nin": ["completed", "cancelled"]},
         "due_date": {"$lt": today_iso},
-    })
-    overdue_instances = await db.task_instances.count_documents({
+    }))
+    overdue_instances = await db.task_instances.count_documents(scoped_job({
         "equipment_id": equipment_id,
         "status": {"$in": ["pending", "overdue", "scheduled"]},
         "due_date": {"$lt": now},
-    })
+    }))
     overdue_pm_total = overdue_scheduled + overdue_instances
 
     window_start = now - timedelta(days=90)
@@ -125,7 +127,7 @@ async def refresh_asset_health_documents(
         query["id"] = {"$in": list(equipment_ids)}
 
     upserted = 0
-    async for eq in db.equipment_nodes.find(query, {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type_id": 1}):
+    async for eq in db.equipment_nodes.find(scoped_job(query), {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type_id": 1}):
         eq_id = eq.get("id")
         if not eq_id:
             continue

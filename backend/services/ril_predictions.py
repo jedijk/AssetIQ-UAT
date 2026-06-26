@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from models.ril import FailurePrediction, Prediction, PredictionConfidence
+from services.tenant_scope import scoped_job
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,8 @@ async def get_predictions(
         query["equipment_id"] = equipment_id
 
     coll = db[collection]
-    total = await coll.count_documents(query)
-    cursor = coll.find(query).sort("calculated_at", -1).skip(skip).limit(limit)
+    total = await coll.count_documents(scoped_job(query))
+    cursor = coll.find(scoped_job(query)).sort("calculated_at", -1).skip(skip).limit(limit)
 
     predictions = []
     async for doc in cursor:
@@ -46,35 +47,35 @@ async def generate_equipment_prediction(
     predictions_collection: str = PREDICTIONS_COLLECTION,
 ) -> Optional[Prediction]:
     """Rule-based prediction engine (v1.2 — writes graph edge when hint present)."""
-    equipment = await db.equipment_nodes.find_one({"id": equipment_id})
+    equipment = await db.equipment_nodes.find_one(scoped_job({"id": equipment_id}))
     if not equipment:
         return None
 
     ninety_days_ago = datetime.utcnow() - timedelta(days=90)
 
-    observation_count = await db[observations_collection].count_documents({
+    observation_count = await db[observations_collection].count_documents(scoped_job({
         "owner_id": owner_id,
         "equipment_id": equipment_id,
         "observed_at": {"$gte": ninety_days_ago},
-    })
-    alert_count = await db[alerts_collection].count_documents({
+    }))
+    alert_count = await db[alerts_collection].count_documents(scoped_job({
         "owner_id": owner_id,
         "equipment_id": equipment_id,
         "alert_time": {"$gte": ninety_days_ago},
-    })
-    graph_edge_count = await db.reliability_edges.count_documents({
+    }))
+    graph_edge_count = await db.reliability_edges.count_documents(scoped_job({
         "$or": [
             {"source_id": equipment_id, "source_type": "equipment"},
             {"target_id": equipment_id, "target_type": "equipment"},
         ],
         "status": {"$ne": "retired"},
-    })
+    }))
 
     failure_predictions: List[FailurePrediction] = []
     equipment_type_id = equipment.get("equipment_type_id")
 
     if equipment_type_id:
-        async for fm in db.failure_modes.find({"equipment_type_ids": equipment_type_id}):
+        async for fm in db.failure_modes.find(scoped_job({"equipment_type_ids": equipment_type_id})):
             base_probability = 0.1
             probability = base_probability + (observation_count * 0.02) + (alert_count * 0.05)
             probability = min(probability, 0.95)
@@ -137,7 +138,7 @@ async def generate_equipment_prediction(
 
     coll = db[predictions_collection]
     existing = await coll.find_one(
-        {"owner_id": owner_id, "equipment_id": equipment_id},
+        scoped_job({"owner_id": owner_id, "equipment_id": equipment_id}),
         {"_id": 0, "version": 1, "history": 1},
     )
     next_version = int((existing or {}).get("version") or 0) + 1
@@ -152,7 +153,7 @@ async def generate_equipment_prediction(
         "graph_edge_count": graph_edge_count,
     }
     await coll.update_one(
-        {"owner_id": owner_id, "equipment_id": equipment_id},
+        scoped_job({"owner_id": owner_id, "equipment_id": equipment_id}),
         {"$set": doc, "$push": {"history": {"$each": [history_entry], "$slice": -20}}},
         upsert=True,
     )

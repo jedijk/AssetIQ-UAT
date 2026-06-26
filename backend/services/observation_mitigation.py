@@ -30,9 +30,10 @@ def is_action_plan_item_done(status: Optional[str]) -> bool:
 
 async def all_action_plan_actions_complete(observation_id: str) -> Tuple[bool, int]:
     from database import db
+    from services.tenant_scope import scoped_job
 
     actions = await db.central_actions.find(
-        observation_action_filter(observation_id),
+        scoped_job(observation_action_filter(observation_id)),
         {"_id": 0, "status": 1},
     ).to_list(500)
     if not actions:
@@ -60,9 +61,10 @@ async def maybe_auto_mitigate_observation(
         return None
 
     from database import db
+    from services.tenant_scope import scoped_job
 
     threat = await db.threats.find_one(
-        {"id": observation_id},
+        scoped_job({"id": observation_id}),
         {"_id": 0, "id": 1, "status": 1, "title": 1},
     )
     if not threat:
@@ -74,7 +76,7 @@ async def maybe_auto_mitigate_observation(
 
     now = datetime.now(timezone.utc).isoformat()
     await db.threats.update_one(
-        {"id": observation_id},
+        scoped_job({"id": observation_id}),
         {
             "$set": {
                 "status": "Mitigated",
@@ -122,9 +124,10 @@ async def build_action_plan_completion_notification(
         return None
 
     from database import db
+    from services.tenant_scope import scoped_job
 
     threat = await db.threats.find_one(
-        {"id": observation_id},
+        scoped_job({"id": observation_id}),
         {"_id": 0, "title": 1, "status": 1},
     )
     if not threat:

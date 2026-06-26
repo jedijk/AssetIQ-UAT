@@ -82,6 +82,7 @@ async def submit_feedback(
         screenshot_url=feedback.screenshot_url,
         module=feedback.module,
         audio_url=audio_url,
+        user=current_user,
     )
     return result
 
@@ -158,7 +159,7 @@ async def transcribe_audio(
 @router.get("/my", response_model=FeedbackListResponse)
 async def get_my_feedback(current_user: dict = Depends(get_current_user)):
     """Get all feedback submitted by the current user."""
-    items = await get_user_feedback(current_user["id"])
+    items = await get_user_feedback(current_user["id"], user=current_user)
     # Enrich with user name
     for item in items:
         item["user_name"] = current_user.get("name")
@@ -184,7 +185,7 @@ async def bulk_update_feedback_status(
     if status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
     
-    result = await bulk_update_status(feedback_ids, status, current_user["id"])
+    result = await bulk_update_status(feedback_ids, status, current_user["id"], user=current_user)
     return result
 
 
@@ -195,7 +196,7 @@ async def get_my_unread_responses_count(
     current_user: dict = Depends(get_current_user)
 ):
     """Get count of feedback responses not yet seen by the user."""
-    count = await get_unread_responses_count(current_user["id"])
+    count = await get_unread_responses_count(current_user["id"], user=current_user)
     return {"unread_count": count}
 
 
@@ -204,7 +205,7 @@ async def mark_my_responses_seen(
     current_user: dict = Depends(get_current_user)
 ):
     """Mark all feedback responses as seen by the user."""
-    count = await mark_responses_as_seen(current_user["id"])
+    count = await mark_responses_as_seen(current_user["id"], user=current_user)
     return {"marked_count": count}
 
 
@@ -218,7 +219,7 @@ async def admin_get_unread_count(
     if current_user.get("role") not in ["admin", "manager", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    count = await get_unread_feedback_count()
+    count = await get_unread_feedback_count(user=current_user)
     return {"unread_count": count}
 
 
@@ -230,7 +231,7 @@ async def admin_mark_all_read(
     if current_user.get("role") not in ["admin", "manager", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    count = await mark_feedback_as_read()
+    count = await mark_feedback_as_read(user=current_user)
     return {"marked_count": count}
 
 
@@ -245,9 +246,9 @@ async def admin_get_all_feedback(
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Mark feedback as read when owner views all feedback
-    await mark_feedback_as_read()
+    await mark_feedback_as_read(user=current_user)
     
-    items = await get_all_feedback(status_filter=status)
+    items = await get_all_feedback(status_filter=status, user=current_user)
     return {"items": items, "total": len(items)}
 
 
@@ -265,6 +266,7 @@ async def admin_update_feedback(
         feedback_id=feedback_id,
         status=update.status,
         user_visible_response=update.user_visible_response,
+        user=current_user,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Feedback not found")
@@ -280,7 +282,7 @@ async def admin_delete_feedback(
     if current_user.get("role") not in ["admin", "manager", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    success = await delete_feedback(feedback_id)
+    success = await delete_feedback(feedback_id, user=current_user)
     if not success:
         raise HTTPException(status_code=404, detail="Feedback not found")
     return {"status": "deleted", "id": feedback_id}
@@ -299,7 +301,7 @@ async def generate_ai_prompt(
     # Fetch selected feedback items
     feedback_items = []
     for fid in feedback_ids:
-        item = await get_feedback_by_id(fid)
+        item = await get_feedback_by_id(fid, user=current_user)
         if item:
             feedback_items.append(item)
     
@@ -367,7 +369,7 @@ async def get_feedback_detail(
     current_user: dict = Depends(get_current_user)
 ):
     """Get details of a specific feedback item (user can only see their own)."""
-    item = await get_feedback_by_id(feedback_id, user_id=current_user["id"])
+    item = await get_feedback_by_id(feedback_id, user_id=current_user["id"], user=current_user)
     if not item:
         raise HTTPException(status_code=404, detail="Feedback not found")
     return item
@@ -388,6 +390,7 @@ async def update_my_feedback(
         severity=update.severity,
         screenshot_url=update.screenshot_url,
         status=update.status,
+        user=current_user,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Feedback not found or not owned by user")
@@ -400,7 +403,7 @@ async def delete_my_feedback(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete user's own feedback."""
-    success = await delete_user_feedback(feedback_id, current_user["id"])
+    success = await delete_user_feedback(feedback_id, current_user["id"], user=current_user)
     if not success:
         raise HTTPException(status_code=404, detail="Feedback not found or not owned by user")
     return {"status": "deleted", "id": feedback_id}

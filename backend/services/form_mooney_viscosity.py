@@ -4,6 +4,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
+from services.tenant_scope import scoped_job
+
 logger = logging.getLogger(__name__)
 
 class MooneyViscosityPairing:
@@ -30,7 +32,7 @@ class MooneyViscosityPairing:
 
     async def try_auto_pair_mooney_viscosity_by_id(self, submission_id: str) -> None:
             """Reload submission by id and run pairing if it is a Mooney viscosity form."""
-            sub = await self.submissions.find_one({"id": submission_id}, {"_id": 0})
+            sub = await self.submissions.find_one(scoped_job({"id": submission_id}), {"_id": 0})
             if sub:
                 await self.try_auto_pair_mooney_viscosity(sub)
 
@@ -152,10 +154,10 @@ class MooneyViscosityPairing:
             # NOTE: use a single backslash in the regex. `r"extruder\\s*..."` is WRONG:
             # it becomes the literal pattern `extruder\s...` (broken matching).
             extruder_tpls = await self.db.form_templates.find(
-                {"name": {"$regex": r"extruder\s*settings", "$options": "i"}},
+                scoped_job({"name": {"$regex": r"extruder\s*settings", "$options": "i"}}),
             ).to_list(200)
             visc_tpls = await self.db.form_templates.find(
-                {"name": {"$regex": r"mooney.*(viscos|sample)", "$options": "i"}},
+                scoped_job({"name": {"$regex": r"mooney.*(viscos|sample)", "$options": "i"}}),
             ).to_list(200)
 
             if not extruder_tpls:
@@ -228,7 +230,7 @@ class MooneyViscosityPairing:
             # Match by template_id OR by template name (fallback) to handle historical data
             # where form_template_id may not align with the template collection.
             ext_subs = await self.db.form_submissions.find(
-                {
+                scoped_job({
                     "$and": [
                         {
                             "$or": [
@@ -238,14 +240,14 @@ class MooneyViscosityPairing:
                         },
                         {"$or": time_window_or},
                     ]
-                },
+                }),
                 {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1, "form_template_name": 1}
             ).to_list(5000)
 
             visc_subs = []
             if visc_ids:
                 visc_subs = await self.db.form_submissions.find(
-                    {
+                    scoped_job({
                         "$and": [
                             {
                                 "$or": [
@@ -255,7 +257,7 @@ class MooneyViscosityPairing:
                             },
                             {"$or": time_window_or},
                         ]
-                    },
+                    }),
                     {"_id": 0, "id": 1, "values": 1, "submitted_at": 1, "created_at": 1, "form_template_name": 1}
                 ).to_list(5000)
 
@@ -307,10 +309,10 @@ class MooneyViscosityPairing:
                     day_start_iso = day_start.strftime("%Y-%m-%dT00:00:00")
                     day_end_iso = day_end.strftime("%Y-%m-%dT23:59:59")
                     ingested = await self.db.production_logs.find(
-                        {
+                        scoped_job({
                             "asset_id": {"$regex": "line.?90", "$options": "i"},
                             "timestamp": {"$gte": day_start_iso, "$lte": day_end_iso},
-                        },
+                        }),
                         {"_id": 0, "timestamp": 1, "mooney_viscosity": 1},
                     ).to_list(5000)
 
@@ -426,7 +428,7 @@ class MooneyViscosityPairing:
                 }
 
             await self.submissions.update_one(
-                {"id": visc_doc["id"]},
+                scoped_job({"id": visc_doc["id"]}),
                 {"$set": {"values": new_values, "auto_paired_to_extruder_id": target_sub.get("id")}}
             )
             visc_doc["values"] = new_values

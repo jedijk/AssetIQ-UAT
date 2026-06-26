@@ -9,6 +9,7 @@ import uuid
 
 from bson import ObjectId
 from database import db
+from services.tenant_scope import scoped
 from services.production_helpers import (
     _require_owner_or_admin,
     _require_owner,
@@ -56,9 +57,9 @@ async def set_production_information_pin(user: dict,
     else:
         pinned = bool(raw)
 
-    sub = await db.form_submissions.find_one({"id": submission_id}, {"_id": 0})
+    sub = await db.form_submissions.find_one(scoped(user, {"id": submission_id}), {"_id": 0})
     if not sub and ObjectId.is_valid(submission_id):
-        sub = await db.form_submissions.find_one({"_id": ObjectId(submission_id)}, {"_id": 0})
+        sub = await db.form_submissions.find_one(scoped(user, {"_id": ObjectId(submission_id)}), {"_id": 0})
     if not sub:
         raise HTTPException(status_code=404, detail="Submission not found")
 
@@ -92,7 +93,7 @@ async def update_production_submission(user: dict,
     if not updates:
         raise HTTPException(status_code=400, detail="No values provided")
 
-    sub = await db.form_submissions.find_one({"id": submission_id}, {"_id": 0})
+    sub = await db.form_submissions.find_one(scoped(user, {"id": submission_id}), {"_id": 0})
     if sub:
         # Update matching fields in the values array (case-insensitive, space/underscore normalized)
         updates_lower = {k.lower(): v for k, v in updates.items()}
@@ -138,7 +139,7 @@ async def update_production_submission(user: dict,
         return {"status": "updated", "source": "form_submission", "id": submission_id, "matched_fields": matched_count}
 
     # Fallback: try the ingested production_logs collection
-    log_entry = await db.production_logs.find_one({"id": submission_id}, {"_id": 0})
+    log_entry = await db.production_logs.find_one(scoped(user, {"id": submission_id}), {"_id": 0})
     if not log_entry:
         raise HTTPException(status_code=404, detail="Submission not found")
 
@@ -218,7 +219,7 @@ async def create_viscosity_submission(user: dict,
     
     # Find the Mooney Viscosity template (try multiple possible names/IDs)
     visc_template = await db.form_templates.find_one(
-        {"name": {"$regex": "^mooney viscosity sample$", "$options": "i"}}
+        scoped(user, {"name": {"$regex": "^mooney viscosity sample$", "$options": "i"}})
     )
     
     if not visc_template:
@@ -230,7 +231,7 @@ async def create_viscosity_submission(user: dict,
     
     # Find Line-90 equipment for consistent equipment assignment
     line90 = await db.equipment_nodes.find_one(
-        {"name": {"$regex": "Line.?90", "$options": "i"}}, {"_id": 0, "id": 1, "name": 1}
+        scoped(user, {"name": {"$regex": "Line.?90", "$options": "i"}}), {"_id": 0, "id": 1, "name": 1}
     )
     equipment_id = line90.get("id") if line90 else ""
     equipment_name = line90.get("name", "Line-90") if line90 else "Line-90"
@@ -305,7 +306,7 @@ async def viscosity_pairing_status(user: dict,
     # Pull all relevant form submissions (broad query, then filter by extracted Date & Time)
     form_patterns = "|".join([p.replace(" ", "\\s*") for p in PRODUCTION_FORMS])
     query = {"form_template_name": {"$regex": f"^({form_patterns}).*$", "$options": "i"}}
-    subs = await db.form_submissions.find(query, {"_id": 0}).to_list(2000)
+    subs = await db.form_submissions.find(scoped(user, query), {"_id": 0}).to_list(2000)
 
     def _time_hhmm(sub):
         raw = _extract_date_time_field_raw(sub)
@@ -335,7 +336,7 @@ async def viscosity_pairing_status(user: dict,
     day_start_iso = f"{date}T00:00:00"
     day_end_iso = f"{date}T23:59:59"
     ingested = await db.production_logs.find(
-        {"asset_id": {"$regex": "line.?90", "$options": "i"}, "timestamp": {"$gte": day_start_iso, "$lte": day_end_iso}},
+        scoped(user, {"asset_id": {"$regex": "line.?90", "$options": "i"}, "timestamp": {"$gte": day_start_iso, "$lte": day_end_iso}}),
         {"_id": 0, "timestamp": 1, "mooney_viscosity": 1},
     ).to_list(5000)
     extruder_ingested_times = []
@@ -393,7 +394,7 @@ async def repair_viscosity_pairing(user: dict,
 
     # Find Mooney viscosity submissions broadly (including versioned template names)
     visc_subs = await db.form_submissions.find(
-        {"form_template_name": {"$regex": r"mooney.*(viscos|sample)", "$options": "i"}},
+        scoped(user, {"form_template_name": {"$regex": r"mooney.*(viscos|sample)", "$options": "i"}}),
         {"_id": 0},
     ).to_list(2000)
 
@@ -431,7 +432,7 @@ async def repair_viscosity_pairing(user: dict,
             await svc._auto_pair_viscosity_to_extruder(s)
             repaired += 1
             updated = await db.form_submissions.find_one(
-                {"id": s.get("id")},
+                scoped(user, {"id": s.get("id")}),
                 {"_id": 0, "id": 1, "auto_paired_to_extruder_id": 1},
             )
             paired_to = (updated or {}).get("auto_paired_to_extruder_id")
@@ -473,7 +474,7 @@ async def viscosity_pairing_debug_report(user: dict,
 
     # --- Form submissions ---
     subs = await db.form_submissions.find(
-        {"form_template_name": {"$regex": r"(extruder.*setting|mooney.*(viscos|sample))", "$options": "i"}},
+        scoped(user, {"form_template_name": {"$regex": r"(extruder.*setting|mooney.*(viscos|sample))", "$options": "i"}}),
         {"_id": 0},
     ).to_list(5000)
 
@@ -580,7 +581,7 @@ async def viscosity_pairing_debug_report(user: dict,
     day_start_iso = f"{date}T00:00:00"
     day_end_iso = f"{date}T23:59:59"
     ingested = await db.production_logs.find(
-        {"asset_id": {"$regex": "line.?90", "$options": "i"}, "timestamp": {"$gte": day_start_iso, "$lte": day_end_iso}},
+        scoped(user, {"asset_id": {"$regex": "line.?90", "$options": "i"}, "timestamp": {"$gte": day_start_iso, "$lte": day_end_iso}}),
         {"_id": 0, "id": 1, "timestamp": 1, "mooney_viscosity": 1},
     ).to_list(5000)
 
@@ -658,7 +659,7 @@ async def viscosity_pairing_debug_report(user: dict,
             vid = v.get("id")
             if not vid:
                 continue
-            sub = await db.form_submissions.find_one({"id": vid}, {"_id": 0})
+            sub = await db.form_submissions.find_one(scoped(user, {"id": vid}), {"_id": 0})
             if not sub:
                 continue
             pairing_probe[vid] = await svc._auto_pair_viscosity_to_extruder(sub, dry_run=True)

@@ -6,13 +6,11 @@ from typing import Optional
 import logging
 
 from database import db
-from services.tenant_schema import merge_tenant_filter, prepend_tenant_match
+from services.tenant_schema import prepend_tenant_match
+from services.tenant_scope import scoped
 from services.ai_gateway import chat as ai_gateway_chat, user_context
 
 logger = logging.getLogger(__name__)
-
-def _tf(user, query=None):
-    return merge_tenant_filter(query or {}, user)
 
 
 
@@ -28,23 +26,23 @@ async def get_action_execution_metrics(
     try:
         async def fetch_metrics():
             # Parallel count queries
-            total_task = db.central_actions.count_documents(_tf(user))
-            completed_task = db.central_actions.count_documents(_tf(user, {
+            total_task = db.central_actions.count_documents(scoped(user))
+            completed_task = db.central_actions.count_documents(scoped(user, {
                 "status": {"$in": ["completed", "Completed", "done", "Done", "closed", "Closed"]}
             }))
-            failed_task = db.central_actions.count_documents(_tf(user, {
+            failed_task = db.central_actions.count_documents(scoped(user, {
                 "status": {"$in": ["failed", "Failed", "cancelled", "Cancelled", "rejected", "Rejected"]}
             }))
-            with_obs_task = db.central_actions.count_documents(_tf(user, {
+            with_obs_task = db.central_actions.count_documents(scoped(user, {
                 "$or": [
                     {"observation_id": {"$exists": True, "$ne": None}},
                     {"threat_id": {"$exists": True, "$ne": None}}
                 ]
             }))
-            with_inv_task = db.central_actions.count_documents(_tf(user, {
+            with_inv_task = db.central_actions.count_documents(scoped(user, {
                 "investigation_id": {"$exists": True, "$ne": None}
             }))
-            with_asset_task = db.central_actions.count_documents(_tf(user, {
+            with_asset_task = db.central_actions.count_documents(scoped(user, {
                 "$or": [
                     {"asset_id": {"$exists": True, "$ne": None}},
                     {"equipment_id": {"$exists": True, "$ne": None}}
@@ -92,21 +90,21 @@ async def get_task_execution_metrics(
     try:
         async def fetch_metrics():
             # Count task instances by status
-            total_task = db.task_instances.count_documents(_tf(user))
-            completed_task = db.task_instances.count_documents(_tf(user, {
+            total_task = db.task_instances.count_documents(scoped(user))
+            completed_task = db.task_instances.count_documents(scoped(user, {
                 "status": {"$in": ["completed", "Completed", "done", "Done"]}
             }))
-            failed_task = db.task_instances.count_documents(_tf(user, {
+            failed_task = db.task_instances.count_documents(scoped(user, {
                 "status": {"$in": ["failed", "Failed", "missed", "Missed", "overdue", "Overdue"]}
             }))
             
             # Count by type - adhoc vs recurring
-            adhoc_total = db.task_instances.count_documents(_tf(user, {"is_adhoc": True}))
-            adhoc_completed = db.task_instances.count_documents(_tf(user, {
+            adhoc_total = db.task_instances.count_documents(scoped(user, {"is_adhoc": True}))
+            adhoc_completed = db.task_instances.count_documents(scoped(user, {
                 "is_adhoc": True,
                 "status": {"$in": ["completed", "Completed", "done", "Done"]}
             }))
-            adhoc_failed = db.task_instances.count_documents(_tf(user, {
+            adhoc_failed = db.task_instances.count_documents(scoped(user, {
                 "is_adhoc": True,
                 "status": {"$in": ["failed", "Failed", "missed", "Missed", "overdue", "Overdue"]}
             }))
@@ -250,30 +248,30 @@ async def get_data_quality_metrics(
     try:
         async def fetch_metrics():
             # Parallel count queries - use correct collections
-            total_task = db.equipment_nodes.count_documents(_tf(user))
-            crit_task = db.equipment_nodes.count_documents(_tf(user, {
+            total_task = db.equipment_nodes.count_documents(scoped(user))
+            crit_task = db.equipment_nodes.count_documents(scoped(user, {
                 "$or": [
                     {"criticality": {"$exists": True, "$nin": [None, ""]}},
                     {"criticality_score": {"$exists": True, "$ne": None}}
                 ]
             }))
-            type_task = db.equipment_nodes.count_documents(_tf(user, {
+            type_task = db.equipment_nodes.count_documents(scoped(user, {
                 "$or": [
                     {"equipment_type_id": {"$exists": True, "$nin": [None, ""]}},
                     {"type": {"$exists": True, "$nin": [None, ""]}}
                 ]
             }))
-            fmea_task = db.failure_modes.count_documents(_tf(user))
+            fmea_task = db.failure_modes.count_documents(scoped(user))
             
             total, with_crit, with_type, fmea_count = await asyncio.gather(
                 total_task, crit_task, type_task, fmea_task
             )
             
             # Calculate FMEA coverage: nodes that have equipment_type_id linked to at least one failure mode
-            fmea_linked_types = set(await db.failure_modes.distinct("equipment_type_ids", _tf(user)))
+            fmea_linked_types = set(await db.failure_modes.distinct("equipment_type_ids", scoped(user)))
             fmea_linked_types.discard(None)
             fmea_linked_types.discard("")
-            assets_with_fmea = await db.equipment_nodes.count_documents(_tf(user, {
+            assets_with_fmea = await db.equipment_nodes.count_documents(scoped(user, {
                 "equipment_type_id": {"$in": list(fmea_linked_types)}
             })) if fmea_linked_types else 0
             
@@ -340,8 +338,8 @@ async def get_reliability_gaps(
             gaps = []
             
             # 1. Count observations without actions
-            threats_count = await db.threats.count_documents(_tf(user))
-            actions_with_obs = await db.central_actions.count_documents(_tf(user, {
+            threats_count = await db.threats.count_documents(scoped(user))
+            actions_with_obs = await db.central_actions.count_documents(scoped(user, {
                 "$or": [
                     {"observation_id": {"$exists": True, "$ne": None}},
                     {"threat_id": {"$exists": True, "$ne": None}}
@@ -360,8 +358,8 @@ async def get_reliability_gaps(
                 })
             
             # 2. Count investigations without follow-up
-            inv_count = await db.investigations.count_documents(_tf(user))
-            actions_with_inv = await db.central_actions.count_documents(_tf(user, {
+            inv_count = await db.investigations.count_documents(scoped(user))
+            actions_with_inv = await db.central_actions.count_documents(scoped(user, {
                 "investigation_id": {"$exists": True, "$ne": None}
             }))
             inv_without_followup = max(0, inv_count - actions_with_inv)
@@ -377,13 +375,13 @@ async def get_reliability_gaps(
                 })
             
             # 3. Critical assets without FMEA - simplified
-            critical_equipment = await db.equipment_nodes.count_documents(_tf(user, {
+            critical_equipment = await db.equipment_nodes.count_documents(scoped(user, {
                 "$or": [
                     {"criticality": {"$in": ["high", "High", "critical", "Critical", "a", "A", "1"]}},
                     {"criticality_score": {"$gte": 8}}
                 ]
             }))
-            fmea_count = await db.failure_modes.count_documents(_tf(user))
+            fmea_count = await db.failure_modes.count_documents(scoped(user))
             
             # Estimate critical without FMEA (simplified - may have duplicates)
             critical_without_fmea_est = max(0, critical_equipment - fmea_count)
@@ -425,28 +423,28 @@ async def generate_ai_recommendations(
     # Gather context data
     try:
         # Get execution metrics
-        actions = await db.central_actions.find(_tf(user)).to_list(length=None)
+        actions = await db.central_actions.find(scoped(user)).to_list(length=None)
         total_actions = len(actions)
         completed = len([a for a in actions if a.get("status", "").lower() in ["completed", "done", "closed"]])
         failed = len([a for a in actions if a.get("status", "").lower() in ["failed", "cancelled", "rejected"]])
         success_rate = round((completed / total_actions * 100), 1) if total_actions > 0 else 0
         
         # Get task metrics
-        tasks = await db.task_assignments.find(_tf(user)).to_list(length=None)
-        schedules = await db.task_schedules.find(_tf(user)).to_list(length=None)
+        tasks = await db.task_assignments.find(scoped(user)).to_list(length=None)
+        schedules = await db.task_schedules.find(scoped(user)).to_list(length=None)
         recurring_ids = set(s.get("id") for s in schedules if s.get("recurrence", {}).get("type") and s.get("recurrence", {}).get("type") != "none")
         
         recurring_count = len([t for t in tasks if t.get("schedule_id") in recurring_ids])
         adhoc_count = len(tasks) - recurring_count
         
         # Get data quality
-        equipment = await db.equipment.find(_tf(user)).to_list(length=None)
+        equipment = await db.equipment.find(scoped(user)).to_list(length=None)
         total_assets = len(equipment)
-        fmea_mappings = await db.equipment_fmea.find(_tf(user)).to_list(length=None)
+        fmea_mappings = await db.equipment_fmea.find(scoped(user)).to_list(length=None)
         fmea_coverage = round((len(fmea_mappings) / total_assets * 100), 1) if total_assets > 0 else 0
         
         # Get gaps summary
-        threats = await db.threats.find(_tf(user)).to_list(length=None)
+        threats = await db.threats.find(scoped(user)).to_list(length=None)
         threat_ids_with_actions = set(a.get("observation_id") or a.get("threat_id") for a in actions if a.get("observation_id") or a.get("threat_id"))
         obs_without_actions = len([t for t in threats if t.get("id") not in threat_ids_with_actions])
         
@@ -597,29 +595,29 @@ async def get_insights_summary(
         async def fetch_summary():
             # Parallel count queries for performance
             # Use correct collections: equipment_nodes for equipment, failure_modes for FMEA
-            total_actions_task = db.central_actions.count_documents(_tf(user))
-            actions_alt_task = db.actions.count_documents(_tf(user))
-            completed_actions_task = db.central_actions.count_documents(_tf(user, {
+            total_actions_task = db.central_actions.count_documents(scoped(user))
+            actions_alt_task = db.actions.count_documents(scoped(user))
+            completed_actions_task = db.central_actions.count_documents(scoped(user, {
                 "status": {"$in": ["completed", "Completed", "done", "Done", "closed", "Closed"]}
             }))
-            completed_actions_alt_task = db.actions.count_documents(_tf(user, {
+            completed_actions_alt_task = db.actions.count_documents(scoped(user, {
                 "status": {"$in": ["completed", "Completed", "done", "Done", "closed", "Closed"]}
             }))
-            total_equipment_task = db.equipment_nodes.count_documents(_tf(user))
-            equipment_with_criticality_task = db.equipment_nodes.count_documents(_tf(user, {
+            total_equipment_task = db.equipment_nodes.count_documents(scoped(user))
+            equipment_with_criticality_task = db.equipment_nodes.count_documents(scoped(user, {
                 "$or": [
                     {"criticality": {"$exists": True, "$nin": [None, ""]}},
                     {"criticality_score": {"$exists": True, "$ne": None}}
                 ]
             }))
-            equipment_with_type_task = db.equipment_nodes.count_documents(_tf(user, {
+            equipment_with_type_task = db.equipment_nodes.count_documents(scoped(user, {
                 "$or": [
                     {"equipment_type_id": {"$exists": True, "$nin": [None, ""]}},
                     {"type": {"$exists": True, "$nin": [None, ""]}}
                 ]
             }))
-            fmea_count_task = db.failure_modes.count_documents(_tf(user))
-            threats_count_task = db.threats.count_documents(_tf(user))
+            fmea_count_task = db.failure_modes.count_documents(scoped(user))
+            threats_count_task = db.threats.count_documents(scoped(user))
             
             # Execute all count queries in parallel
             (
@@ -655,10 +653,10 @@ async def get_insights_summary(
             if total_equipment > 0:
                 crit_pct = (equipment_with_criticality / total_equipment * 100)
                 # FMEA coverage: nodes linked to at least one failure mode via equipment_type_ids
-                fmea_linked_types = set(await db.failure_modes.distinct("equipment_type_ids", _tf(user)))
+                fmea_linked_types = set(await db.failure_modes.distinct("equipment_type_ids", scoped(user)))
                 fmea_linked_types.discard(None)
                 fmea_linked_types.discard("")
-                assets_with_fmea = await db.equipment_nodes.count_documents(_tf(user, {
+                assets_with_fmea = await db.equipment_nodes.count_documents(scoped(user, {
                     "equipment_type_id": {"$in": list(fmea_linked_types)}
                 })) if fmea_linked_types else 0
                 fmea_pct = (assets_with_fmea / total_equipment * 100)
@@ -668,7 +666,7 @@ async def get_insights_summary(
                 completeness_score = 0
             
             # Count actions with observation/threat references
-            actions_with_obs = await db.central_actions.count_documents(_tf(user, {
+            actions_with_obs = await db.central_actions.count_documents(scoped(user, {
                 "$or": [
                     {"observation_id": {"$exists": True, "$ne": None}},
                     {"threat_id": {"$exists": True, "$ne": None}}
@@ -680,7 +678,7 @@ async def get_insights_summary(
             obs_without_actions_estimate = max(0, threats_count - actions_with_obs)
             
             # Count critical equipment without FMEA (simplified)
-            critical_equipment = await db.equipment_nodes.count_documents(_tf(user, {
+            critical_equipment = await db.equipment_nodes.count_documents(scoped(user, {
                 "$or": [
                     {"criticality": {"$in": ["high", "High", "critical", "Critical", "a", "A", "1"]}},
                     {"criticality_score": {"$gte": 8}}
@@ -695,7 +693,7 @@ async def get_insights_summary(
                 critical_gaps += 1
             
             # Bad actors - simplified estimate based on failed actions ratio
-            failed_actions = await db.central_actions.count_documents(_tf(user, {
+            failed_actions = await db.central_actions.count_documents(scoped(user, {
                 "status": {"$in": ["failed", "Failed", "cancelled", "Cancelled", "rejected", "Rejected"]}
             }))
             bad_actors_estimate = 1 if (failed_actions > 0 and total_actions > 0 and (failed_actions / total_actions * 100) > 15) else 0
