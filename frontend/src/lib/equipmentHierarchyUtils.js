@@ -36,3 +36,18 @@ export function canBeChildOf(childLevel, parentLevel) {
   const childIdx = LEVEL_ORDER.indexOf(normalizedChild);
   return parentIdx >= 0 && childIdx === parentIdx + 1;
 }
+
+/** ISO levels (and legacy aliases) that may receive spare-part equipment links. */
+export const SPARE_PART_LINKABLE_LEVELS = new Set([
+  "equipment_unit",
+  "subunit",
+  "maintainable_item",
+  "equipment",
+  "tag",
+]);
+
+export function isSparePartLinkableLevel(level) {
+  if (!level) return false;
+  const normalized = normalizeLevel(level);
+  return SPARE_PART_LINKABLE_LEVELS.has(level) || SPARE_PART_LINKABLE_LEVELS.has(normalized);
+}

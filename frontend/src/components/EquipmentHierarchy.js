@@ -39,6 +39,7 @@ import {
   EyeOff,
   ClipboardList,
   FoldVertical,
+  Package,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -48,9 +49,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { DocumentViewer } from "./DocumentViewer";
 import { getBackendUrl } from "../lib/apiConfig";
 import { getEquipmentLevelLabel } from "../lib/equipmentLevelLabels";
-import { LEVEL_ORDER as ISO_LEVEL_ORDER } from "../lib/equipmentHierarchyUtils";
+import { LEVEL_ORDER as ISO_LEVEL_ORDER, isSparePartLinkableLevel } from "../lib/equipmentHierarchyUtils";
 import { computeCriticalityScore, getCriticalityDimensions } from "../lib/criticalityScore";
 import MaintenanceProgramPanel from "./equipment/MaintenanceProgramPanel";
+import EquipmentSparePartsPanel from "./spareiq/EquipmentSparePartsPanel";
 
 // ISO 14224 Level Configuration
 const ISO_LEVEL_CONFIG = {
@@ -471,7 +473,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
   return (
     <>
     <Dialog open={open && !previewFile} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm sm:max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden" data-testid="equipment-details-dialog">
+      <DialogContent className="max-w-sm sm:max-w-lg max-h-[85vh] flex flex-col p-0 overflow-hidden" data-testid="equipment-details-dialog">
         <DialogHeader className="px-4 pt-4 sm:px-6 sm:pt-6 pb-2">
           <div className="flex items-start gap-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -573,6 +575,21 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
             <div>
               <label className="text-xs text-slate-500 block mb-1">{t("common.description")}</label>
               <p className="text-sm text-slate-600">{translatedDescription}</p>
+            </div>
+          )}
+
+          {isSparePartLinkableLevel(node.level) && (
+            <div className="pt-3 border-t border-slate-200">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Package className="w-3.5 h-3.5 text-amber-600" />
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                  {t?.("equipment.spareParts") || "Spare Parts"}
+                </span>
+              </div>
+              <EquipmentSparePartsPanel
+                equipmentId={node.id}
+                equipmentName={translatedName}
+              />
             </div>
           )}
 

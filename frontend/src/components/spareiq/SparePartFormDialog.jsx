@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "../../contexts/LanguageContext";
 
 import { equipmentHierarchyAPI } from "../../lib/apis/equipment";
+import { isSparePartLinkableLevel } from "../../lib/equipmentHierarchyUtils";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -21,7 +22,9 @@ import {
   SelectValue,
 } from "../ui/select";
 
-const EQUIPMENT_LEVELS = new Set(["equipment", "equipment_unit", "tag"]);
+function filterLinkableNodes(nodes) {
+  return (nodes || []).filter((n) => isSparePartLinkableLevel(n.level) || !n.level);
+}
 
 export default function SparePartFormDialog({
   open,
@@ -43,6 +46,8 @@ export default function SparePartFormDialog({
   const [componentPositions, setComponentPositions] = useState({});
 
   const [equipmentNodes, setEquipmentNodes] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -50,13 +55,40 @@ export default function SparePartFormDialog({
     equipmentHierarchyAPI.getNodes().then((res) => {
       if (!cancelled) {
         const nodes = Array.isArray(res) ? res : res?.nodes || [];
-        setEquipmentNodes(
-          nodes.filter((n) => EQUIPMENT_LEVELS.has(n.level) || !n.level)
-        );
+        setEquipmentNodes(filterLinkableNodes(nodes));
       }
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const q = equipmentSearch.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setSearchLoading(true);
+    const timer = setTimeout(() => {
+      equipmentHierarchyAPI.searchNodes(q, 50).then((res) => {
+        if (cancelled) return;
+        const nodes = res?.results || [];
+        setSearchResults(filterLinkableNodes(nodes));
+      }).catch(() => {
+        if (!cancelled) setSearchResults([]);
+      }).finally(() => {
+        if (!cancelled) setSearchLoading(false);
+      });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, equipmentSearch]);
 
   useEffect(() => {
     if (!open) return;
@@ -87,13 +119,64 @@ export default function SparePartFormDialog({
     }
   }, [open, initialValues]);
 
+  const nodeCatalog = useMemo(() => {
+    const byId = new Map();
+    for (const node of equipmentNodes) {
+      if (node?.id) byId.set(node.id, node);
+    }
+    for (const node of searchResults) {
+      if (node?.id) byId.set(node.id, node);
+    }
+    return byId;
+  }, [equipmentNodes, searchResults]);
+
   const filteredEquipment = useMemo(() => {
     const q = equipmentSearch.trim().toLowerCase();
+    if (q.length >= 2) {
+      const merged = new Map();
+      for (const node of searchResults) {
+        if (node?.id) merged.set(node.id, node);
+      }
+      for (const node of equipmentNodes) {
+        if (!node?.id) continue;
+        const haystack = [node.name, node.tag, node.path, node.full_path]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (haystack.includes(q)) merged.set(node.id, node);
+      }
+      return Array.from(merged.values()).slice(0, 50);
+    }
     if (!q) return equipmentNodes.slice(0, 50);
     return equipmentNodes
-      .filter((n) => (n.name || "").toLowerCase().includes(q) || (n.tag || "").toLowerCase().includes(q))
+      .filter((n) => {
+        const haystack = [n.name, n.tag, n.path, n.full_path]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      })
       .slice(0, 50);
-  }, [equipmentNodes, equipmentSearch]);
+  }, [equipmentNodes, equipmentSearch, searchResults]);
+
+  const displayEquipment = useMemo(() => {
+    const seen = new Set();
+    const rows = [];
+    for (const id of selectedEquipment) {
+      const node = nodeCatalog.get(id);
+      if (node && !seen.has(id)) {
+        seen.add(id);
+        rows.push(node);
+      }
+    }
+    for (const node of filteredEquipment) {
+      if (node?.id && !seen.has(node.id)) {
+        seen.add(node.id);
+        rows.push(node);
+      }
+    }
+    return rows;
+  }, [selectedEquipment, nodeCatalog, filteredEquipment]);
 
   const toggleEquipment = (equipmentId) => {
     setSelectedEquipment((prev) =>
@@ -124,7 +207,7 @@ export default function SparePartFormDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {initialValues
+            {initialValues?.id
               ? (t("spareiq.edit") || "Edit Spare Part")
               : (t("spareiq.create") || "Create Spare Part")}
           </DialogTitle>
@@ -171,11 +254,22 @@ export default function SparePartFormDialog({
             <Input
               value={equipmentSearch}
               onChange={(e) => setEquipmentSearch(e.target.value)}
-              placeholder={t("spareiq.searchEquipment") || "Search equipment..."}
+              placeholder={t("spareiq.searchEquipment") || "Search subunits, maintainable items, tags..."}
             />
+            {searchLoading && (
+              <p className="text-xs text-slate-500">{t("common.loading") || "Loading..."}</p>
+            )}
             <div className="max-h-40 overflow-y-auto rounded border border-slate-200 divide-y">
-              {filteredEquipment.map((node) => {
+              {displayEquipment.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-slate-500">
+                  {equipmentSearch.trim().length >= 2
+                    ? (t("spareiq.noEquipmentMatches") || "No matching equipment")
+                    : (t("spareiq.searchEquipmentHint") || "Type to search subunits and maintainable items")}
+                </p>
+              ) : null}
+              {displayEquipment.map((node) => {
                 const checked = selectedEquipment.includes(node.id);
+                const pathHint = node.path || node.full_path;
                 return (
                   <label key={node.id} className="flex items-start gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
                     <input
@@ -187,6 +281,14 @@ export default function SparePartFormDialog({
                     <span>
                       <span className="font-medium text-slate-900">{node.name}</span>
                       {node.tag && <span className="text-slate-500 ml-1">({node.tag})</span>}
+                      {node.level && (
+                        <span className="block text-xs text-slate-400 capitalize">
+                          {(node.level || "").replace(/_/g, " ")}
+                        </span>
+                      )}
+                      {pathHint && (
+                        <span className="block text-xs text-slate-500">{pathHint}</span>
+                      )}
                       {checked && (
                         <Input
                           className="mt-1 h-8 text-xs"
