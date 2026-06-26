@@ -35,5 +35,6 @@ export {
   mapCentralActionToPlanItem,
 } from "./apis/observationWorkspace";
 export { pushNotificationsAPI } from "./apis/pushNotifications";
+export { tenantManagementAPI } from "./apis/tenantManagement";
 
 export { api as default } from "./apiClient";

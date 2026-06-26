@@ -34,6 +34,14 @@ async def create_indexes():
     await db.users.create_index("role", background=True)
     await db.users.create_index("assigned_installations", background=True)
     print("   ✓ users indexes created")
+
+    # ============= TENANTS COLLECTION =============
+    print("\n📋 Creating indexes for 'tenants' collection...")
+    await db.tenants.create_index("tenant_id", unique=True, background=True)
+    await db.tenants.create_index("slug", unique=True, background=True)
+    await db.tenants.create_index("status", background=True)
+    await db.tenants.create_index("created_at", background=True)
+    print("   ✓ tenants indexes created")
     
     # ============= THREATS/OBSERVATIONS COLLECTION =============
     print("\n📋 Creating indexes for 'threats' collection...")

@@ -309,10 +309,11 @@ Production soak and production rollout are **intentionally skipped**. Recommende
 
 1. **Re-run UAT verification scripts on live Atlas** — publish exit codes in §2; update Workstreams A–D in `PHASE1_EXECUTION.md`.
 2. **Complete tenant hardening beyond maintenance** — `phase2_tenancy_report.py` on UAT; cross-tenant tests with tenant #2.
-3. **Reactive graph chain maturity** — extend sync handlers per `RELIABILITY_KNOWLEDGE_GRAPH_IMPLEMENTATION_PLAN.md`.
-4. **Break down top god files** — Frontend/backend routes per Platform 1.0 WS4.
-5. **AI platform consolidation** — Wire grounded orchestrator or remove dead paths; async OpenAI client.
-6. **Graph performance benchmarks** — Run harness against UAT-scale data.
+3. **Owner Tenant Management (v1)** — Settings → Tenant Management at `/settings/tenant-management`; owner-only API at `/api/admin/tenants/*`; `tenants` registry collection with suspend/archive lifecycle; validation script `validate_tenant_onboarding.py`.
+4. **Reactive graph chain maturity** — extend sync handlers per `RELIABILITY_KNOWLEDGE_GRAPH_IMPLEMENTATION_PLAN.md`.
+5. **Break down top god files** — Frontend/backend routes per Platform 1.0 WS4.
+6. **AI platform consolidation** — Wire grounded orchestrator or remove dead paths; async OpenAI client.
+7. **Graph performance benchmarks** — Run harness against UAT-scale data.
 
 ---
 

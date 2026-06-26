@@ -68,6 +68,7 @@ const staticRouteLabels = {
   '/settings/criticality-definitions': 'Criticality Definitions',
   '/settings/feedback': 'Feedback',
   '/settings/log-ingestion': 'Log Ingestion',
+  '/settings/tenant-management': 'Tenant Management',
   '/settings/privacy': 'Privacy',
   '/settings/deletion-requests': 'Deletion Requests',
   '/settings/consent-management': 'Consent Management',

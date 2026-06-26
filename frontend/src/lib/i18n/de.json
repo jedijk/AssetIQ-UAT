@@ -109,6 +109,10 @@
         "label": "Log Ingestion",
         "description": "Upload & parse production logs"
       },
+      "tenantManagement": {
+        "label": "Mandantenverwaltung",
+        "description": "Plattform-Administration für Kundenmandanten"
+      },
       "statistics": {
         "label": "Statistics",
         "description": "Usage analytics and reports"

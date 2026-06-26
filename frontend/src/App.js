@@ -77,6 +77,7 @@ const SettingsServerPerformancePage = lazy(() => import("./pages/SettingsServerP
 const SettingsMaintenanceReadinessPage = lazy(() => import("./pages/SettingsMaintenanceReadinessPage"));
 const SettingsDatabasePage = lazy(() => import("./pages/SettingsDatabasePage"));
 const SettingsLogIngestionPage = lazy(() => import("./pages/SettingsLogIngestionPage"));
+const SettingsTenantManagementPage = lazy(() => import("./pages/SettingsTenantManagementPage"));
 const SettingsPrivacyPage = lazy(() => import("./pages/SettingsPrivacyPage"));
 const SettingsDeletionRequestsPage = lazy(() => import("./pages/SettingsDeletionRequestsPage"));
 const SettingsConsentManagementPage = lazy(() => import("./pages/SettingsConsentManagementPage"));
@@ -593,6 +594,7 @@ function App() {
                   <Route path="criticality-definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
                   <Route path="feedback" element={<Suspense fallback={<RouteFallback />}><FeedbackPage /></Suspense>} />
                   <Route path="log-ingestion" element={<Suspense fallback={<RouteFallback />}><SettingsLogIngestionPage /></Suspense>} />
+                  <Route path="tenant-management" element={<Suspense fallback={<RouteFallback />}><SettingsTenantManagementPage /></Suspense>} />
                   <Route path="privacy" element={<Suspense fallback={<RouteFallback />}><SettingsPrivacyPage /></Suspense>} />
                   <Route path="deletion-requests" element={<Suspense fallback={<RouteFallback />}><SettingsDeletionRequestsPage /></Suspense>} />
                   <Route path="consent-management" element={<Suspense fallback={<RouteFallback />}><SettingsConsentManagementPage /></Suspense>} />

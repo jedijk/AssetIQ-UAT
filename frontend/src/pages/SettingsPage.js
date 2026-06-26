@@ -28,6 +28,7 @@ import {
   Languages,
   ClipboardCheck,
   Monitor,
+  Building2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -166,6 +167,13 @@ const SETTINGS_SECTIONS = [
     icon: Database,
     path: "/settings/database",
     roles: ["owner"]
+  },
+  {
+    id: "tenant-management",
+    sectionKey: "tenantManagement",
+    icon: Building2,
+    path: "/settings/tenant-management",
+    roles: ["owner"],
   },
   {
     id: "log-ingestion",

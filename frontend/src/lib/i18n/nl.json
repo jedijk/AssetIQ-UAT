@@ -109,6 +109,10 @@
         "label": "Log-invoer",
         "description": "Productielogs uploaden en verwerken"
       },
+      "tenantManagement": {
+        "label": "Tenantbeheer",
+        "description": "Platformbeheer voor klant-tenants"
+      },
       "statistics": {
         "label": "Statistieken",
         "description": "Gebruiksanalyses en rapporten"

@@ -61,6 +61,7 @@ from routes.visual_board_templates import router as visual_board_templates_route
 from routes.visual_board_screens import router as visual_board_screens_router
 from routes.visual_display import router as visual_display_router
 from routes.spare_parts import router as spare_parts_router
+from routes.tenant_management import router as tenant_management_router
 
 all_routers = [
     auth_router,
@@ -123,4 +124,5 @@ all_routers = [
     visual_board_screens_router,
     visual_display_router,
     spare_parts_router,
+    tenant_management_router,
 ]

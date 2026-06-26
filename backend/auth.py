@@ -194,6 +194,15 @@ async def _validate_token(token: str) -> dict:
             raise HTTPException(status_code=401, detail="User not found")
         if user.get("is_active") is False:
             raise HTTPException(status_code=401, detail="Account deactivated")
+        from services.tenant_schema import tenant_id_from_user
+        from services.tenant_registry import is_tenant_login_allowed
+
+        tenant_id = tenant_id_from_user(user)
+        if tenant_id and not await is_tenant_login_allowed(tenant_id):
+            raise HTTPException(
+                status_code=403,
+                detail="This organization is suspended or archived. Contact your platform administrator.",
+            )
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")

@@ -394,6 +394,17 @@ async def login(request: Request, credentials: UserLogin, response: Response):
             status_code=403,
             detail="Your account has been deactivated. Please contact an administrator."
         )
+
+    from services.tenant_schema import tenant_id_from_user
+    from services.tenant_registry import is_tenant_login_allowed
+
+    tenant_id = tenant_id_from_user(user)
+    if tenant_id and not await is_tenant_login_allowed(tenant_id):
+        await record_login_attempt(credentials.email, success=False, ip_address=ip_address)
+        raise HTTPException(
+            status_code=403,
+            detail="This organization is suspended or archived. Contact your platform administrator.",
+        )
     
     # Record successful login
     await record_login_attempt(credentials.email, success=True, ip_address=ip_address)

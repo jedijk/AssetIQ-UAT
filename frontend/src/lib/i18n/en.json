@@ -152,6 +152,10 @@
         "label": "Log Ingestion",
         "description": "Upload & parse production logs"
       },
+      "tenantManagement": {
+        "label": "Tenant Management",
+        "description": "Platform admin for customer tenants"
+      },
       "statistics": {
         "label": "Statistics",
         "description": "Usage analytics and reports"

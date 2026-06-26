@@ -51,6 +51,7 @@ ROLES = {
             "installations:all",  # Special permission to see all installations
             "vmb:read", "vmb:write", "vmb:publish", "vmb:admin",
             "spareiq:read", "spareiq:write", "spareiq:delete",
+            "tenant_management:read", "tenant_management:write", "tenant_management:admin",
         ]
     },
     "admin": {

@@ -38,6 +38,9 @@ API_ONLY_PERMISSIONS = frozenset({
     "analytics:export",
     "vmb:publish",
     "vmb:admin",
+    "tenant_management:read",
+    "tenant_management:write",
+    "tenant_management:admin",
 })
 
 _rbac = RBACService.__new__(RBACService)

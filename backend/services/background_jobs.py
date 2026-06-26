@@ -106,6 +106,26 @@ class BackgroundJobService:
         max_retries: int = 3,
         **kwargs: Any,
     ) -> Any:
+        tenant_id = kwargs.get("tenant_id")
+        if tenant_id is None and args:
+            first = args[0]
+            if isinstance(first, dict):
+                tenant_id = first.get("tenant_id")
+        from services.tenant_registry import should_skip_tenant_jobs
+
+        if await should_skip_tenant_jobs(tenant_id):
+            await self.update_record(
+                job_id,
+                status=JobStatus.COMPLETED.value,
+                error=None,
+                result={"skipped": True, "reason": "tenant_suspended_or_archived"},
+            )
+            logger.info(
+                "job skipped for inactive tenant",
+                extra={"job_event": "skipped", "job_id": job_id, "job_type": job_type, "tenant_id": tenant_id},
+            )
+            return {"skipped": True, "reason": "tenant_suspended_or_archived"}
+
         last_error: Optional[Exception] = None
         for attempt in range(1, max_retries + 1):
             await self.update_record(job_id, status=JobStatus.RUNNING.value, attempts=attempt)
