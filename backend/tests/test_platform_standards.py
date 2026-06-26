@@ -25,7 +25,7 @@ def test_service_module_size_gate_passes():
     assert check_service_module_sizes(backend_root=BACKEND_ROOT) == []
 
 
-def test_tenant_baseline_covers_current_flagged():
+def test_tenant_audit_reports_zero_flagged():
     from architecture.platform_standards import (
         TENANT_FILTER_FLAGGED_BASELINE,
         check_tenant_service_filters,

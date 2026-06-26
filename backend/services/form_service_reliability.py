@@ -3,7 +3,17 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from services.tenant_schema import merge_tenant_filter
+
 logger = logging.getLogger(__name__)
+
+
+def _submission_user(submission: Dict[str, Any], submitted_by: str) -> dict:
+    user_ctx: Dict[str, Any] = {"id": submitted_by}
+    tenant_id = submission.get("tenant_id") or submission.get("company_id")
+    if tenant_id:
+        user_ctx["company_id"] = tenant_id
+    return user_ctx
 
 
 async def after_form_submission_reliability_update(
@@ -33,14 +43,15 @@ async def after_form_submission_reliability_update(
         scheduled_task_id = None
         failure_mode_id = None
         tenant_id = submission.get("tenant_id")
+        user_ctx = _submission_user(submission, submitted_by)
         if task_instance_id:
             inst = await db.task_instances.find_one(
-                {"_id": task_instance_id},
+                merge_tenant_filter({"_id": task_instance_id}, user_ctx),
                 {"scheduled_task_id": 1, "failure_mode_id": 1, "equipment_id": 1, "tenant_id": 1},
             )
             if not inst:
                 inst = await db.task_instances.find_one(
-                    {"id": task_instance_id},
+                    merge_tenant_filter({"id": task_instance_id}, user_ctx),
                     {"scheduled_task_id": 1, "failure_mode_id": 1, "equipment_id": 1, "tenant_id": 1},
                 )
             if inst:
@@ -63,13 +74,12 @@ async def after_form_submission_reliability_update(
 
         if equipment_id:
             equip = await db.equipment_nodes.find_one(
-                {"id": equipment_id},
+                merge_tenant_filter({"id": equipment_id}, user_ctx),
                 {"name": 1, "installation_id": 1},
             )
             if equip and equip.get("name"):
-                user_ctx = {"id": submitted_by}
                 if tenant_id:
-                    user_ctx["tenant_id"] = tenant_id
+                    user_ctx["company_id"] = tenant_id
                 await recalculate_threat_scores_for_asset(
                     asset_name=equip["name"],
                     user_id=submitted_by or "system",

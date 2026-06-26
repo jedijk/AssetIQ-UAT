@@ -225,8 +225,10 @@ class MaintenanceProgramService:
         Ensure maintenance_programs_v2 exists for equipment after scheduler apply-strategy.
         Creates a new program from strategy or regenerates an existing one.
         """
+        equipment = await _load_equipment_for_program(equipment_id)
+        tenant_id = tenant_id_from_record(equipment)
         existing = await db.maintenance_programs_v2.find_one(
-            {"equipment_id": equipment_id},
+            maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id}),
             {"equipment_id": 1, "_id": 0},
         )
 
@@ -247,10 +249,8 @@ class MaintenanceProgramService:
             )
             action = "created"
 
-        equipment = await db.equipment_nodes.find_one(
-            {"id": equipment_id},
-            {"_id": 0, "tag": 1, "name": 1},
-        )
+        equipment = await _load_equipment_for_program(equipment_id)
+        tenant_id = tenant_id_from_record(equipment)
         update_fields: Dict[str, Any] = {
             "applied_strategy_version": strategy_version,
             "updated_at": datetime.utcnow().isoformat(),
@@ -264,7 +264,7 @@ class MaintenanceProgramService:
             update_fields["status"] = ProgramStatus.ACTIVE.value
 
         result = await db.maintenance_programs_v2.update_one(
-            {"equipment_id": equipment_id},
+            maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id}),
             {"$set": update_fields},
         )
         if result.matched_count == 0:
@@ -322,9 +322,12 @@ class MaintenanceProgramService:
     ) -> List[MaintenanceProgramTask]:
         """Generate maintenance tasks from equipment type strategy"""
         
+        equipment = await _load_equipment_for_program(equipment_id)
+        tenant_id = tenant_id_from_record(equipment)
+
         # Get strategy
         strategy = await db.equipment_type_strategies.find_one(
-            {"equipment_type_id": equipment_type_id},
+            maintenance_scoped_tenant(tenant_id, {"equipment_type_id": equipment_type_id}),
             {"_id": 0}
         )
         
@@ -420,13 +423,13 @@ class MaintenanceProgramService:
         Preserves manual/imported tasks and overridden strategy tasks by default.
         """
         strategy = await db.equipment_type_strategies.find_one(
-            {"equipment_type_id": equipment_type_id},
+            maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
             {"version": 1, "_id": 0},
         )
         strategy_version = (strategy or {}).get("version", "1.0")
 
         equipment_nodes = await db.equipment_nodes.find(
-            {"equipment_type_id": equipment_type_id},
+            maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
             {"id": 1, "_id": 0},
         ).to_list(500)
         equipment_ids = [node["id"] for node in equipment_nodes if node.get("id")]
@@ -434,7 +437,7 @@ class MaintenanceProgramService:
         created: List[str] = []
         if equipment_ids:
             existing_docs = await db.maintenance_programs_v2.find(
-                {"equipment_id": {"$in": equipment_ids}},
+                maintenance_scoped_job({"equipment_id": {"$in": equipment_ids}}),
                 {"equipment_id": 1, "_id": 0},
             ).to_list(len(equipment_ids))
             existing_ids = {doc.get("equipment_id") for doc in existing_docs}
@@ -456,7 +459,7 @@ class MaintenanceProgramService:
                     )
 
         programs = await db.maintenance_programs_v2.find(
-            {"equipment_type_id": equipment_type_id},
+            maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
             {"equipment_id": 1, "_id": 0},
         ).to_list(500)
 

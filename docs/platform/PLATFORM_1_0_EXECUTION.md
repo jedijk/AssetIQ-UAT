@@ -281,7 +281,7 @@ Provider Layer → Prompt Registry → Context Builder → Evidence Builder
 | Standards documentation | **Done** — `docs/platform/PLATFORM_STANDARDS.md` |
 | Shared check module | **Done** — `architecture/platform_standards.py` |
 | Service LOC gate | **Done** — 800 LOC + allowlist (WS4 baseline) |
-| Tenant ratio gate | **Done** — baseline grandfathering, fail on new risks |
+| Tenant ratio gate | **Done** — zero flagged baseline, strict CI gate |
 | AI entry point gate | **Done** — wraps `ai_entry_point_report.py` |
 | Layer boundary gate | **Done** — services must not import routes |
 | CI integration | **Done** — `.github/workflows/backend-tests.yml` |

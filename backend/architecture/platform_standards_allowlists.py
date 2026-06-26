@@ -93,13 +93,5 @@ TENANT_FILTER_ALLOWLIST: frozenset[str] = frozenset({
     "services/event_outbox.py",
 })
 
-# Grandfathered low tenant-helper ratio files (heuristic audit). CI fails on new entries.
-TENANT_FILTER_FLAGGED_BASELINE: frozenset[str] = frozenset({
-    "services/maintenance_scheduler_cleanup.py",
-    "services/maintenance_strategy_v2_instances.py",
-    "services/maintenance_program_service.py",
-    "services/maintenance_program_scheduler_sync.py",
-    "services/intelligence_map_routes_service.py",
-    "services/form_service_reliability.py",
-    "services/maintenance_scheduler_shared.py",
-})
+# No grandfathered tenant audit failures — WS1 definition of done.
+TENANT_FILTER_FLAGGED_BASELINE: frozenset[str] = frozenset()

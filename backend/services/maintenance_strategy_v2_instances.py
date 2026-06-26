@@ -23,6 +23,7 @@ from services.maintenance_strategy_helpers import (
     calculate_frequency_for_criticality,
     log_strategy_audit,
 )
+from services.tenant_scope import scoped as _tenant_query
 
 
 async def generate_tasks_for_equipment(
@@ -30,9 +31,9 @@ async def generate_tasks_for_equipment(
     request: GenerateTasksRequest, current_user: dict
 ):
     """Generate maintenance tasks for a specific equipment asset based on its criticality"""
-    strategy = await db.equipment_type_strategies.find_one({
+    strategy = await db.equipment_type_strategies.find_one(_tenant_query(current_user, {
         "equipment_type_id": equipment_type_id
-    })
+    }))
     
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found for this equipment type")
@@ -78,9 +79,9 @@ async def generate_tasks_for_equipment(
         generated_tasks.append(gen_task)
     
     # Create or update equipment strategy instance
-    existing_instance = await db.equipment_strategy_instances.find_one({
+    existing_instance = await db.equipment_strategy_instances.find_one(_tenant_query(current_user, {
         "equipment_id": request.equipment_id
-    })
+    }))
     
     instance = EquipmentStrategyInstance(
         id=existing_instance.get("id") if existing_instance else str(uuid.uuid4()),
@@ -101,7 +102,7 @@ async def generate_tasks_for_equipment(
     
     if existing_instance:
         await db.equipment_strategy_instances.update_one(
-            {"equipment_id": request.equipment_id},
+            _tenant_query(current_user, {"equipment_id": request.equipment_id}),
             {"$set": instance_dict}
         )
     else:
@@ -125,7 +126,7 @@ async def get_equipment_strategy_instance(
 ):
     """Get the strategy instance for a specific equipment asset"""
     instance = await db.equipment_strategy_instances.find_one(
-        {"equipment_id": equipment_id},
+        _tenant_query(current_user, {"equipment_id": equipment_id}),
         {"_id": 0}
     )
     
@@ -141,9 +142,9 @@ async def override_equipment_task(
     updates: Dict[str, Any], current_user: dict
 ):
     """Override a generated task at equipment level"""
-    instance = await db.equipment_strategy_instances.find_one({
+    instance = await db.equipment_strategy_instances.find_one(_tenant_query(current_user, {
         "equipment_id": equipment_id
-    })
+    }))
     
     if not instance:
         raise HTTPException(status_code=404, detail="Equipment strategy instance not found")
@@ -171,7 +172,7 @@ async def override_equipment_task(
         raise HTTPException(status_code=404, detail="Task not found")
     
     await db.equipment_strategy_instances.update_one(
-        {"equipment_id": equipment_id},
+        _tenant_query(current_user, {"equipment_id": equipment_id}),
         {
             "$set": {
                 "generated_tasks": generated_tasks,
@@ -190,9 +191,9 @@ async def disable_failure_mode_for_equipment(
     reason: Optional[str] = None, *, current_user: dict
 ):
     """Disable a specific failure mode for an equipment asset"""
-    instance = await db.equipment_strategy_instances.find_one({
+    instance = await db.equipment_strategy_instances.find_one(_tenant_query(current_user, {
         "equipment_id": equipment_id
-    })
+    }))
     
     if not instance:
         raise HTTPException(status_code=404, detail="Equipment strategy instance not found")
@@ -214,7 +215,7 @@ async def disable_failure_mode_for_equipment(
             generated_tasks[i]["activation_state"] = TaskActivationState.DISABLED.value
     
     await db.equipment_strategy_instances.update_one(
-        {"equipment_id": equipment_id},
+        _tenant_query(current_user, {"equipment_id": equipment_id}),
         {
             "$set": {
                 "disabled_failure_modes": disabled_fms,
@@ -234,17 +235,17 @@ async def regenerate_equipment_tasks(
     request: RegenerateStrategyRequest, current_user: dict
 ):
     """Regenerate tasks for equipment after strategy template changes"""
-    instance = await db.equipment_strategy_instances.find_one({
+    instance = await db.equipment_strategy_instances.find_one(_tenant_query(current_user, {
         "equipment_id": equipment_id
-    })
+    }))
     
     if not instance:
         raise HTTPException(status_code=404, detail="Equipment strategy instance not found")
     
     # Get latest strategy
-    strategy = await db.equipment_type_strategies.find_one({
+    strategy = await db.equipment_type_strategies.find_one(_tenant_query(current_user, {
         "equipment_type_id": instance.get("equipment_type_id")
-    })
+    }))
     
     if not strategy:
         raise HTTPException(status_code=404, detail="Equipment type strategy not found")
@@ -323,7 +324,7 @@ async def regenerate_equipment_tasks(
         generated_tasks.append(gen_task)
     
     await db.equipment_strategy_instances.update_one(
-        {"equipment_id": equipment_id},
+        _tenant_query(current_user, {"equipment_id": equipment_id}),
         {
             "$set": {
                 "generated_tasks": [t.model_dump() for t in generated_tasks],
@@ -352,9 +353,9 @@ async def add_local_task(
     request: AddTaskTemplateRequest, current_user: dict
 ):
     """Add a local task to an equipment (not from template)"""
-    instance = await db.equipment_strategy_instances.find_one({
+    instance = await db.equipment_strategy_instances.find_one(_tenant_query(current_user, {
         "equipment_id": equipment_id
-    })
+    }))
     
     if not instance:
         raise HTTPException(status_code=404, detail="Equipment strategy instance not found")
@@ -378,7 +379,7 @@ async def add_local_task(
     local_task_dict = local_task.model_dump()
     
     await db.equipment_strategy_instances.update_one(
-        {"equipment_id": equipment_id},
+        _tenant_query(current_user, {"equipment_id": equipment_id}),
         {
             "$push": {"local_tasks": local_task_dict},
             "$set": {
@@ -406,7 +407,7 @@ async def delete_local_task(
 ):
     """Delete a local task from equipment and clean up its scheduled tasks + maintenance program."""
     result = await db.equipment_strategy_instances.update_one(
-        {"equipment_id": equipment_id},
+        _tenant_query(current_user, {"equipment_id": equipment_id}),
         {
             "$pull": {"local_tasks": {"id": task_id}},
             "$set": {"updated_at": datetime.utcnow().isoformat()}
@@ -419,18 +420,18 @@ async def delete_local_task(
     # Clean up any maintenance_program + open scheduled_tasks created from this local task
     program_ids = [
         p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_id": equipment_id, "task_template_id": task_id},
+            _tenant_query(current_user, {"equipment_id": equipment_id, "task_template_id": task_id}),
             {"id": 1, "_id": 0},
         )
     ]
     scheduled_deleted = 0
     if program_ids:
-        sched_res = await db.scheduled_tasks.delete_many({
+        sched_res = await db.scheduled_tasks.delete_many(_tenant_query(current_user, {
             "maintenance_program_id": {"$in": program_ids},
-        })
+        }))
         scheduled_deleted = sched_res.deleted_count
     progs_res = await db.maintenance_programs.delete_many(
-        {"equipment_id": equipment_id, "task_template_id": task_id},
+        _tenant_query(current_user, {"equipment_id": equipment_id, "task_template_id": task_id}),
     )
 
     return {
@@ -446,9 +447,9 @@ async def enable_failure_mode_for_equipment(
     failure_mode_id: str, current_user: dict
 ):
     """Re-enable a previously disabled failure mode for an equipment asset"""
-    instance = await db.equipment_strategy_instances.find_one({
+    instance = await db.equipment_strategy_instances.find_one(_tenant_query(current_user, {
         "equipment_id": equipment_id
-    })
+    }))
     
     if not instance:
         raise HTTPException(status_code=404, detail="Equipment strategy instance not found")
@@ -471,7 +472,7 @@ async def enable_failure_mode_for_equipment(
                 generated_tasks[i]["activation_state"] = TaskActivationState.INHERITED.value
     
     await db.equipment_strategy_instances.update_one(
-        {"equipment_id": equipment_id},
+        _tenant_query(current_user, {"equipment_id": equipment_id}),
         {
             "$set": {
                 "disabled_failure_modes": disabled_fms,
@@ -492,7 +493,7 @@ async def get_equipment_sync_status(
 ):
     """Check sync status between equipment strategy and type strategy"""
     instance = await db.equipment_strategy_instances.find_one(
-        {"equipment_id": equipment_id},
+        _tenant_query(current_user, {"equipment_id": equipment_id}),
         {"_id": 0}
     )
     
@@ -501,7 +502,7 @@ async def get_equipment_sync_status(
     
     # Get latest strategy version
     strategy = await db.equipment_type_strategies.find_one(
-        {"equipment_type_id": instance.get("equipment_type_id")},
+        _tenant_query(current_user, {"equipment_type_id": instance.get("equipment_type_id")}),
         {"_id": 0, "version": 1}
     )
     

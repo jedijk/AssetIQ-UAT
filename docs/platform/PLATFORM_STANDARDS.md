@@ -38,7 +38,7 @@ All Mongo reads/writes in services must use canonical tenant helpers:
 
 - `merge_tenant_filter`, `scoped`, `scoped_job`, `tenant_read_filter`, domain-specific `*_scoped` helpers
 
-**CI gate:** heuristic audit flags services with ≥3 `find`/`aggregate` calls and tenant-helper ratio < 0.25. New flagged files fail CI; seven maintenance modules are grandfathered in the baseline.
+**CI gate:** heuristic audit flags services with ≥3 `find`/`aggregate` calls and tenant-helper ratio < 0.25. Any flagged file fails CI (zero baseline).
 
 Audit script (informational): `scripts/tenant_service_filter_audit.py`
 

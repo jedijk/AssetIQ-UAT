@@ -8,14 +8,16 @@ from services.maintenance_scheduler_shared import (
     _active_strategy_type_ids,
     _equipment_ids_for_type,
 )
+from services.maintenance_tenant_scope import maintenance_scoped_job
 from services.scheduler_helpers import program_is_strategy_backed
+
 
 async def clear_equipment_schedule_after_program_delete(
     equipment_id: str,
 ) -> Dict[str, Any]:
     """Cancel open scheduled tasks and deactivate legacy programs when a v2 program is deleted."""
     legacy_programs = await db.maintenance_programs.find(
-        {"equipment_id": equipment_id},
+        maintenance_scoped_job({"equipment_id": equipment_id}),
         {"id": 1, "_id": 0},
     ).to_list(10000)
     program_ids = [p["id"] for p in legacy_programs if p.get("id")]
@@ -58,7 +60,7 @@ async def clear_equipment_type_schedule_after_strategy_delete(
     """Remove scheduler programs and scheduled tasks when an equipment-type strategy is deleted."""
     equipment_ids: Set[str] = set()
     async for eq in db.equipment_nodes.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"id": 1, "_id": 0},
     ):
         if eq.get("id"):
@@ -66,7 +68,7 @@ async def clear_equipment_type_schedule_after_strategy_delete(
 
     program_ids: List[str] = []
     async for prog in db.maintenance_programs.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"id": 1, "equipment_id": 1, "_id": 0},
     ):
         if prog.get("id"):
@@ -75,7 +77,7 @@ async def clear_equipment_type_schedule_after_strategy_delete(
             equipment_ids.add(prog["equipment_id"])
 
     async for prog in db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"equipment_id": 1, "_id": 0},
     ):
         if prog.get("equipment_id"):
@@ -112,43 +114,6 @@ async def clear_equipment_type_schedule_after_strategy_delete(
     }
 
 
-async def _active_strategy_type_ids() -> Set[str]:
-    global _ACTIVE_STRATEGY_CACHE
-    now = time.monotonic()
-    if _ACTIVE_STRATEGY_CACHE is not None:
-        cached_at, cached_ids = _ACTIVE_STRATEGY_CACHE
-        if now - cached_at < _ACTIVE_STRATEGY_CACHE_TTL:
-            return cached_ids
-
-    ids = {
-        doc["equipment_type_id"]
-        async for doc in db.equipment_type_strategies.find(
-            _ACTIVE_STRATEGY_TYPE_QUERY,
-            {"equipment_type_id": 1, "_id": 0},
-        )
-        if doc.get("equipment_type_id")
-    }
-    _ACTIVE_STRATEGY_CACHE = (now, ids)
-    return ids
-
-
-async def _equipment_ids_for_type(equipment_type_id: str) -> Set[str]:
-    equipment_ids: Set[str] = set()
-    async for eq in db.equipment_nodes.find(
-        {"equipment_type_id": equipment_type_id},
-        {"id": 1, "_id": 0},
-    ):
-        if eq.get("id"):
-            equipment_ids.add(eq["id"])
-    async for prog in db.maintenance_programs.find(
-        {"$or": [{"equipment_type_id": equipment_type_id}, {"strategy_id": equipment_type_id}]},
-        {"equipment_id": 1, "_id": 0},
-    ):
-        if prog.get("equipment_id"):
-            equipment_ids.add(prog["equipment_id"])
-    return equipment_ids
-
-
 async def cleanup_scheduled_tasks_without_active_programs(
     equipment_type_id: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -158,7 +123,7 @@ async def cleanup_scheduled_tasks_without_active_programs(
         program_query["equipment_type_id"] = equipment_type_id
 
     equipped: Set[str] = set()
-    async for prog in db.maintenance_programs.find(program_query, {"equipment_id": 1, "_id": 0}):
+    async for prog in db.maintenance_programs.find(maintenance_scoped_job(program_query), {"equipment_id": 1, "_id": 0}):
         if prog.get("equipment_id"):
             equipped.add(prog["equipment_id"])
 
@@ -169,7 +134,7 @@ async def cleanup_scheduled_tasks_without_active_programs(
         type_equipment_ids = [
             eq["id"]
             async for eq in db.equipment_nodes.find(
-                {"equipment_type_id": equipment_type_id},
+                maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
                 {"id": 1, "_id": 0},
             )
             if eq.get("id")
@@ -210,7 +175,7 @@ async def cleanup_stale_strategy_schedules(
     if equipment_type_id:
         strategy_query["equipment_type_id"] = equipment_type_id
 
-    strategies = await db.equipment_type_strategies.find(strategy_query, {"_id": 0}).to_list(500)
+    strategies = await db.equipment_type_strategies.find(maintenance_scoped_job(strategy_query), {"_id": 0}).to_list(500)
     stale_program_ids: List[str] = []
 
     for strategy in strategies:
@@ -227,7 +192,7 @@ async def cleanup_stale_strategy_schedules(
             "$or": [{"equipment_type_id": etid}, {"strategy_id": etid}],
         }
         async for prog in db.maintenance_programs.find(
-            program_query,
+            maintenance_scoped_job(program_query),
             {"id": 1, "task_template_id": 1, "is_active": 1, "task_source": 1, "pm_import_task_id": 1, "_id": 0},
         ):
             if not program_is_strategy_backed(prog):
@@ -289,7 +254,7 @@ async def cleanup_schedules_without_strategy(
 
     # Find ALL programs whose strategy no longer exists (regardless of task_source)
     async for prog in db.maintenance_programs.find(
-        program_query,
+        maintenance_scoped_job(program_query),
         {
             "id": 1,
             "strategy_id": 1,
@@ -322,7 +287,7 @@ async def cleanup_schedules_without_strategy(
 
     all_program_ids = {
         p["id"]
-        async for p in db.maintenance_programs.find({}, {"id": 1, "_id": 0})
+        async for p in db.maintenance_programs.find(maintenance_scoped_job({}), {"id": 1, "_id": 0})
         if p.get("id")
     }
 
@@ -384,7 +349,7 @@ async def cleanup_schedules_without_strategy(
     
     orphan_v2_program_ids: List[str] = []
     async for prog in db.maintenance_programs_v2.find(
-        v2_program_query,
+        maintenance_scoped_job(v2_program_query),
         {"id": 1, "equipment_type_id": 1, "_id": 0},
     ):
         eq_type = prog.get("equipment_type_id")
