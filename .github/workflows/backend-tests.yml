@@ -45,6 +45,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
 
+      - name: Platform standards gate (WS8)
+        run: |
+          cd backend && python scripts/verify_platform_standards.py
+
       - name: AI entry point gate
         run: |
           cd backend && python scripts/ai_entry_point_report.py

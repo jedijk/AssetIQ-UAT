@@ -23,6 +23,7 @@
 | AI gateway | **Done (WS5)** — unified `ai_platform` API; all vision/multimodal paths migrated |
 | Executive read models | **Done (WS6)** — dashboard routes read snapshots; materializers refresh on miss/invalidation |
 | Graph performance benchmarks | **Done (WS7)** — harness, verify gate, optimization report |
+| Platform standards | **Done (WS8)** — standards doc + unified CI gate |
 | Large-file modularization | **Done (WS4)** — zero service modules over 800 LOC |
 | R2 on UAT (AI scan photos) | **Open** — ops, not blocking Platform 1.0 code track |
 
@@ -39,7 +40,7 @@ Platform 1.0 is complete when:
 - [x] Every AI feature uses the unified AI platform
 - [x] Executive dashboards use read models
 - [x] Graph performance benchmarks completed
-- [ ] Engineering standards documented and CI-enforced
+- [x] Engineering standards documented and CI-enforced
 
 ---
 
@@ -271,9 +272,21 @@ Provider Layer → Prompt Registry → Context Builder → Evidence Builder
 
 **Covers:** Max service/component size · folder structure · naming · API/graph/event conventions · query keys · tenant helpers · AI entry points · error handling · logging · testing
 
-**Status:** **Partial** — `tenant_service_filter_audit.py`, `route_auth_inventory.py`, architecture boundaries tests exist; no unified standards doc + CI gate
+**Status:** **Done** — unified standards doc + `verify_platform_standards.py` CI gate
 
-**Definition of done:** Standards documented · CI validates new code
+**Docs:** [`PLATFORM_STANDARDS.md`](./PLATFORM_STANDARDS.md)
+
+| Task | Status |
+|------|--------|
+| Standards documentation | **Done** — `docs/platform/PLATFORM_STANDARDS.md` |
+| Shared check module | **Done** — `architecture/platform_standards.py` |
+| Service LOC gate | **Done** — 800 LOC + allowlist (WS4 baseline) |
+| Tenant ratio gate | **Done** — baseline grandfathering, fail on new risks |
+| AI entry point gate | **Done** — wraps `ai_entry_point_report.py` |
+| Layer boundary gate | **Done** — services must not import routes |
+| CI integration | **Done** — `.github/workflows/backend-tests.yml` |
+
+**Definition of done:** Standards documented · CI validates new code ✓
 
 ---
 

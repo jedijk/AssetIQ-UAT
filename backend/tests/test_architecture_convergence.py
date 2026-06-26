@@ -625,102 +625,15 @@ def test_frontend_raw_fetch_allowlist():
 
 
 SERVICES_DIR = BACKEND_ROOT / "services"
-SERVICE_LOC_LIMIT = 800
-# Grandfathered god-modules pending modularization — fail if count grows or new offenders appear.
-SERVICE_LOC_ALLOWLIST = {
-    "ai_risk_service.py": 46,
-    "ai_risk_dashboard.py": 186,
-    "ai_risk_analysis.py": 632,
-    "chat_routes_service.py": 200,
-    "chat_routes_processor.py": 670,
-    "chat_routes_state.py": 150,
-    "chat_routes_media.py": 60,
-    "chat_routes_observation.py": 240,
-    "chat_routes_confirm.py": 110,
-    "chat_routes_finalize.py": 210,
-    "decision_engine.py": 395,
-    "decision_engine_evaluators.py": 366,
-    "decision_engine_suggestions.py": 252,
-    "equipment_import_service.py": 40,
-    "equipment_import_unstructured.py": 270,
-    "equipment_import_excel.py": 715,
-    "equipment_import_json.py": 95,
-    "form_service.py": 360,
-    "form_service_templates.py": 450,
-    "form_service_submit.py": 270,
-    "form_service_submission_detail.py": 130,
-    "form_service_reliability.py": 95,
-    "form_service_submissions_query.py": 280,
-    "form_service_thresholds.py": 120,
-    "form_service_serializers.py": 110,
-    "form_service_analytics.py": 80,
-    "form_service_submissions_list.py": 180,
-    "maintenance_program_service.py": 620,
-    "maintenance_program_task_crud.py": 290,
-    "maintenance_program_regeneration.py": 290,
-    "maintenance_program_scheduler_sync.py": 280,
-    "maintenance_program_helpers.py": 60,
-    "maintenance_program_session_import.py": 100,
-    "maintenance_program_enrichment.py": 170,
-    "maintenance_scheduler_sync.py": 50,
-    "maintenance_scheduler_shared.py": 80,
-    "maintenance_scheduler_strategy_sync.py": 175,
-    "maintenance_scheduler_v2_sync.py": 390,
-    "maintenance_scheduler_cleanup.py": 425,
-    "maintenance_scheduler_refresh.py": 210,
-    "maintenance_strategy_v2_service.py": 820,
-    "maintenance_strategy_v2_instances.py": 540,
-    "maintenance_strategy_v2_sync.py": 260,
-    "pm_import/ai_review.py": 139,
-    "pm_import/pm_import_equipment_match.py": 164,
-    "pm_import/pm_import_fm_match.py": 147,
-    "pm_import/pm_import_recommendation.py": 530,
-    "process_import_service.py": 380,
-    "process_import_constants.py": 175,
-    "process_import_vision.py": 565,
-    "production_dashboard_service.py": 60,
-    "production_dashboard_scope.py": 432,
-    "production_dashboard_forms.py": 514,
-    "production_dashboard_ingest.py": 358,
-    "production_logs_service.py": 420,
-    "production_logs_ingest.py": 580,
-    "production_logs_templates.py": 430,
-    "production_logs_parsing.py": 600,
-    "maintenance_program_ai_recommendations.py": 230,
-    "ril_predictions.py": 180,
-    "reliability_graph.py": 185,
-    "reliability_graph_core.py": 275,
-    "reliability_graph_strategy.py": 530,
-    "reliability_graph_entities.py": 285,
-    "ril_service.py": 215,
-    "ril_observations.py": 162,
-    "ril_readings.py": 174,
-    "ril_alerts.py": 222,
-    "ril_correlations.py": 160,
-    "ril_cases.py": 355,
-    "task_service.py": 720,
-    "task_service_completion.py": 320,
-    "task_service_helpers.py": 160,
-    "task_service_plans.py": 280,
-    "task_service_scheduling.py": 220,
-    "task_service_templates.py": 180,
-    "threat_service_investigation.py": 520,
-}
+from architecture.platform_standards import (
+    SERVICE_LOC_LIMIT,
+    check_service_module_sizes,
+)
 
 
 def test_service_modules_respect_loc_limit_or_allowlist():
     """Services over 800 LOC must be explicitly allowlisted (no silent growth)."""
-    violations: list[str] = []
-    for path in SERVICES_DIR.rglob("*.py"):
-        if path.name == "__init__.py":
-            continue
-        rel = path.relative_to(SERVICES_DIR).as_posix()
-        line_count = len(path.read_text(encoding="utf-8").splitlines())
-        allowed = SERVICE_LOC_ALLOWLIST.get(rel) or SERVICE_LOC_ALLOWLIST.get(path.name)
-        if line_count > SERVICE_LOC_LIMIT and allowed is None:
-            violations.append(f"{rel}: {line_count} LOC (limit {SERVICE_LOC_LIMIT})")
-        elif allowed is not None and line_count > allowed + 50:
-            violations.append(f"{rel}: {line_count} LOC exceeds allowlist cap {allowed}")
+    violations = check_service_module_sizes(backend_root=BACKEND_ROOT)
     assert not violations, "Oversized service modules: " + "; ".join(sorted(violations)[:12])
 
 
@@ -837,6 +750,21 @@ def test_ws7_graph_performance_benchmark_exists():
     assert script.is_file()
     runner = BACKEND_ROOT / "scripts" / "benchmark_reliability_graph.py"
     assert runner.is_file()
+
+
+def test_ws8_platform_standards_gate_exists():
+    """WS8 — unified platform standards doc and CI verify gate."""
+    from architecture.platform_standards import PLATFORM_STANDARD_GATES, run_platform_standards_checks
+
+    assert len(PLATFORM_STANDARD_GATES) == 4
+    results = run_platform_standards_checks(backend_root=BACKEND_ROOT)
+    assert results["service_module_size"] == []
+    assert results["service_route_boundary"] == []
+
+    doc = BACKEND_ROOT.parent / "docs" / "platform" / "PLATFORM_STANDARDS.md"
+    assert doc.is_file()
+    script = BACKEND_ROOT / "scripts" / "verify_platform_standards.py"
+    assert script.is_file()
 
 
 def test_openai_imports_are_allowlisted():
