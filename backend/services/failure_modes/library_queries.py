@@ -12,7 +12,6 @@ import re
 import time
 
 from utils.mongo_regex import escape_regex, exact_case_insensitive
-from services.ai_gateway import chat as ai_gateway_chat
 from services.failure_modes.cache import _cache, _invalidate_cache
 
 logger = logging.getLogger(__name__)
@@ -335,16 +334,6 @@ class FailureModesMixin:
             for fm in cluster
         ]
 
-        sys_prompt = (
-            "You are a reliability engineer reviewing a failure-modes library. "
-            "Only group failure modes that are CLEAR duplicates or trivial rewordings of "
-            "the SAME failure (e.g. 'Bearing Failure' vs 'Drive Bearing Failure' when both "
-            "mean generic bearing failure). Do NOT group related failures that share a "
-            "word but differ in phenomenon (e.g. 'Bearing Failure' ≠ 'Bearing Wear', "
-            "'Seal Leak' ≠ 'Bearing Failure'). Equipment type is irrelevant. Different "
-            "ISO 14224 mechanisms must stay separate (Wear ≠ Seizure ≠ Fatigue). When "
-            "unsure, return no group for those ids. Return strict JSON only."
-        )
         user_msg = (
             "Candidate failure modes:\n"
             f"{json.dumps(items, indent=2)}\n\n"
@@ -356,21 +345,21 @@ class FailureModesMixin:
 
         data = None
         try:
-            content = await ai_gateway_chat(
-                [
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_msg},
-                ],
-                user_id=user_id,
-                company_id=company_id,
+            from services.ai_platform import execute_json_prompt
+
+            result = await execute_json_prompt(
+                "fm.confirm_similar_cluster",
+                user={"id": user_id, "company_id": company_id},
+                user_message=user_msg,
                 endpoint="failure_modes.ai_confirm_similar_cluster",
                 model="gpt-4o-mini",
                 temperature=0,
                 max_tokens=1400,
                 response_format={"type": "json_object"},
             )
-            data = json.loads(content.strip())
-        except json.JSONDecodeError:
+            parsed = result["parsed"]
+            data = parsed if isinstance(parsed, dict) else None
+        except Exception:
             logger.warning("AI similar-FM cluster JSON parse failed")
         if not data:
             return []

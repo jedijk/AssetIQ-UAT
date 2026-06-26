@@ -120,7 +120,7 @@ def test_pm_import_service_uses_gateway():
     parts = [p.read_text() for p in sorted(pkg.glob("*.py"))]
     parts.append((services_dir / "pm_import_service.py").read_text())
     source = "\n".join(parts)
-    assert "from services.ai_gateway import chat_with_images" in source
+    assert "execute_vision_json_prompt" in source
     assert "client.chat.completions.create" not in source
 
 
@@ -134,10 +134,10 @@ def test_production_logs_ingest_uses_tracked_jobs():
 
 def test_ai_fm_suggestions_uses_ai_gateway():
     source = (Path(__file__).resolve().parents[1] / "routes" / "ai_fm_suggestions.py").read_text()
-    assert "from services.ai_gateway import chat_completion_response" in source
+    assert "from services.ai_platform import execute_json_prompt" in source
     assert "AsyncOpenAI" not in source
     assert "guarded_openai_create" not in source
-    assert "chat_completion_response" in source
+    assert "execute_json_prompt" in source
 
 
 def test_translations_mutations_require_library_write():
@@ -457,15 +457,15 @@ def test_ai_risk_engine_uses_gateway():
     source = (Path(__file__).resolve().parents[1] / "ai_risk_engine.py").read_text()
     idx = source.index("async def _call_openai")
     block = source[idx: idx + 500]
-    assert "chat_completion_response" in block
+    assert "execute_prompt" in block
 
 
 def test_ai_helpers_chat_paths_use_gateway():
     source = (Path(__file__).resolve().parents[1] / "ai_helpers.py").read_text()
-    assert "_gateway_completion" in source
+    assert "execute_multimodal_json_prompt" in source
     idx = source.index("async def analyze_threat_with_ai")
     block = source[idx: idx + 800]
-    assert "_gateway_completion" in block
+    assert "execute_multimodal_json_prompt" in block
     assert "chat_completions_create(client" not in block
 
 

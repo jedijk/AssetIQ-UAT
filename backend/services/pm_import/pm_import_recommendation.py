@@ -127,31 +127,20 @@ Respond with a JSON object:
                 # Return default recommendation without AI
                 return self._default_recommendation(similar_failure_modes, task)
             
-            system_message = (
-                "You are an expert in industrial equipment maintenance and failure mode analysis. "
-                "Respond only with valid JSON."
-            )
-            response = await ai_gateway_chat(
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": prompt},
-                ],
-                user_id="pm-import",
+            from services.ai_platform import execute_json_prompt
+
+            result = await execute_json_prompt(
+                "pm_import.recommendation",
+                user={"id": "pm-import", "company_id": "default"},
+                user_message=prompt,
                 endpoint="pm_import.ai_review.recommendation",
                 model="gpt-4o-mini",
                 temperature=0.2,
                 response_format={"type": "json_object"},
             )
-            
-            # Parse JSON response
-            response_text = response.strip()
-            if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
-            response_text = response_text.strip()
-            
-            recommendation = json.loads(response_text)
+            recommendation = result["parsed"]
+            if not recommendation or not isinstance(recommendation, dict):
+                return self._default_recommendation(similar_failure_modes, task)
             
             # Validate and enrich recommendation
             if recommendation.get("action") in ["merge", "new_task"] and recommendation.get("target_failure_mode_id"):

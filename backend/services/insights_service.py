@@ -472,36 +472,25 @@ Focus on:
 Return as JSON array with fields: title, description, impact (high/medium/low)
 """
         
-        import json
+        from services.ai_platform import execute_json_prompt
 
-        uid, cid = user_context(user)
-        response_text = await ai_gateway_chat(
-            [
-                {
-                    "role": "system",
-                    "content": "You are a reliability engineering expert. Provide specific, actionable recommendations based on the data. Return only valid JSON array.",
-                },
-                {"role": "user", "content": context},
-            ],
-            user_id=uid,
-            company_id=cid,
+        result = await execute_json_prompt(
+            "insights.recommendations",
+            user=user,
+            user_message=context,
             endpoint="insights.ai_recommendations",
             model="gpt-4o",
             temperature=0.5,
         )
-        response_text = response_text.strip()
-        
-        # Extract JSON from response
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0]
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0]
-        
-        try:
-            recommendations = json.loads(response_text)
-            if not isinstance(recommendations, list):
-                recommendations = recommendations.get("actions", recommendations.get("recommendations", []))
-        except json.JSONDecodeError:
+        parsed = result["parsed"]
+        if isinstance(parsed, list):
+            recommendations = parsed
+        elif isinstance(parsed, dict):
+            recommendations = parsed.get("actions", parsed.get("recommendations", []))
+        else:
+            recommendations = None
+
+        if not recommendations:
             # Fallback recommendations
             recommendations = [
                 {

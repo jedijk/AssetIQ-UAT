@@ -834,78 +834,36 @@ Detailed Action Items:
 ================================================================================
 """
     
-    prompt = f"""You are a senior reliability engineer and root cause analysis expert preparing an executive briefing based on a completed causal investigation. Your analysis must be DATA-DRIVEN and reference SPECIFIC details from the investigation.
+    from services.ai_prompt_registry import render_prompt
 
-ANALYSIS REQUIREMENTS:
-1. EXECUTIVE SUMMARY (3-4 detailed paragraphs):
-   - Paragraph 1: Describe what happened - reference the specific asset ({inv.get('asset_name', 'the asset')}), location, and incident date. Summarize the event sequence.
-   - Paragraph 2: Explain WHY it happened - explicitly name the identified root causes and explain their relationship to the failure modes.
-   - Paragraph 3: Describe the impact and current action plan status. Reference specific numbers (e.g., "{len(open_actions)} actions pending, {len(completed_actions)} completed").
-   - Paragraph 4: Provide overall assessment of investigation completeness and risk exposure.
-
-2. KEY FINDINGS (5-7 findings):
-   - Each finding must reference specific data from the investigation
-   - Include the actual failure modes, mechanisms, and root causes identified
-   - Cite specific contributing factors discovered
-   - Reference action plan progress with real numbers
-
-3. NEXT STEPS (5-8 specific actions):
-   - Prioritize based on the HIGH PRIORITY actions that are still OPEN
-   - Reference specific owners and due dates where available
-   - Include validation requirements for unvalidated actions
-   - Add follow-up investigation steps if root causes are incomplete
-
-4. STRATEGIC RECOMMENDATIONS (3-5 recommendations):
-   - Based on the specific failure modes and mechanisms found
-   - Reference the contributing factor categories
-   - Include preventive measures tied to the actual root causes
-   - Suggest systemic improvements based on investigation findings
-
-{context}
-
-CRITICAL: Your response must be CONTENT-RICH and reference actual data points, names, dates, equipment, and findings from this investigation. Avoid generic statements. Every bullet point should contain specific information.
-
-Respond in JSON format:
-{{
-  "summary": "Multi-paragraph executive summary with specific references...",
-  "key_findings": ["Specific finding 1 with data...", "Specific finding 2 with data...", ...],
-  "next_steps": ["Specific action with owner/date...", "Specific action 2...", ...],
-  "recommendations": ["Specific recommendation based on findings...", ...]
-}}"""
+    prompt = render_prompt(
+        "reports.investigation_briefing.user",
+        {
+            "asset_name": inv.get("asset_name", "the asset"),
+            "open_actions_count": str(len(open_actions)),
+            "completed_actions_count": str(len(completed_actions)),
+            "context": context,
+        },
+    )
 
     try:
         import uuid
         inv_id = inv.get('id', str(uuid.uuid4()))
         
-        uid, cid = user_context(current_user)
-        response_text = await ai_gateway_chat(
-            [
-                {
-                    "role": "system",
-                    "content": "You are a senior reliability engineer and root cause analysis expert. Always respond with valid JSON only.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            user_id=uid,
-            company_id=cid,
+        from services.ai_platform import execute_json_prompt
+
+        result = await execute_json_prompt(
+            "reports.investigation_summary",
+            user=current_user,
+            user_message=prompt,
             endpoint="reports.investigation_ai_summary",
             model="gpt-4o",
             temperature=0.5,
         )
-        response_text = response_text.strip()
-        
-        # Parse JSON response
-        import json
-        # Clean up response if needed
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        if response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-        
-        result = json.loads(response_text.strip())
-        return result
+        parsed = result["parsed"]
+        if not isinstance(parsed, dict) or not parsed:
+            raise ValueError("empty JSON from investigation summary")
+        return parsed
     except Exception as e:
         logger.error(f"Error generating AI summary: {e}")
         # Return a detailed fallback that still references specific data

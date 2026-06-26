@@ -226,7 +226,7 @@ async def improve_threat_description(
     Use AI to improve/enhance the observation description to be more professional
     and engineer-like in the user's UI language.
     """
-    from services.ai_gateway import chat as ai_gateway_chat
+    from services.ai_platform import execute_prompt
 
     threat = await _find_threat_scoped(user, threat_id)
     if not threat:
@@ -245,34 +245,22 @@ async def improve_threat_description(
     output_language = output_language_names[ui_lang]
 
     try:
-        improved = await ai_gateway_chat(
-            [
-                {
-                    "role": "system",
-                    "content": f"""You are a reliability engineer improving observation descriptions for a maintenance management system.
+        from services.ai_platform import execute_prompt
 
-Rewrite the description to be:
-- Professional and technical
-- 2-4 sentences maximum
-- Clear and objective
-- Using proper engineering terminology
-- Suitable for a formal maintenance record
-- Written entirely in {output_language}
-
-If the original text is in another language, translate and improve it into {output_language}.
-Keep the core meaning but improve clarity and professionalism.
-Output only the improved description text, no labels or formatting.""",
-                },
-                {
-                    "role": "user",
-                    "content": f"Equipment: {equipment_name}\nFailure mode: {failure_mode}\n\nOriginal description: {current_desc[:1500]}",
-                },
-            ],
+        result = await execute_prompt(
+            "threat.improve_description",
+            user=user,
+            user_message=(
+                f"Equipment: {equipment_name}\nFailure mode: {failure_mode}\n\n"
+                f"Original description: {current_desc[:1500]}"
+            ),
+            variables={"output_language": output_language},
             endpoint="threats.improve_description",
             model="gpt-4o-mini",
             temperature=0.3,
             max_tokens=300,
         )
+        improved = (result["content"] or "").strip()
 
         improved = (improved or "").strip()
         if not improved:

@@ -335,50 +335,40 @@ class AIRiskEngine:
     
     async def _call_openai(
         self,
-        system_prompt: str,
+        prompt_id: str,
         user_message: str,
         analysis_type: str = "risk_analysis",
     ) -> str:
-        """Make a guarded chat completion via the AI gateway."""
-        from services.ai_gateway import chat_completion_response
+        """Make a guarded chat completion via the unified AI platform."""
+        from services.ai_platform import execute_prompt
 
         max_tokens = self.TOKEN_LIMITS.get(analysis_type, 3000)
         temperature = 0.3 if analysis_type == "risk_analysis" else 0.4
         try:
-            logger.info("Calling AI gateway with model gpt-4o, max_tokens=%s", max_tokens)
-            response = await chat_completion_response(
-                [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
+            logger.info("Calling AI platform with model gpt-4o, max_tokens=%s", max_tokens)
+            result = await execute_prompt(
+                prompt_id,
+                user_message=user_message,
                 endpoint=f"ai_risk_engine.{analysis_type}",
                 model="gpt-4o",
                 max_completion_tokens=max_tokens,
                 temperature=temperature,
             )
-            return response.choices[0].message.content
+            return result["content"]
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
             raise
     
     def _parse_json_response(self, response: str) -> dict:
         """Parse JSON from LLM response, handling markdown code blocks"""
+        from services.ai_output_validation import parse_json_from_llm
+
         if response is None:
             logger.error("Response is None")
             return {}
-        clean_response = response.strip()
-        logger.info(f"Parsing response (first 200 chars): {clean_response[:200]}")
-        if clean_response.startswith("```"):
-            clean_response = clean_response.split("```")[1]
-            if clean_response.startswith("json"):
-                clean_response = clean_response[4:]
-        clean_response = clean_response.strip()
-        try:
-            return json.loads(clean_response)
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parse error: {e}. Response: {clean_response[:500]}")
-            return {}
-    
+        logger.info("Parsing response (first 200 chars): %s", (response or "")[:200])
+        return parse_json_from_llm(response)
+
     def _build_threat_context(self, threat: dict, equipment_data: dict = None, historical_threats: list = None, equipment_history: dict = None) -> str:
         """Build context string for AI analysis with sanitized inputs"""
         # Sanitize threat data to prevent prompt injection
@@ -579,7 +569,7 @@ EQUIPMENT INFORMATION:
                 except Exception as graph_exc:
                     logger.debug("graph risk context skipped: %s", graph_exc)
             
-            response = await self._call_openai(RISK_ANALYSIS_PROMPT, f"Analyze this threat:\n{context}", 'risk_analysis')
+            response = await self._call_openai("risk.analysis", f"Analyze this threat:\n{context}", 'risk_analysis')
             
             data = self._parse_json_response(response) or {}
             
@@ -748,7 +738,7 @@ EQUIPMENT INFORMATION:
         try:
             context = self._build_threat_context(threat, equipment_data, None, equipment_history)
             
-            response = await self._call_openai(CAUSE_ANALYSIS_PROMPT, f"Analyze causes for this threat (max {max_causes} causes):\n{context}", 'cause_analysis')
+            response = await self._call_openai("risk.cause_analysis", f"Analyze causes for this threat (max {max_causes} causes):\n{context}", 'cause_analysis')
             data = self._parse_json_response(response)
             
             # Build probable causes with normalized probability levels
@@ -802,7 +792,7 @@ EQUIPMENT INFORMATION:
         try:
             context = self._build_threat_context(threat)
             
-            response = await self._call_openai(FAULT_TREE_PROMPT, f"Generate a fault tree (max depth {max_depth}):\n{context}", 'fault_tree')
+            response = await self._call_openai("risk.fault_tree", f"Generate a fault tree (max depth {max_depth}):\n{context}", 'fault_tree')
             data = self._parse_json_response(response)
             
             def parse_node(node_data: dict) -> FaultTreeNode:
@@ -844,7 +834,7 @@ EQUIPMENT INFORMATION:
         try:
             context = self._build_threat_context(threat)
             
-            response = await self._call_openai(BOW_TIE_PROMPT, f"Generate a bow-tie model:\n{context}", 'bow_tie')
+            response = await self._call_openai("risk.bow_tie", f"Generate a bow-tie model:\n{context}", 'bow_tie')
             data = self._parse_json_response(response)
             
             preventive_barriers = [
@@ -897,7 +887,7 @@ EQUIPMENT INFORMATION:
             
             context += f"\nPRIORITIZE BY: {prioritize_by}\n"
             
-            response = await self._call_openai(ACTION_OPTIMIZATION_PROMPT, f"Recommend optimized actions:\n{context}", 'action_optimization')
+            response = await self._call_openai("risk.action_optimization", f"Recommend optimized actions:\n{context}", 'action_optimization')
             data = self._parse_json_response(response)
             
             recommended_actions = [

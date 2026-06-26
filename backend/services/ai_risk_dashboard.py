@@ -115,15 +115,6 @@ async def dashboard_intent(
         },
     ]
 
-    system = (
-        "You are AssetIQ's AI Dashboard Builder. "
-        "Your job is to map a user request into ONE safe dashboard template id from the provided list. "
-        "Do not output SQL, schema, joins, or technical field names. "
-        "If ambiguous, choose template_id='clarify' and ask exactly one short question.\n\n"
-        "Return JSON only with keys: template_id, title, why, params.\n"
-        "params must be an object (can be empty)."
-    )
-
     user = {
         "prompt": prompt.strip(),
         "available_templates": templates,
@@ -135,23 +126,20 @@ async def dashboard_intent(
     }
 
     try:
+        from services.ai_platform import execute_json_prompt
+
         model = os.environ.get("OPENAI_MODEL_DASHBOARD_BUILDER", "gpt-4o-mini")
-        uid, cid = user_context(actor)
-        raw = await chat(
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": json.dumps(user)},
-            ],
+        result = await execute_json_prompt(
+            "dashboard.intent_classifier",
+            user=actor,
+            user_message=json.dumps(user),
+            endpoint="ai_routes.dashboard_intent",
             model=model,
             temperature=0.2,
             max_tokens=500,
             response_format={"type": "json_object"},
-            user_id=uid,
-            company_id=cid,
-            endpoint="ai_routes.dashboard_intent",
         )
-
-        parsed = json.loads(raw or "{}")
+        parsed = result["parsed"] or {}
         template_id = parsed.get("template_id")
         if template_id not in {t["template_id"] for t in templates}:
             template_id = "clarify"

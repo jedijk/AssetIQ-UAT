@@ -10,7 +10,7 @@ from typing import Optional, Tuple
 from fastapi import HTTPException
 
 from database import db
-from services.ai_gateway import chat as ai_gateway_chat, user_context
+from services.ai_gateway import user_context
 from services.investigation_queries import investigation_query
 from services.storage_service import APP_NAME, MIME_TYPES, get_object_async, put_object_async
 from services.tenant_schema import with_tenant_id
@@ -138,38 +138,30 @@ async def ai_problem_check(user: dict, inv_id: str, description: str) -> dict:
             logger.warning("investigation evidence pack failed: %s", exc)
 
     try:
-        uid, cid = user_context(user)
+        from services.ai_platform import execute_json_prompt
+
         user_content = f"Analyze this problem statement for defensive reasoning:\n\n{description}"
         if evidence_pack and evidence_pack.get("prompt_summary"):
             user_content += (
                 f"\n\nLinked equipment evidence:\n{evidence_pack['prompt_summary']}\n"
                 f"{format_citations_for_prompt(evidence_pack.get('citations') or [])}"
             )
-        content = await ai_gateway_chat(
-            [
-                {"role": "system", "content": DEFENSIVE_REASONING_CHECK_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-            user_id=uid,
-            company_id=cid,
+        result = await execute_json_prompt(
+            "investigation.defensive_reasoning",
+            user=user,
+            user_message=user_content,
             endpoint="investigations.ai_problem_check",
             model="gpt-4o-mini",
             temperature=0.3,
             max_tokens=2000,
         )
-        content = content.strip()
-        if content.startswith("```"):
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-        content = content.strip().rstrip("```")
-        result = json.loads(content)
+        parsed = result["parsed"] or {}
         payload = {
-            "analysis": result.get("analysis", {}),
-            "has_issues": result.get("has_issues", False),
-            "refined_description": result.get("refined_description", description),
-            "guidance": result.get("guidance", []),
-            "changes_made": result.get("changes_made", []),
+            "analysis": parsed.get("analysis", {}),
+            "has_issues": parsed.get("has_issues", False),
+            "refined_description": parsed.get("refined_description", description),
+            "guidance": parsed.get("guidance", []),
+            "changes_made": parsed.get("changes_made", []),
         }
         return attach_citations_to_response(
             payload,

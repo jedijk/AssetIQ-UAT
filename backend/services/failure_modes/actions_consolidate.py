@@ -3,23 +3,30 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Set, Tuple
 
-from services.ai_gateway import chat as ai_gateway_chat
+from services.ai_platform import execute_json_prompt
 from services.failure_modes.cache import _invalidate_cache
+
+CONSOLIDATE_ACTIONS_PROMPT = (
+    "You are a senior reliability engineer cleaning up a failure-mode FMEA action list. "
+    "Merge duplicate and overlapping recommended maintenance actions into a concise set "
+    "of DISTINCT tasks. Each output action must be a different maintenance intent "
+    "(do not merge inspect vs replace vs lubricate vs overhaul unless they are true duplicates). "
+    "Prefer PM for scheduled upkeep, PDM for condition monitoring, CM for corrective work. "
+    "Use lowercase discipline keys: rotating, static, piping, electrical, instrumentation, "
+    "civil, operations, laboratory. "
+    "Return strict JSON only."
+)
 
 
 class ActionsConsolidateMixin:
     """Mixin — requires FailureModesMixin action helpers and CRUD update()."""
 
-    CONSOLIDATE_ACTIONS_SYSTEM_PROMPT = (
-        "You are a senior reliability engineer cleaning up a failure-mode FMEA action list. "
-        "Merge duplicate and overlapping recommended maintenance actions into a concise set "
-        "of DISTINCT tasks. Each output action must be a different maintenance intent "
-        "(do not merge inspect vs replace vs lubricate vs overhaul unless they are true duplicates). "
-        "Prefer PM for scheduled upkeep, PDM for condition monitoring, CM for corrective work. "
-        "Use lowercase discipline keys: rotating, static, piping, electrical, instrumentation, "
-        "civil, operations, laboratory. "
-        "Return strict JSON only."
-    )
+    CONSOLIDATE_ACTIONS_SYSTEM_PROMPT = CONSOLIDATE_ACTIONS_PROMPT
+
+    @staticmethod
+    def _consolidate_system_prompt() -> str:
+        from services.ai_prompt_registry import render_prompt
+        return render_prompt("fm.consolidate_actions")
 
     @classmethod
     def _clamp_consolidation_targets(
@@ -166,23 +173,21 @@ class ActionsConsolidateMixin:
             f"Return {target_min}–{target_max} consolidated_actions."
         )
 
-        content = await ai_gateway_chat(
-            [
-                {"role": "system", "content": self.CONSOLIDATE_ACTIONS_SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg},
-            ],
-            user_id=user_id,
-            company_id=company_id,
+        from services.ai_platform import execute_json_prompt
+
+        result = await execute_json_prompt(
+            "fm.consolidate_actions",
+            user={"id": user_id, "company_id": company_id},
+            user_message=user_msg,
             endpoint="ai_fm_suggestions.consolidate_failure_mode_actions",
             model="gpt-4o-mini",
             temperature=0,
             max_tokens=2500,
             response_format={"type": "json_object"},
         )
-        try:
-            data = json.loads(content.strip())
-        except json.JSONDecodeError as exc:
-            raise ValueError("Failed to parse AI consolidation response") from exc
+        data = result["parsed"] or {}
+        if not isinstance(data, dict):
+            raise ValueError("Failed to parse AI consolidation response")
 
         ai_items = data.get("consolidated_actions") or []
         consolidated = self._build_consolidated_action_objects(actions, ai_items)

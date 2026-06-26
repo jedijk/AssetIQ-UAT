@@ -119,73 +119,37 @@ class ProcessImportVisionMixin:
         session_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Extract equipment and hierarchy from an image using GPT-4o Vision."""
-        from services.ai_gateway import chat_with_images
+        from services.ai_platform import execute_vision_json_prompt
 
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OpenAI API key not configured")
 
         user_id, company_id = await self._ai_user_context(session_id)
-        
+
         mime_type = f"image/{file_type}" if file_type != "jpg" else "image/jpeg"
-        
-        prompt = """Analyze this process flow diagram (PFD) or engineering schematic and extract all equipment, systems, and process units.
-
-For each item found, identify:
-1. Equipment Tag (e.g., 1P-4003, 1R-2002, CV-201)
-2. Equipment Name/Description
-3. Equipment Type (Pump, Compressor, Tank, Vessel, Exchanger, Filter, Reactor, Extruder, Conveyor, Motor, Valve, Instrument, etc.)
-4. Process Unit/Area it belongs to (if visible, e.g., 1U-10, 2U-20)
-5. System/Function (e.g., Cooling Water, Main Process, Offgas Treatment)
-
-Return the data as a JSON array where each item has:
-{
-  "tag": "equipment tag or identifier",
-  "name": "descriptive name",
-  "equipment_type": "type of equipment",
-  "unit": "process unit if identified (e.g., 1U-10)",
-  "system": "functional system if identifiable",
-  "description": "brief operational description",
-  "level_hint": "Plant/Unit, Section/System, Equipment Unit, Subunit, or Maintainable Item",
-  "confidence": 0-100 confidence score
-}
-
-Focus on:
-- Major equipment (pumps, compressors, vessels, exchangers, reactors)
-- Process units and areas
-- Control valves and instruments if clearly marked
-- Flow paths and connections
-
-Only return the JSON array, no other text."""
 
         try:
-            result_text = (
-                await chat_with_images(
-                    prompt,
-                    image_base64_list=[{"media_type": mime_type, "data": img_b64}],
-                    user_id=user_id,
-                    company_id=company_id,
-                    endpoint="process_import.vision_extract",
-                    model="gpt-4o",
-                    temperature=0.1,
-                    max_tokens=4000,
-                )
-            ).strip()
-            
-            # Parse JSON
-            import json
-            if result_text.startswith("```"):
-                result_text = re.sub(r'^```(?:json)?\n?', '', result_text)
-                result_text = re.sub(r'\n?```$', '', result_text)
-            
-            items = json.loads(result_text)
-            
-            # Add source page info
+            result = await execute_vision_json_prompt(
+                "process_import.vision_extract",
+                user={"id": user_id, "company_id": company_id},
+                user_message="Extract all equipment items from this diagram.",
+                image_base64=img_b64,
+                media_type=mime_type,
+                endpoint="process_import.vision_extract",
+                model="gpt-4o",
+                temperature=0.1,
+                max_tokens=4000,
+            )
+            items = result.get("parsed")
+            if not isinstance(items, list):
+                items = []
+
             for item in items:
                 item["source_page"] = page_num
-            
+
             return items
-            
+
         except Exception as e:
             logger.error(f"Vision API error: {e}")
             return []
@@ -390,74 +354,41 @@ Only return the JSON array, no other text."""
         session_id: str
     ) -> List[Dict[str, Any]]:
         """Estimate criticality scores for equipment."""
-        from services.ai_gateway import chat as ai_gateway_chat
+        from services.ai_platform import execute_json_prompt
 
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             return items
 
         user_id, company_id = await self._ai_user_context(session_id)
-        
-        # Only estimate for Equipment Units
+
         equipment_items = [i for i in items if i.get("level") == "Equipment Unit"]
-        
+
         if not equipment_items:
             return items
-        
-        # Batch process
+
         equipment_summary = "\n".join([
             f"- {i['tag']}: {i['name']} ({i['equipment_type']})"
-            for i in equipment_items[:20]  # Limit to 20
+            for i in equipment_items[:20]
         ])
-        
-        prompt = f"""Estimate criticality scores for these industrial equipment items.
-
-Equipment list:
-{equipment_summary}
-
-For each equipment, provide scores from 0-5 for:
-- Safety (rotating equipment, pressure, temperature, hazardous materials, stored energy)
-- Production (bottleneck, shutdown risk, redundancy, downstream impact)
-- Environmental (emissions, leaks, contamination, discharge)
-- Reputation (product quality, customer impact, public exposure)
-
-Return JSON array:
-[
-  {{
-    "tag": "equipment tag",
-    "safety": 0-5,
-    "production": 0-5,
-    "environmental": 0-5,
-    "reputation": 0-5,
-    "reasoning": "brief explanation"
-  }}
-]
-
-Only return JSON array."""
 
         try:
-            result_text = (
-                await ai_gateway_chat(
-                    [{"role": "user", "content": prompt}],
-                    user_id=user_id,
-                    company_id=company_id,
-                    endpoint="process_import.estimate_criticality",
-                    model="gpt-4o-mini",
-                    max_tokens=2000,
-                    temperature=0.2,
-                )
-            ).strip()
-            
-            import json
-            if result_text.startswith("```"):
-                result_text = re.sub(r'^```(?:json)?\n?', '', result_text)
-                result_text = re.sub(r'\n?```$', '', result_text)
-            
-            criticality_data = json.loads(result_text)
-            
-            # Map back to items
-            crit_map = {c["tag"]: c for c in criticality_data}
-            
+            result = await execute_json_prompt(
+                "process_import.estimate_criticality",
+                user={"id": user_id, "company_id": company_id},
+                user_message="Estimate criticality for each equipment item listed.",
+                variables={"equipment_list": equipment_summary},
+                endpoint="process_import.estimate_criticality",
+                model="gpt-4o-mini",
+                max_tokens=2000,
+                temperature=0.2,
+            )
+            criticality_data = result.get("parsed")
+            if not isinstance(criticality_data, list):
+                criticality_data = []
+
+            crit_map = {c["tag"]: c for c in criticality_data if isinstance(c, dict) and c.get("tag")}
+
             for item in items:
                 if item["tag"] in crit_map:
                     crit = crit_map[item["tag"]]
@@ -465,13 +396,13 @@ Only return JSON array."""
                         "safety": crit.get("safety", 0),
                         "production": crit.get("production", 0),
                         "environmental": crit.get("environmental", 0),
-                        "reputation": crit.get("reputation", 0)
+                        "reputation": crit.get("reputation", 0),
                     }
                     item["criticality_reasoning"] = crit.get("reasoning", "")
-            
+
         except Exception as e:
             logger.error(f"Criticality estimation error: {e}")
-        
+
         return items
     
     def _is_unit_tag(self, tag: str) -> bool:

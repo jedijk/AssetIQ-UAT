@@ -637,7 +637,7 @@ class PMImportMixin:
         session_id: str
     ) -> List[Dict[str, Any]]:
         """Use GPT-4o Vision to extract maintenance tasks from images/scanned documents."""
-        from services.ai_gateway import chat_with_images
+        from services.ai_platform import execute_vision_json_prompt
 
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
@@ -677,49 +677,23 @@ class PMImportMixin:
         
         for idx, img_b64 in enumerate(images_b64):
             mime_type = "image/png" if file_type == "pdf" else f"image/{file_type}"
-            
-            prompt = """Analyze this maintenance plan document and extract all preventive maintenance tasks.
-
-For each maintenance task found, extract:
-1. The original task text exactly as written
-2. The equipment or component mentioned
-3. Any frequency information (daily, weekly, monthly, etc.)
-4. Any additional details
-
-Return the data as a JSON array where each item has:
-{
-  "task": "original task text",
-  "equipment": "equipment/component name if mentioned",
-  "frequency": "frequency if mentioned",
-  "details": "any additional details"
-}
-
-If the document is in Dutch, still extract the tasks but keep them in Dutch.
-Only return the JSON array, no other text."""
 
             try:
-                result_text = (
-                    await chat_with_images(
-                        prompt,
-                        image_base64_list=[{"media_type": mime_type, "data": img_b64}],
-                        user_id=user_id,
-                        company_id=company_id,
-                        endpoint="pm_import.vision_ocr",
-                        model="gpt-4o",
-                        temperature=0,
-                        max_tokens=4000,
-                    )
-                ).strip()
-                
-                # Parse JSON response
-                import json
-                # Clean up response
-                if result_text.startswith("```"):
-                    result_text = re.sub(r'^```(?:json)?\n?', '', result_text)
-                    result_text = re.sub(r'\n?```$', '', result_text)
-                
-                tasks = json.loads(result_text)
-                
+                result = await execute_vision_json_prompt(
+                    "pm_import.vision_ocr",
+                    user={"id": user_id, "company_id": company_id},
+                    user_message="Extract all maintenance tasks from this document page.",
+                    image_base64=img_b64,
+                    media_type=mime_type,
+                    endpoint="pm_import.vision_ocr",
+                    model="gpt-4o",
+                    temperature=0,
+                    max_tokens=4000,
+                )
+                tasks = result.get("parsed")
+                if not isinstance(tasks, list):
+                    tasks = []
+
                 for task in tasks:
                     raw_text = task.get("task", "")
                     if task.get("equipment"):

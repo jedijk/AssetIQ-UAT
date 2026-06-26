@@ -16,7 +16,6 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from auth import get_current_user
 from services.ai_extract_queries import find_form_template, get_correction_hints, insert_corrections
-from services.ai_gateway import chat_with_images, user_context
 from services.storage_service import put_object_async
 
 logger = logging.getLogger(__name__)
@@ -221,31 +220,52 @@ def _schema_has_date_or_datetime(schema: ExtractionSchema) -> bool:
     return any(f.type in ("date", "datetime") for f in schema.fields)
 
 
+def _build_date_rules_block(has_date_field: bool, has_datetime_field: bool) -> str:
+    if has_date_field or has_datetime_field:
+        from services.ai_prompt_definitions import VISION_DATE_RULES_BLOCK
+        return VISION_DATE_RULES_BLOCK
+    return ""
+
+
+def _build_capture_anchor_block(
+    capture_anchor_utc: Optional[datetime],
+    has_date_field: bool,
+    has_datetime_field: bool,
+) -> str:
+    if not capture_anchor_utc or not (has_date_field or has_datetime_field):
+        return ""
+    from services.ai_prompt_registry import render_prompt
+    return render_prompt(
+        "vision.capture_anchor",
+        {"anchor_time": capture_anchor_utc.strftime("%Y-%m-%d %H:%M UTC")},
+    )
+
+
+def _build_hints_block(hints: Optional[List[str]]) -> str:
+    if not hints:
+        return ""
+    return "\n\nIMPORTANT - Learned corrections from past usage:\n" + "\n".join(f"  {h}" for h in hints)
+
+
 def _build_prompt(
     schema: ExtractionSchema,
     hints: List[str] = None,
     capture_anchor_utc: Optional[datetime] = None,
 ) -> str:
+    from services.ai_prompt_registry import render_prompt
+
     if schema.prompt_template:
         prompt = schema.prompt_template
         if hints:
             prompt += "\n\nLearned corrections from past usage:\n" + "\n".join(hints)
         if capture_anchor_utc and _schema_has_date_or_datetime(schema):
-            anchor = capture_anchor_utc.strftime("%Y-%m-%d %H:%M UTC")
-            prompt += (
-                "\n\nPHOTO CAPTURE ANCHOR (UTC): approximately "
-                f"{anchor}. For ambiguous reading dates/times, align with this capture window; "
-                "do not guess a year or month far from it unless the image clearly shows a different printed date."
+            prompt += render_prompt(
+                "vision.custom_capture_anchor",
+                {"anchor_time": capture_anchor_utc.strftime("%Y-%m-%d %H:%M UTC")},
             )
         return prompt
 
-    lines = [
-        "Analyze this image and extract the following data fields.",
-        "CRITICAL: The 'key' in your response MUST be EXACTLY the same string as listed below. Do not rename, abbreviate, or modify the keys.",
-        "For each key, also provide a confidence score (0.0 to 1.0).",
-        "",
-        "Fields to extract:",
-    ]
+    field_lines: List[str] = []
     has_date_field = False
     has_datetime_field = False
     for f in schema.fields:
@@ -261,48 +281,20 @@ def _build_prompt(
             desc += ". Return the datetime STRICTLY in ISO format YYYY-MM-DDTHH:MM (e.g. 2024-07-21T14:30)"
             has_datetime_field = True
         required = " [REQUIRED]" if f.required else ""
-        lines.append(f'  - "{f.key}": {desc}{required} (type: {f.type})')
+        field_lines.append(f'  - "{f.key}": {desc}{required} (type: {f.type})')
 
-    if has_date_field or has_datetime_field:
-        lines.append("")
-        lines.append("DATE FORMAT RULES (very important):")
-        lines.append("- European dates like '21-07-2024', '21/07/2024', '21.07.2024' mean 21 July 2024 (day-month-year).")
-        lines.append("- Always output dates as YYYY-MM-DD (ISO 8601).")
-        lines.append("- Month names in Dutch/German/English (e.g. 'juli', 'Juli', 'July') must be converted to numeric format.")
-        lines.append("- If the year is written with only 2 digits (e.g. '24'), assume 20XX (2024).")
-
-    if capture_anchor_utc and (has_date_field or has_datetime_field):
-        anchor = capture_anchor_utc.strftime("%Y-%m-%d %H:%M UTC")
-        lines.append("")
-        lines.append("PHOTO CAPTURE ANCHOR (trust this for ambiguous dates):")
-        lines.append(f"- This photo was captured at approximately {anchor}.")
-        lines.append(
-            "- For date/datetime fields that describe when this reading was taken (gauges, forms, labels on equipment): "
-            "the calendar date should match this capture window unless the image clearly shows a different printed date as the main subject."
-        )
-        lines.append(
-            "- Do not output a year or month far from this capture window from noisy or partial digits. "
-            "If the printed date is ambiguous, use the capture calendar date and set confidence lower."
-        )
-
-    # Append learned corrections
-    if hints:
-        lines.append("")
-        lines.append("IMPORTANT - Learned corrections from past usage:")
-        for h in hints:
-            lines.append(f"  {h}")
-
-    lines.append("")
-    lines.append("Return ONLY valid JSON in this exact format:")
-    lines.append('{')
-    lines.append('  "results": [')
-    lines.append('    {"key": "<field_key>", "value": <extracted_value>, "confidence": <0.0-1.0>, "raw_text": "<what you read from image>"},')
-    lines.append('    ...')
-    lines.append('  ]')
-    lines.append('}')
-    lines.append("")
-    lines.append("If a field is not visible or cannot be determined, set value to null and confidence to 0.")
-    return "\n".join(lines)
+    fields_block = "\n" + "\n".join(field_lines) if field_lines else ""
+    return render_prompt(
+        "vision.field_extraction",
+        {
+            "fields_block": fields_block,
+            "date_rules_block": _build_date_rules_block(has_date_field, has_datetime_field),
+            "anchor_block": _build_capture_anchor_block(
+                capture_anchor_utc, has_date_field, has_datetime_field
+            ),
+            "hints_block": _build_hints_block(hints),
+        },
+    )
 
 
 @router.post("/extract", response_model=ExtractionResponse)
@@ -383,26 +375,23 @@ async def extract_from_image(
     )
 
     try:
-        uid, cid = user_context(current_user)
-        raw = await chat_with_images(
-            prompt,
-            image_base64_list=[{"data": b64, "media_type": mime}],
+        from services.ai_platform import execute_vision_json_prompt
+
+        result = await execute_vision_json_prompt(
+            "vision.field_extraction",
+            user=current_user,
+            user_message="",
+            prompt_text=prompt,
+            image_base64=b64,
+            media_type=mime,
+            endpoint="ai_extract.extract_from_photo",
             model="gpt-4o",
             max_tokens=1000,
             temperature=0.1,
-            user_id=uid,
-            company_id=cid,
-            endpoint="ai_extract.extract_from_photo",
         )
-        raw = raw.strip()
+        raw = (result.get("content") or "").strip()
         logger.info(f"[AI Extract] Raw response (first 500 chars): {raw[:500]}")
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
-            raw = raw.strip()
-
-        parsed = json.loads(raw)
+        parsed = result.get("parsed") or {}
         results = parsed.get("results", [])
 
         extracted = []

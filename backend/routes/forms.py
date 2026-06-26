@@ -458,32 +458,21 @@ async def search_form_documents(
             for d in documents
         ])
         
-        system_prompt = f"""You are a helpful assistant that searches reference documents for a form.
-The user is filling out a form and needs help finding information in the attached documents.
+        from services.ai_platform import execute_prompt
 
-Available Documents:
-{doc_context}
-
-Provide helpful, concise answers based on the document names, descriptions and types available.
-If a specific document would be most relevant, mention its name.
-If you cannot find relevant information, say so clearly and suggest which document type might help."""
-        
-        uid, cid = user_context(current_user)
-        answer = await ai_gateway_chat(
-            [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": request.query},
-            ],
-            user_id=uid,
-            company_id=cid,
+        answer = await execute_prompt(
+            "forms.document_search",
+            user=current_user,
+            user_message=request.query,
+            variables={"doc_context": doc_context},
             endpoint="forms.document_search",
             model="gpt-4o-mini",
             temperature=0.3,
         )
-        
+
         return {
             "query": request.query,
-            "answer": answer,
+            "answer": answer["content"],
             "relevant_documents": [
                 {"id": d["id"], "name": d["name"], "url": d["url"], "type": d["type"]}
                 for d in documents

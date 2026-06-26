@@ -355,46 +355,21 @@ async def ai_parse_file(user: dict,
 
     # Call AI to analyze the log structure
     try:
-        raw = await ai_gateway_chat(
-            [
-                {"role": "system", "content": """You are a production log analyst. Analyze the sample data and return a JSON object with:
-{
-  "delimiter": "detected delimiter character (comma, semicolon, tab, pipe, or space)",
-  "has_header": true/false,
-  "skip_rows": number of rows to skip before data starts,
-  "columns": ["list of column names"],
-  "column_mapping": {
-    "timestamp": "name of timestamp column or null",
-    "asset_id": "name of asset/equipment ID column or null",
-    "status": "name of status column or null",
-    "metric_columns": ["names of numeric metric columns"]
-  },
-  "timestamp_format": "detected format like %Y-%m-%d %H:%M:%S or null",
-  "notes": "brief description of the data structure"
-}
-Return ONLY valid JSON, no markdown."""},
-                {"role": "user", "content": f"Analyze this production log file sample:\n\n{sample_text}"},
-            ],
-            user_id=uid,
-            company_id=cid,
+        from services.ai_platform import execute_json_prompt
+
+        result = await execute_json_prompt(
+            "production.log_parse",
+            user={"id": uid, "company_id": cid},
+            user_message=f"Analyze this production log file sample:\n\n{sample_text}",
             endpoint="production_logs.ai_parse",
             model="gpt-4o",
             max_tokens=1000,
             temperature=0.1,
         )
-        raw = raw.strip()
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
-            raw = raw.strip()
-
-        result = json.loads(raw)
-        return {"success": True, "analysis": result, "sample_lines": len(sample_text.splitlines())}
-
-    except json.JSONDecodeError:
-        return {"success": False, "error": "AI returned invalid format", "raw": raw[:500]}
+        analysis = result["parsed"]
+        if not analysis:
+            return {"success": False, "error": "AI returned invalid format", "raw": raw[:500]}
+        return {"success": True, "analysis": analysis, "sample_lines": len(sample_text.splitlines())}
     except Exception as e:
         logger.error(f"[AI Parse] Failed: {e}")
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")

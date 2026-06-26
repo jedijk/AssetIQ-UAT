@@ -63,7 +63,7 @@ async def generate_ai_insights(user: dict, data: dict):
     """Generate AI-powered daily insights by analyzing the current production data."""
     from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
     from services.ai_evidence_pack import build_evidence_pack
-    from services.ai_gateway import chat as ai_gateway_chat, user_context
+    from services.ai_gateway import user_context
 
     uid, cid = user_context(user)
 
@@ -93,25 +93,17 @@ RSD: {kpis.get('rsd', 0)}% (target: <{kpis.get('rsd_target', 7)}%)
 Runtime: {kpis.get('runtime_hours', 0)} hours
 Samples: {kpis.get('sample_count', 0)} extruder, {kpis.get('viscosity_sample_count', 0)} viscosity"""
 
-    prompt = f"""Analyze this production data for Line-90 extruder on {date} and generate 3-5 concise daily insights.
+    from services.ai_prompt_registry import render_prompt
 
-KPIs:
-{kpi_text}
-
-Mooney Viscosity samples: {visc_text}
-
-Production Log:
-{log_text}
-
-Rules:
-- Each insight should have a severity: critical, warning, success, or info
-- Focus on anomalies, trends, quality issues, and operational efficiency
-- Be specific with times and values
-- Keep each insight title under 50 chars, description under 100 chars
-- Return ONLY valid JSON array, no markdown, no explanation
-
-Format:
-[{{"title": "...", "description": "...", "severity": "critical|warning|success|info", "time": "HH:MM"}}]"""
+    prompt = render_prompt(
+        "production.daily_insights.user",
+        {
+            "date": date,
+            "kpi_text": kpi_text,
+            "visc_text": visc_text,
+            "log_text": log_text,
+        },
+    )
 
     evidence_block = evidence_pack.get("prompt_summary") or ""
     citation_block = format_citations_for_prompt(evidence_pack.get("citations") or [])
@@ -121,31 +113,19 @@ Format:
         prompt += f"\n{citation_block}"
 
     try:
-        messages = [
-            {"role": "system", "content": "You are a production engineer AI assistant analyzing extruder and rubber compound production data. Return only valid JSON."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = await ai_gateway_chat(
-            messages,
-            user_id=uid,
-            company_id=cid,
+        from services.ai_platform import execute_json_prompt
+
+        result = await execute_json_prompt(
+            "production.daily_insights",
+            user=user,
+            user_message=prompt,
             endpoint="production.ai_insights",
             model="gpt-4o",
             temperature=0.7,
         )
-
-        # Parse JSON response
-        import json as json_module
-        # Strip markdown code blocks if present
-        clean = response.strip()
-        if clean.startswith("```"):
-            clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
-        if clean.endswith("```"):
-            clean = clean[:-3]
-        clean = clean.strip()
-
-        insights = json_module.loads(clean)
+        insights = result["parsed"]
+        if not isinstance(insights, list) or not insights:
+            raise ValueError("AI returned invalid insights JSON")
 
         # Delete existing AI insights for this date
         await db.production_events.delete_many({"date": date, "type": "insight", "_ai_generated": True})
@@ -185,7 +165,7 @@ Format:
 async def generate_machine_analysis(user: dict, data: dict = None):
     """AI-powered analysis of production data to determine optimal machine settings. Accepts optional date range."""
     import statistics
-    from services.ai_gateway import chat as ai_gateway_chat, user_context
+    from services.ai_gateway import user_context
 
     uid, cid = user_context(user)
 
@@ -324,79 +304,39 @@ async def generate_machine_analysis(user: dict, data: dict = None):
     ])
 
     range_desc = f"from {start} to {end}" if start and end else "all historical data"
-    prompt = f"""You are analyzing production data for a Line-90 rubber compound extruder ({range_desc}) to determine OPTIMAL MACHINE SETTINGS.
+    from services.ai_prompt_registry import render_prompt
 
-OVERALL STATISTICS ({len(all_visc)} samples across {len(daily_summaries)} production days, period: {range_desc}):
-- Mean Viscosity: {overall_avg:.2f} MU (target: 50-60 MU)
-- Std Dev: {overall_std:.2f} MU
-- In Target Range: {in_target_pct:.1f}%
-- Total production days analyzed: {len(daily_summaries)}
-- Good days (visc 50-60 & RSD<5%): {len(good_days)}
-- Problematic days: {len(bad_days)}
-
-BEST PERFORMING DAYS (viscosity in range, low variation):
-{good_text}
-
-WORST PERFORMING DAYS (out of range or high variation):
-{bad_text}
-
-CONTROLLABLE INPUTS: RPM, Feed rate (kg/h), M% (Motor Torque percentage, shown as 80-90 not 0.80-0.90), MT1/MT2/MT3 (temperatures)
-QUALITY OUTCOMES: Mooney Viscosity (target 50-60 MU), RSD (target <5%), Waste (minimize)
-
-Analyze the data and provide:
-
-1. **optimal_settings**: The recommended settings for each controllable input (RPM, Feed, M% (Motor Torque), MT1, MT2, MT3) with specific values and acceptable ranges.
-
-2. **key_findings**: 3-5 key statistical findings about what drives good vs bad days. Be specific with numbers.
-
-3. **correlations**: What input parameters most strongly correlate with viscosity being in/out of target range?
-
-4. **risk_factors**: Settings combinations that tend to produce out-of-spec results.
-
-5. **improvement_recommendations**: 3-5 specific, actionable recommendations to improve the {100-in_target_pct:.1f}% of samples currently out of target.
-
-Return ONLY valid JSON with this structure:
-{{
-  "optimal_settings": {{
-    "RPM": {{"recommended": 165, "range": [160, 170], "unit": "rpm"}},
-    "Feed": {{"recommended": 520, "range": [500, 540], "unit": "kg/h"}},
-    "Motor_Torque": {{"recommended": 85, "range": [80, 90], "unit": "%"}},
-    "MT1": {{"recommended": 210, "range": [200, 220], "unit": "°C"}},
-    "MT2": {{"recommended": 168, "range": [160, 175], "unit": "°C"}},
-    "MT3": {{"recommended": 155, "range": [145, 165], "unit": "°C"}}
-  }},
-  "key_findings": ["finding1", "finding2", ...],
-  "correlations": ["correlation1", "correlation2", ...],
-  "risk_factors": ["risk1", "risk2", ...],
-  "improvement_recommendations": ["rec1", "rec2", ...],
-  "summary": "2-3 sentence executive summary"
-}}"""
+    prompt = render_prompt(
+        "production.machine_settings.user",
+        {
+            "range_desc": range_desc,
+            "sample_count": str(len(all_visc)),
+            "day_count": str(len(daily_summaries)),
+            "overall_avg": f"{overall_avg:.2f}",
+            "overall_std": f"{overall_std:.2f}",
+            "in_target_pct": f"{in_target_pct:.1f}",
+            "good_days_count": str(len(good_days)),
+            "bad_days_count": str(len(bad_days)),
+            "good_text": good_text,
+            "bad_text": bad_text,
+            "out_of_target_pct": f"{100 - in_target_pct:.1f}",
+        },
+    )
 
     try:
-        messages = [
-            {"role": "system", "content": "You are an expert production engineer and data scientist specializing in rubber compound extrusion and Mooney viscosity optimization. Analyze the data rigorously and provide specific, actionable recommendations. Return only valid JSON."},
-            {"role": "user", "content": prompt}
-        ]
+        from services.ai_platform import execute_json_prompt
 
-        response = await ai_gateway_chat(
-            messages,
-            user_id=uid,
-            company_id=cid,
+        result = await execute_json_prompt(
+            "production.machine_settings",
+            user=user,
+            user_message=prompt,
             endpoint="production.machine_analysis",
             model="gpt-4o",
             temperature=0.3,
         )
-
-        # Parse JSON response
-        import json as json_module
-        clean = response.strip()
-        if clean.startswith("```"):
-            clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
-        if clean.endswith("```"):
-            clean = clean[:-3]
-        clean = clean.strip()
-
-        analysis = json_module.loads(clean)
+        analysis = result["parsed"]
+        if not isinstance(analysis, dict) or not analysis:
+            raise ValueError("AI returned invalid machine analysis JSON")
 
         # Save analysis to DB
         analysis_doc = {

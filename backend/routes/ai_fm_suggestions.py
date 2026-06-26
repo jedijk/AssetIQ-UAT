@@ -19,8 +19,44 @@ load_dotenv()
 
 from iso14224_models import EQUIPMENT_TYPES
 from auth import require_permission, get_current_user
-from services.ai_gateway import chat_completion_response, user_context, RateLimitError
+from services.ai_gateway import user_context, RateLimitError
 from services import ai_fm_queries as fmq
+
+
+async def _fm_json(
+    prompt_id: str,
+    *,
+    user: Optional[dict],
+    user_message: str,
+    endpoint: str,
+    max_tokens: int = 4000,
+    max_retries: int = 0,
+    model: str = "gpt-4o",
+) -> Dict[str, Any]:
+    """Run a registered FM prompt with deterministic JSON settings."""
+    from services.ai_platform import execute_json_prompt
+
+    result = await execute_json_prompt(
+        prompt_id,
+        user=user,
+        user_message=user_message,
+        endpoint=endpoint,
+        model=model,
+        temperature=0,
+        max_tokens=max_tokens,
+        seed=42,
+        response_format={"type": "json_object"},
+        max_retries=max_retries,
+    )
+    parsed = result.get("parsed")
+    if not isinstance(parsed, dict):
+        raise json.JSONDecodeError(
+            "Expected JSON object",
+            result.get("content") or "",
+            0,
+        )
+    return parsed
+
 
 logger = logging.getLogger(__name__)
 
@@ -59,30 +95,6 @@ class SuggestFailureModesResponse(BaseModel):
     total_suggestions: int
 
 # ============= AI Service =============
-
-SYSTEM_PROMPT = """You are an industrial reliability engineer. Your task is to map failure modes to equipment types.
-
-STRICT RULES - Follow exactly:
-
-1. DISCIPLINE MATCHING (primary criteria):
-   - Rotating equipment → ONLY failures related to: bearings, seals, vibration, imbalance, lubrication, shaft, impeller, motor
-   - Static equipment → ONLY failures related to: corrosion, erosion, fatigue, cracking, fouling, leakage, blockage
-   - Piping/Valves → ONLY failures related to: leakage, blockage, erosion, corrosion, valve stuck, actuator
-   - Electrical → ONLY failures related to: insulation, overheating, short circuit, open circuit, contact failure
-   - Instrumentation → ONLY failures related to: calibration, drift, signal loss, sensor failure, communication
-
-2. CONFIDENCE SCORING (be conservative):
-   - 0.90-0.95: Exact match (e.g., "Bearing Failure" for "Centrifugal Pump")
-   - 0.80-0.89: Strong match (same equipment category)
-   - 0.70-0.79: Good match (related equipment type)
-   - Below 0.70: Do not include
-
-3. OUTPUT REQUIREMENTS:
-   - Return 4-6 failure modes per equipment type (no more, no less)
-   - Sort by confidence descending
-   - Use EXACT IDs from the input lists
-
-Return ONLY valid JSON. No explanations outside JSON."""
 
 
 def get_cache_key(equipment_ids: List[str], fm_ids: List[str]) -> str:
@@ -154,23 +166,12 @@ Return JSON:
 }}"""
 
     try:
-        uid, cid = user_context(current_user)
-        response = await chat_completion_response(
-            user_id=uid,
-            company_id=cid,
+        result = await _fm_json(
+            "fm.failure_mode_mapping",
+            user=current_user,
+            user_message=user_prompt,
             endpoint="ai_fm_suggestions.failure_modes",
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0,  # Completely deterministic
-            max_tokens=4000,
-            seed=42,  # Fixed seed for reproducibility
-            response_format={"type": "json_object"}
         )
-        
-        result = json.loads(response.choices[0].message.content.strip())
         
         suggestions = []
         for item in result.get("suggestions", []):
@@ -349,40 +350,6 @@ class SuggestEquipmentTypeMappingsResponse(BaseModel):
     total_matched: int
 
 
-EQUIPMENT_TYPE_MAPPING_SYSTEM_PROMPT = """You are an industrial reliability engineer. Your task is to map equipment instances (nodes from a plant hierarchy) to the correct equipment type from an ISO 14224-aligned catalog.
-
-STRICT RULES:
-
-1. NAME MATCHING (primary):
-   - Use ONLY the node's `name` and `description` to infer the equipment kind. DO NOT use, infer from, or reason about any numeric or alphanumeric plant tag/identifier.
-   - Plant tags such as "P-101", "V-201", "1C-1005-0031", "1E-4001" carry NO classification value. If anything in the name still looks like a tag (e.g. a leading code like "1C-1005-0031 Pump"), ignore that portion entirely and reason only on the descriptive words that follow ("Pump").
-   - Examples of correct reasoning:
-       * "1C-1005-0031 Screw Motor Reductor" → reason on "Screw Motor Reductor" only → Gearbox.
-       * "P-101 Feed Pump" → reason on "Feed Pump" only → Centrifugal Pump.
-       * "V-201 Knock-Out Drum" → reason on "Knock-Out Drum" only → Pressure Vessel.
-   - NEVER let the tag or numbering influence the discipline, confidence, or reasoning.
-
-2. DISCIPLINE COHERENCE:
-   - Rotating: pumps, compressors, fans, blowers, gearboxes, motors, turbines.
-   - Static: vessels, columns/towers, drums, heat exchangers, reactors, boilers, tanks.
-   - Piping: valves, piping, strainers, filters.
-   - Electrical: transformers, switchgear, cables, motors (electrical view), UPS.
-   - Instrumentation: transmitters, gauges, analyzers, sensors.
-
-3. CONFIDENCE SCORING (be conservative):
-   - 0.90-0.95: Exact match (the node's name unambiguously names this equipment type).
-   - 0.80-0.89: Strong match (clear keywords + correct discipline).
-   - 0.70-0.79: Reasonable match (related family).
-   - Below 0.70: Do not return a best_match; set it to null.
-
-4. OUTPUT REQUIREMENTS:
-   - For each node: pick at most ONE best_match. Optionally include up to 2 alternatives, each with their own confidence and reasoning.
-   - Use EXACT equipment_type IDs from the catalog. Never invent IDs.
-   - If nothing reasonable matches (confidence < 0.70 for all), return best_match: null and alternatives: [].
-   - The `reasoning` text MUST NOT quote or reference the plant tag.
-
-Return ONLY valid JSON. No prose outside JSON."""
-
 
 # Strips a leading plant-tag-like prefix from an equipment node name so the AI
 # never sees codes such as "1C-1005-0031" in the descriptive name.
@@ -488,23 +455,12 @@ Return JSON:
 If no equipment_type fits a node with confidence >= 0.70, set its best_match to null and alternatives to []."""
 
     try:
-        uid, cid = user_context(current_user)
-        response = await chat_completion_response(
-            user_id=uid,
-            company_id=cid,
+        result = await _fm_json(
+            "fm.equipment_type_mapping",
+            user=current_user,
+            user_message=user_prompt,
             endpoint="ai_fm_suggestions.equipment_type_mappings",
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": EQUIPMENT_TYPE_MAPPING_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0,
-            max_tokens=4000,
-            seed=42,
-            response_format={"type": "json_object"},
         )
-
-        result = json.loads(response.choices[0].message.content.strip())
 
         valid_ids = {et.id for et in equipment_types}
         valid_node_ids = {n.id for n in nodes}
@@ -638,32 +594,6 @@ class SuggestNewEquipmentTypesResponse(BaseModel):
     total: int
 
 
-NEW_EQUIPMENT_TYPE_SYSTEM_PROMPT = """You are an industrial reliability engineer building an ISO 14224-aligned equipment type catalog.
-
-The user has provided:
-1. A list of EXISTING equipment types already in the catalog.
-2. A list of equipment instances (nodes) from their plant hierarchy.
-
-Your task: identify recurring equipment KINDS in the node list that are NOT well-represented by the existing catalog, and propose NEW equipment types to add.
-
-STRICT RULES:
-
-1. DO NOT propose anything that is already covered by an existing type. Read the existing list carefully.
-2. Group node instances by their underlying equipment kind. Ignore plant codes, tag numbers and unit prefixes (e.g. P-101, V-201, 1F-3001).
-3. Only propose a new equipment type when at least 2 nodes (or 1 clearly distinct unfamiliar item) point to the same kind.
-4. Each suggestion must have:
-   - `suggested_id`: lowercase snake_case identifier, max 40 chars, unique, not present in existing IDs (e.g. "screw_motor_reductor").
-   - `suggested_name`: human-readable Title Case name (e.g. "Screw Motor Reductor").
-   - `discipline`: ONE of exactly: Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory.
-   - `rationale`: 1 short sentence explaining what the equipment is and why it is missing.
-   - `example_node_ids`: up to 5 node IDs that motivated this suggestion (use exact IDs from input).
-   - `example_node_names`: matching names for those IDs.
-   - `node_count`: total number of nodes you found that map to this new type.
-5. Be CONSERVATIVE. Better to return fewer high-quality suggestions than many noisy ones. Return at most 15 suggestions, sorted by node_count descending.
-6. Skip nodes whose names are too generic to classify ("Unit", "System", "Component", numeric-only).
-
-Return ONLY valid JSON. No prose outside JSON."""
-
 
 def get_new_types_cache_key(nodes: List[EquipmentNodeInput], et_ids: List[str]) -> str:
     """Cache key based on node descriptors + existing type IDs."""
@@ -731,23 +661,12 @@ Return JSON:
 }}"""
 
     try:
-        uid, cid = user_context(current_user)
-        response = await chat_completion_response(
-            user_id=uid,
-            company_id=cid,
+        result = await _fm_json(
+            "fm.new_equipment_type",
+            user=current_user,
+            user_message=user_prompt,
             endpoint="ai_fm_suggestions.new_equipment_types",
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": NEW_EQUIPMENT_TYPE_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0,
-            max_tokens=4000,
-            seed=42,
-            response_format={"type": "json_object"},
         )
-
-        result = json.loads(response.choices[0].message.content.strip())
 
         existing_ids_lower = {et.id.lower() for et in existing_types}
         existing_names_lower = {et.name.lower() for et in existing_types}
@@ -883,57 +802,6 @@ class SuggestNewFailureModesResponse(BaseModel):
     total: int
 
 
-NEW_FAILURE_MODE_SYSTEM_PROMPT = """You are a senior reliability engineer (CMRP-level, ISO 14224 fluent) auditing a failure mode catalog.
-
-The user gives you:
-1. A list of EXISTING failure modes already in the library (with the equipment_type_ids they cover).
-2. A list of equipment types from their catalog.
-
-Your task: propose NEW failure modes that should be added — failure modes that are clearly relevant for the given equipment types but are NOT yet represented in the existing library (or are missing for specific equipment types they should cover).
-
-STRICT RULES:
-
-1. CATEGORY DISCIPLINE:
-   - Rotating equipment failures: bearings, seals, vibration, imbalance, misalignment, lubrication, shaft, impeller, motor windings, cavitation.
-   - Static equipment failures: corrosion, erosion, fatigue, cracking, fouling, leakage, blockage, embrittlement.
-   - Piping/Valves: leakage, blockage, erosion, stuck actuator, packing failure, seat damage.
-   - Electrical: insulation breakdown, overheating, short circuit, open circuit, contact pitting.
-   - Instrumentation: calibration drift, signal loss, sensor fouling, communication failure.
-
-2. AVOID DUPLICATION:
-   - Do NOT propose any failure mode whose name is already in the existing list (case-insensitive). Read carefully.
-   - If a failure mode already exists for SOME equipment types but is clearly missing for OTHERS, you may propose extending it — but only if the gap is meaningful (e.g. "Bearing Failure" exists for centrifugal pumps but is missing for gas turbines).
-
-3. SCORING (use ISO 14224 / SAE J1739 conventions, 1-10 scale):
-   - severity: 1 (negligible) → 10 (catastrophic, safety/environmental).
-   - occurrence: 1 (very rare, < 1 in 10⁶) → 10 (very high, > 1 in 2).
-   - detectability: 1 (almost certain to detect early) → 10 (no detection possible).
-   - Be REALISTIC. Most production failures sit S 5-8, O 3-6, D 4-7.
-
-4. ISO 14224 MECHANISM CODE (`mechanism` field): use a short ISO code such as:
-   BRD (breakdown), LKG (leakage), COR (corrosion), ERO (erosion), FAT (fatigue), FRA (fracture),
-   WEA (wear), CON (contamination), INS (insulation failure), CAL (calibration), VIB (vibration),
-   ELU (electrical), UNK (unknown). Pick the closest fit.
-
-5. EQUIPMENT MAPPING:
-   - `equipment_type_ids` MUST contain at least one ID from the user's catalog. Use EXACT IDs only.
-   - Each suggestion should target the most relevant equipment types (typically 1-4 IDs).
-   - Always also fill `equipment_type_names` matching those IDs.
-
-6. CONTENT QUALITY:
-   - `failure_mode`: short, specific, action-oriented (e.g. "Mechanical Seal Face Wear", not "Pump Failure").
-   - `potential_effects`: 2-4 short bullets describing consequences (e.g. "Process leak", "Pump shutdown").
-   - `potential_causes`: 2-4 short bullets describing root causes.
-   - `recommended_actions`: 2-4 concrete maintenance actions (e.g. "Vibration trend monitoring (PDM)", "Replace seal during planned shutdown (PM)").
-   - `keywords`: 3-6 lowercase search terms.
-   - `rationale`: 1 short sentence explaining WHY this failure mode is missing and where it applies.
-
-7. QUANTITY:
-   - Return at MOST 15 suggestions, sorted by RPN descending.
-   - Prefer fewer, higher-quality, high-RPN gaps over many marginal ones.
-
-Return ONLY valid JSON. No prose outside JSON."""
-
 
 def get_new_fms_cache_key(eq_types: List[EquipmentTypeOption], existing: List[ExistingFailureModeBrief]) -> str:
     et_keys = sorted([f"{et.id}|{et.discipline or ''}" for et in eq_types])
@@ -1005,23 +873,13 @@ Return JSON:
 }}"""
 
     try:
-        uid, cid = user_context(current_user)
-        response = await chat_completion_response(
-            user_id=uid,
-            company_id=cid,
+        result = await _fm_json(
+            "fm.new_failure_mode",
+            user=current_user,
+            user_message=user_prompt,
             endpoint="ai_fm_suggestions.new_failure_modes",
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": NEW_FAILURE_MODE_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0,
             max_tokens=4500,
-            seed=42,
-            response_format={"type": "json_object"},
         )
-
-        result = json.loads(response.choices[0].message.content.strip())
 
         existing_names = {(fm.failure_mode or "").strip().lower() for fm in existing_failure_modes}
         valid_et_ids = {et.id for et in equipment_types}
@@ -1215,91 +1073,6 @@ class ImprovedFailureMode(BaseModel):
     rationale: str = ""
 
 
-IMPROVE_FAILURE_MODE_SYSTEM_PROMPT = """You are a senior reliability engineer (CMRP-level, ISO 14224 fluent) refining a SINGLE failure-mode record so it can serve as a high-quality reference in a production FMEA library.
-
-You are given:
-1. The current failure mode record (with its existing fields).
-2. The user's equipment type catalog (so equipment_type_ids stay valid).
-
-Your job: produce an IMPROVED version of every field. **Critically: if a field is already strong, you MUST return it VERBATIM (identical bytes — same wording, same order, same casing).** Do NOT rewrite for style alone. Only change a field when you can clearly defend the change in one sentence to a reviewer.
-
-DECIDE-TO-CHANGE RULES (apply per field):
-
-A. failure_mode (name):
-   - Keep verbatim if it is already short, specific and action-oriented.
-   - Change ONLY if the existing name is generic ("Pump Failure"), redundant, or hides the mechanism.
-
-B. discipline / mechanism:
-   - Keep verbatim if the existing value is in the allowed set and matches the equipment family.
-   - discipline must be exactly ONE of: Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory. (Note: the input field may be named `category` for legacy reasons — treat it as the discipline.)
-   - mechanism must be a short ISO 14224 code: BRD, LKG, COR, ERO, FAT, FRA, WEA, CON, INS, CAL, VIB, ELU, OVH, CAV, UNK.
-
-C. severity / occurrence / detectability (SAE J1739 scale, 1-10):
-   - Keep verbatim if the existing value is realistic for the equipment family.
-   - Change ONLY when the existing value is implausible (e.g. severity=10 for a minor wear mode, all values = 1, missing/None, or the cluster of S/O/D is wildly out of line).
-   - Be REALISTIC and CONSERVATIVE: most production failures sit S 5-8, O 3-6, D 4-7. Never inflate by more than 2 points.
-
-D. keywords (3-6, lowercase):
-   - Keep the existing list verbatim if it has 3+ relevant entries and no redundancy.
-   - Change ONLY to: add 1-2 missing high-value terms, remove duplicates, or fix typos.
-
-E. potential_effects / potential_causes / recommended_actions (lists):
-   - Keep verbatim if the existing list has 3+ specific, well-written entries.
-   - Change ONLY when there is a real gap: missing common cause, missing critical effect, vague actions like "check regularly". When changing, preserve good existing entries and add (don't replace).
-   - For `recommended_actions` SPECIFICALLY: aim for a **balanced mix of PM (preventive), CM (corrective) and PDM (predictive)** task types AND tag each action with the correct discipline.
-     * Format EVERY action as: `"<Action text> [<DISCIPLINE>] (<TYPE>[, <frequency>])"`.
-     * Allowed disciplines (EXACTLY 8 — never use any other label, in particular NEVER use "Mechanical"):
-       **Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory**.
-     * Pick the discipline that actually performs the physical work:
-       - bearings, seals, alignment, lubrication, vibration, couplings, shafts, impellers → Rotating
-       - heat exchangers, pressure vessels, tanks, columns, fouling/corrosion on static metal → Static
-       - pipe/flange/valve work, gasket replacement, line walks → Piping
-       - motor windings, megger tests, MCC/switchgear, cabling, grounding → Electrical
-       - transmitters, calibration, loop checks, PLCs, positioners, DCS → Instrumentation
-       - foundations, baseplates, grouting, anchor bolts, structural steel → Civil
-       - operator rounds, procedure changes, setpoint adjustments, NPSH tweaks, housekeeping → Operations
-       - oil analysis, NDE/UT/RT/PT/MT, metallurgical testing, sampling → Laboratory
-     * Allowed type markers: PM, CM, PDM.
-     * Examples of correct output:
-         - "Vibration trend monitoring [Rotating] (PDM, monthly)"
-         - "Megger insulation test [Electrical] (PDM, annually)"
-         - "Calibrate temperature transmitter [Instrumentation] (PM, every 6 months)"
-         - "Replace failed bearing [Rotating] (CM)"
-         - "Restart pump with manual reset [Operations] (CM)"
-         - "Hydrostatic pressure test [Piping] (PM, every 5 years)"
-         - "Re-grout pump baseplate [Civil] (CM)"
-         - "Send oil sample for ferrography [Laboratory] (PDM, quarterly)"
-     * If the existing list already covers the mix well, keep it verbatim.
-     * If the existing list is heavy on one type/discipline (e.g. all Rotating / all PM), ADD complementary actions across the right disciplines instead of replacing.
-
-F. equipment_type_ids:
-   - Keep existing valid IDs verbatim. Add up to 2 more EXACT IDs from the user's catalog ONLY if the failure mode clearly applies and was previously missing.
-   - NEVER invent IDs. NEVER drop a valid existing ID.
-   - If the existing list is empty, propose 1-3 IDs.
-
-OUTPUT REQUIREMENTS:
-
-1. `improvements_summary` (0-5 short bullets):
-   - One bullet per field you actually CHANGED, referencing the field name.
-   - If you changed nothing, return an empty list.
-   - NEVER include a bullet for a field you kept verbatim.
-   - In any human-readable text (summary, explanations, rationale) refer to the field as "discipline" — never "category".
-
-2. `field_explanations` (object, keyed by field name) — REQUIRED FOR EVERY FIELD:
-   - Include a 1-sentence explanation for **every** field in this list:
-     "failure_mode", "category", "mechanism", "severity", "occurrence", "detectability", "keywords", "potential_effects", "potential_causes", "recommended_actions", "equipment_type_ids".
-   - For CHANGED fields: explain WHY you changed it (what was wrong, what is now better).
-     Example: `"severity": "Lowered from 9 to 7 — typical for non-safety bearing wear on centrifugal pumps."`
-   - For UNCHANGED fields: state WHY the current value is already strong with concrete reasoning — reference the specific value, scale, scope or ISO context. Avoid generic phrases like "looks good".
-     Example: `"keywords": "Already covers mechanism (vibration), location (bearing) and equipment context — 4 lowercase terms aligned with ISO 14224 search vocabulary."`
-     Example: `"severity": "S=7 correctly reflects loss-of-containment risk without crossing into catastrophic safety/environmental territory (≥9)."`
-   - In the human-readable explanation TEXT, always say "discipline" (e.g. "discipline is Rotating because…"), even when the JSON key is `category`. Never write the word "category" in any explanation, summary, or rationale.
-   - Never leave a field out. Never write empty strings.
-
-3. `rationale`: one short sentence summarising the overall direction. If nothing changed, say so plainly (e.g. "Record is already strong; no changes needed."). Use "discipline" wording, not "category".
-
-Return ONLY valid JSON. No prose outside JSON."""
-
 
 def _improve_cache_key(fm: ExistingFailureModeFull, et_ids: List[str]) -> str:
     fingerprint = json.dumps({
@@ -1403,24 +1176,14 @@ Return JSON:
 }}"""
 
     try:
-        uid, cid = user_context(current_user)
-        response = await chat_completion_response(
-            user_id=uid,
-            company_id=cid,
+        result = await _fm_json(
+            "fm.improve_failure_mode",
+            user=current_user,
+            user_message=user_prompt,
             endpoint="ai_fm_suggestions.improve_failure_mode",
-            max_retries=4,
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": IMPROVE_FAILURE_MODE_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0,
             max_tokens=3500,
-            seed=42,
-            response_format={"type": "json_object"},
+            max_retries=4,
         )
-
-        result = json.loads(response.choices[0].message.content.strip())
 
         valid_et_ids = {et.id for et in equipment_types}
         et_name_by_id = {et.id: et.name for et in equipment_types}
@@ -2170,14 +1933,6 @@ async def find_similar_failure_modes(
     valid_ids_overall = {fm.id for fm in fms}
     used_ids: set = set()  # Prevent overlapping groups across clusters
 
-    sys_prompt = (
-        "You are a reliability engineer reviewing a failure-modes library. "
-        "Only group CLEAR duplicates or trivial rewordings of the SAME failure. "
-        "Do NOT group related failures that share a component word but differ in "
-        "phenomenon. Equipment type is irrelevant. Different ISO 14224 mechanisms "
-        "must stay separate. When unsure, keep SEPARATE. Output STRICT JSON."
-    )
-
     for cluster in candidate_clusters:
         items = [{"id": fm.id, "name": fm.failure_mode} for fm in cluster]
         user_msg = (
@@ -2191,23 +1946,15 @@ async def find_similar_failure_modes(
             "in at most ONE group — never overlap."
         )
         try:
-            uid, cid = user_context(current_user)
-            resp = await chat_completion_response(
-                user_id=uid,
-                company_id=cid,
+            data = await _fm_json(
+                "fm.similar_failure_modes",
+                user=current_user,
+                user_message=user_msg,
                 endpoint="ai_fm_suggestions.find_similar_failure_modes",
+                max_tokens=600,
                 max_retries=4,
                 model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_msg},
-                ],
-                temperature=0,
-                max_tokens=600,
-                seed=42,
-                response_format={"type": "json_object"},
             )
-            data = json.loads(resp.choices[0].message.content.strip())
             groups = data.get("groups") or []
         except RateLimitError:
             raise HTTPException(status_code=429, detail="OpenAI rate limit — try again in a moment.")

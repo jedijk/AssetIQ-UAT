@@ -133,37 +133,28 @@ class TranslationService:
         source_lang_name = lang_names.get(source_language, source_language)
         target_lang_name = lang_names.get(target_language, target_language)
         
-        system_message = f"""You are a professional technical translator specializing in {context}.
-Your task is to translate text from {source_lang_name} to {target_lang_name}.
-
-Guidelines:
-1. Maintain technical accuracy and terminology consistency
-2. Preserve formatting, line breaks, and structure
-3. Keep placeholders, codes, and tags unchanged
-4. Use industry-standard terminology for the target language
-5. If text contains lists, preserve the list format{dictionary_context}
-
-Respond ONLY with the translated text, nothing else."""
-        
         try:
-            from services.ai_gateway import chat as ai_gateway_chat
+            from services.ai_platform import execute_prompt
 
-            translation = await ai_gateway_chat(
-                [
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": text},
-                ],
-                user_id=user_id,
-                company_id=company_id,
+            translation = await execute_prompt(
+                "translation.technical_text",
+                user={"id": user_id, "company_id": company_id},
+                user_message=text,
+                variables={
+                    "context": context,
+                    "source_lang_name": source_lang_name,
+                    "target_lang_name": target_lang_name,
+                    "dictionary_context": dictionary_context,
+                },
                 endpoint="translation.translate_text",
                 model=self.model_name,
                 temperature=0.3,
                 max_tokens=2000,
             )
+            translation_text = translation["content"]
             
-            # Apply dictionary post-processing
             if use_dictionary and dictionary:
-                translation = self.apply_dictionary(translation, dictionary, target_language)
+                translation_text = self.apply_dictionary(translation_text, dictionary, target_language)
             
             # Calculate confidence based on text complexity and dictionary coverage
             confidence = 0.85  # Base confidence for AI translations
@@ -172,7 +163,7 @@ Respond ONLY with the translated text, nothing else."""
             if dictionary_context:
                 confidence += 0.05  # Higher confidence when dictionary terms were used
             
-            return translation.strip(), min(confidence, 0.95)
+            return translation_text.strip(), min(confidence, 0.95)
             
         except Exception as e:
             logger.error(f"Translation error: {e}")

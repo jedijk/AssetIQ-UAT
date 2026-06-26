@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from services.ai_context_builder import build_ai_context
 from services.ai_gateway import chat as ai_gateway_chat, user_context
+from services.ai_output_validation import parse_json_from_llm
 from services.ai_prompt_registry import get_prompt, list_prompts, render_prompt
 
 logger = logging.getLogger(__name__)
@@ -19,12 +20,57 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "build_ai_context",
     "execute_grounded_prompt",
+    "execute_json_prompt",
+    "execute_multimodal_json_prompt",
     "execute_prompt",
+    "execute_vision_json_prompt",
     "get_prompt",
     "list_prompts",
+    "parse_json_from_llm",
     "render_prompt",
     "user_context",
 ]
+
+
+async def _completion_content(
+    messages: List[Dict[str, Any]],
+    *,
+    uid: str,
+    cid: str,
+    endpoint: str,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    gateway_kwargs: Dict[str, Any],
+) -> str:
+    """Run chat completion; uses retry transport when max_retries is set."""
+    kwargs = dict(gateway_kwargs)
+    max_retries = int(kwargs.pop("max_retries", 0) or 0)
+    if max_retries > 0:
+        from services.ai_gateway import chat_completion_response
+
+        response = await chat_completion_response(
+            messages,
+            user_id=uid,
+            company_id=cid,
+            endpoint=endpoint,
+            model=model,
+            max_retries=max_retries,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
+        return response.choices[0].message.content
+    return await ai_gateway_chat(
+        messages,
+        user_id=uid,
+        company_id=cid,
+        endpoint=endpoint,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        **kwargs,
+    )
 
 
 async def execute_prompt(
@@ -32,6 +78,7 @@ async def execute_prompt(
     *,
     user: Optional[dict] = None,
     user_message: str,
+    variables: Optional[Dict[str, str]] = None,
     context: Optional[str] = None,
     equipment_id: Optional[str] = None,
     intent: Optional[str] = None,
@@ -40,6 +87,7 @@ async def execute_prompt(
     temperature: float = 0.2,
     max_tokens: int = 1200,
     extra_messages: Optional[List[Dict[str, str]]] = None,
+    **gateway_kwargs: Any,
 ) -> Dict[str, Any]:
     """
     Execute a registered prompt with optional assembled context.
@@ -50,7 +98,7 @@ async def execute_prompt(
     uid, cid = user_context(user)
     ep = endpoint or f"ai_platform.{prompt_id}"
 
-    system_text = spec.text
+    system_text = render_prompt(prompt_id, variables) if variables else spec.text
     if context:
         system_text = f"{system_text}\n\n---\nContext:\n{context}"
 
@@ -59,14 +107,15 @@ async def execute_prompt(
         messages.extend(extra_messages)
     messages.append({"role": "user", "content": user_message})
 
-    content = await ai_gateway_chat(
+    content = await _completion_content(
         messages,
-        user_id=uid,
-        company_id=cid,
+        uid=uid,
+        cid=cid,
         endpoint=ep,
         model=model or spec.default_model,
         temperature=temperature,
         max_tokens=max_tokens,
+        gateway_kwargs=gateway_kwargs,
     )
 
     return {
@@ -77,6 +126,154 @@ async def execute_prompt(
         "endpoint": ep,
         "equipment_id": equipment_id,
         "intent": intent,
+    }
+
+
+async def execute_json_prompt(
+    prompt_id: str,
+    *,
+    user: Optional[dict] = None,
+    user_message: str,
+    variables: Optional[Dict[str, str]] = None,
+    context: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    intent: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    model: Optional[str] = None,
+    temperature: float = 0.2,
+    max_tokens: int = 1200,
+    extra_messages: Optional[List[Dict[str, str]]] = None,
+    default: Optional[Dict[str, Any]] = None,
+    **gateway_kwargs: Any,
+) -> Dict[str, Any]:
+    """Execute a registered prompt and parse JSON from the model response."""
+    spec = get_prompt(prompt_id)
+    system_text = render_prompt(prompt_id, variables) if variables else spec.text
+    if context:
+        system_text = f"{system_text}\n\n---\nContext:\n{context}"
+
+    uid, cid = user_context(user)
+    ep = endpoint or f"ai_platform.{prompt_id}"
+
+    messages: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
+    if extra_messages:
+        messages.extend(extra_messages)
+    messages.append({"role": "user", "content": user_message})
+
+    content = await _completion_content(
+        messages,
+        uid=uid,
+        cid=cid,
+        endpoint=ep,
+        model=model or spec.default_model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        gateway_kwargs=gateway_kwargs,
+    )
+    parsed = parse_json_from_llm(content, default=default)
+
+    return {
+        "content": content,
+        "parsed": parsed,
+        "prompt_id": spec.id,
+        "prompt_version": spec.version,
+        "model": model or spec.default_model,
+        "endpoint": ep,
+        "equipment_id": equipment_id,
+        "intent": intent,
+    }
+
+
+async def execute_vision_json_prompt(
+    prompt_id: str,
+    *,
+    user: Optional[dict] = None,
+    user_message: str,
+    image_base64: str,
+    media_type: str = "image/jpeg",
+    variables: Optional[Dict[str, str]] = None,
+    prompt_text: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    model: Optional[str] = None,
+    temperature: float = 0.2,
+    max_tokens: int = 1200,
+    default: Optional[Dict[str, Any]] = None,
+    **gateway_kwargs: Any,
+) -> Dict[str, Any]:
+    """Execute a registered prompt with a single image and parse JSON from the response."""
+    from services.ai_gateway import chat_with_images
+
+    spec = get_prompt(prompt_id)
+    if prompt_text is not None:
+        full_prompt = f"{prompt_text}\n\n{user_message}" if user_message else prompt_text
+    else:
+        system_text = render_prompt(prompt_id, variables) if variables else spec.text
+        full_prompt = f"{system_text}\n\n{user_message}"
+    uid, cid = user_context(user)
+    ep = endpoint or f"ai_platform.{prompt_id}"
+
+    content = await chat_with_images(
+        full_prompt,
+        image_base64_list=[{"data": image_base64, "media_type": media_type}],
+        user_id=uid,
+        company_id=cid,
+        endpoint=ep,
+        model=model or spec.default_model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        **gateway_kwargs,
+    )
+    parsed = parse_json_from_llm(content, default=default)
+    return {
+        "content": content,
+        "parsed": parsed,
+        "prompt_id": spec.id,
+        "prompt_version": spec.version,
+        "model": model or spec.default_model,
+        "endpoint": ep,
+    }
+
+
+async def execute_multimodal_json_prompt(
+    prompt_id: str,
+    *,
+    user: Optional[dict] = None,
+    user_content: Any,
+    variables: Optional[Dict[str, str]] = None,
+    endpoint: Optional[str] = None,
+    model: Optional[str] = None,
+    temperature: float = 0.2,
+    max_tokens: int = 1200,
+    default: Optional[Dict[str, Any]] = None,
+    **gateway_kwargs: Any,
+) -> Dict[str, Any]:
+    """Execute a registered prompt with multimodal user content (e.g. text + image)."""
+    spec = get_prompt(prompt_id)
+    system_text = render_prompt(prompt_id, variables) if variables else spec.text
+    uid, cid = user_context(user)
+    ep = endpoint or f"ai_platform.{prompt_id}"
+    messages: List[Dict[str, Any]] = [
+        {"role": "system", "content": system_text},
+        {"role": "user", "content": user_content},
+    ]
+    content = await _completion_content(
+        messages,
+        uid=uid,
+        cid=cid,
+        endpoint=ep,
+        model=model or spec.default_model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        gateway_kwargs=gateway_kwargs,
+    )
+    parsed = parse_json_from_llm(content, default=default)
+    return {
+        "content": content,
+        "parsed": parsed,
+        "prompt_id": spec.id,
+        "prompt_version": spec.version,
+        "model": model or spec.default_model,
+        "endpoint": ep,
     }
 
 
@@ -99,10 +296,8 @@ async def execute_grounded_prompt(
     """
     Grounded execution: evidence pack + optional copilot tools + registered prompt.
     """
-    from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
     from services.ai_orchestrator import run_grounded_recommendation
 
-    # Delegate to orchestrator (citations + tool loop); pass prompt_id for future registry wiring
     result = await run_grounded_recommendation(
         user=user,
         intent=intent,

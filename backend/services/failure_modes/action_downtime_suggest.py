@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Any, Dict, List
 
-from services.ai_gateway import chat_completion_response
+from services.ai_platform import execute_json_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 _CLASSIFY_CHUNK_SIZE = 4
 _REVIEW_BATCH_MAX = 8
 
-_SYSTEM_PROMPT = """You are a maintenance reliability engineer.
+DOWNTIME_CLASSIFY_PROMPT = """You are a maintenance reliability engineer.
 For each maintenance action, decide whether performing it requires taking the equipment or process unit out of service (shutdown / isolation / downtime).
 
 Set requires_downtime=true when:
@@ -27,6 +27,14 @@ Set requires_downtime=false when:
 - Operator or procedural changes with no physical shutdown
 
 Return JSON only."""
+
+
+def _downtime_prompt() -> str:
+    from services.ai_prompt_registry import render_prompt
+    return render_prompt("fm.downtime_classification")
+
+
+_SYSTEM_PROMPT = DOWNTIME_CLASSIFY_PROMPT  # backward compat
 
 
 async def _suggest_chunk(
@@ -58,26 +66,21 @@ Actions:
 Return JSON: {{"results": [{{"i": 0, "requires_downtime": false, "reasoning": "..."}}]}}"""
 
     max_tokens = min(1600, max(300, len(actions) * 80 + 120))
-    response = await chat_completion_response(
-        user_id=user_id,
-        company_id=company_id,
-        endpoint=endpoint,
-        max_retries=2,
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0,
-        max_tokens=max_tokens,
-        seed=42,
-        response_format={"type": "json_object"},
-    )
     try:
-        content = (response.choices[0].message.content or "").strip()
-        data = json.loads(content)
-    except (json.JSONDecodeError, AttributeError, IndexError, TypeError) as exc:
-        logger.error("Downtime classifier JSON parse failed: %s", exc)
+        result = await execute_json_prompt(
+            "fm.downtime_classification",
+            user={"id": user_id, "company_id": company_id},
+            user_message=user_prompt,
+            endpoint=endpoint,
+            model="gpt-4o-mini",
+            temperature=0,
+            max_tokens=max_tokens,
+            seed=42,
+            response_format={"type": "json_object"},
+        )
+        data = result["parsed"] or {}
+    except Exception as exc:
+        logger.error("Downtime classifier failed: %s", exc)
         return _fallback_results(actions)
 
     raw_results = data.get("results") or []

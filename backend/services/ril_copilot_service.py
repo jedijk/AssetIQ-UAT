@@ -156,28 +156,18 @@ class ReliabilityCopilotService:
         
         # Unmatched queries: optional ai_gateway intent classification
         try:
-            from services.ai_gateway import chat as ai_gateway_chat
+            from services.ai_platform import execute_prompt
 
-            answer = await ai_gateway_chat(
-                [
-                    {
-                        "role": "system",
-                        "content": (
-                            "Classify the reliability query into one intent: "
-                            "risk_analysis, changes_summary, equipment_details, "
-                            "attention_required, predictions, cases_summary, alerts_summary, "
-                            "general_summary. Reply with the intent slug only."
-                        ),
-                    },
-                    {"role": "user", "content": query},
-                ],
-                user_id="ril-copilot",
+            result = await execute_prompt(
+                "ril.copilot_intent_classifier",
+                user={"id": "ril-copilot", "company_id": "default"},
+                user_message=query,
                 endpoint="ril.copilot.classify_intent",
                 model="gpt-4o-mini",
                 temperature=0,
                 max_tokens=32,
             )
-            slug = (answer or "").strip().lower().replace(" ", "_")
+            slug = (result["content"] or "").strip().lower().replace(" ", "_")
             allowed = {
                 "risk_analysis", "changes_summary", "equipment_details",
                 "attention_required", "predictions", "cases_summary",
@@ -483,7 +473,7 @@ class ReliabilityCopilotService:
     ) -> Dict[str, Any]:
         """Generate AI response based on gathered data"""
         from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
-        from services.ai_gateway import chat as ai_gateway_chat, user_context
+        from services.ai_gateway import user_context
 
         uid, cid = user_context(current_user)
         if uid == "anonymous":
@@ -491,26 +481,6 @@ class ReliabilityCopilotService:
 
         citations = (evidence_pack or {}).get("citations") or []
         citation_block = format_citations_for_prompt(citations)
-
-        # Build system prompt
-        system_prompt = """You are the Reliability Copilot, an AI assistant for industrial reliability engineers.
-You help analyze equipment health, identify risks, explain failure patterns, and provide actionable recommendations.
-
-Your responses should be:
-- Concise and actionable
-- Focused on reliability and maintenance
-- Based on the provided data and evidence pack
-- Include specific numbers and equipment references when available
-
-When graph edge IDs are provided, cite them inline using [cite:<edge_id>] for traceability.
-
-Format your response with:
-1. A direct answer to the question
-2. Key supporting data points (include twin week-over-week deltas when present)
-3. Recommended actions (if applicable)
-4. A "Sources" section listing cited IDs when evidence was used
-
-Use markdown formatting for clarity."""
 
         # Build user prompt with data context
         data_summary = self._summarize_data_for_prompt(data, intent)
@@ -539,18 +509,19 @@ Available Data:
         user_prompt += f"{path_lines}\nPlease provide a helpful response to the query based on the available data."
 
         try:
-            answer = await ai_gateway_chat(
-                [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                user_id=uid,
-                company_id=cid,
+            from services.ai_platform import execute_prompt
+
+            actor = current_user or {"id": uid, "company_id": cid}
+            result = await execute_prompt(
+                "ril.copilot_assistant",
+                user=actor,
+                user_message=user_prompt,
                 endpoint="ril.copilot.query",
                 model="gpt-4o",
                 temperature=0.3,
                 max_tokens=1000,
             )
+            answer = result["content"]
         except Exception as e:
             logger.error(f"Error generating copilot response: {e}")
             answer = self._generate_fallback_response(intent, data)

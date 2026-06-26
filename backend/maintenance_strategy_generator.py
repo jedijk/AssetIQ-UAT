@@ -188,22 +188,21 @@ class MaintenanceStrategyGenerator:
         """Make a chat completion call via the shared AI gateway."""
         import asyncio
 
-        from services.ai_gateway import chat_completion_response
+        from services.ai_platform import execute_prompt
 
         async def _run():
-            response = await chat_completion_response(
-                [
-                    {"role": "system", "content": STRATEGY_GENERATION_PROMPT},
-                    {"role": "user", "content": user_message},
-                ],
-                user_id=user_id,
-                company_id="default",
+            from services.ai_platform import execute_prompt
+
+            result = await execute_prompt(
+                "maintenance.strategy_generation",
+                user={"id": user_id, "company_id": "default"},
+                user_message=user_message,
                 endpoint="maintenance_strategy_generator.generate",
                 model="gpt-4o",
                 max_tokens=4000,
                 temperature=0.5,
             )
-            return response.choices[0].message.content
+            return result["content"]
 
         try:
             return asyncio.run(_run())
@@ -213,13 +212,8 @@ class MaintenanceStrategyGenerator:
     
     def _parse_json_response(self, response: str) -> dict:
         """Parse JSON from LLM response, handling markdown code blocks"""
-        clean_response = response.strip()
-        if clean_response.startswith("```"):
-            clean_response = clean_response.split("```")[1]
-            if clean_response.startswith("json"):
-                clean_response = clean_response[4:]
-        clean_response = clean_response.strip()
-        return json.loads(clean_response)
+        from services.ai_output_validation import parse_json_from_llm
+        return parse_json_from_llm(response)
     
     def _build_fmea_context(self, equipment_type: str, failure_modes: List[dict]) -> str:
         """Build context string with FMEA data"""

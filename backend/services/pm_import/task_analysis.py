@@ -474,37 +474,27 @@ Respond in JSON format:
                     "raw_frequency": (t.get("frequency") or "")[:80],
                 })
             
-            sys_prompt = (
-                "You are a maintenance engineering assistant. For each task, return a JSON "
-                "object with keys exactly: task_description (English), task_type, discipline, "
-                "frequency, frequency_days, estimated_hours, confidence_score. "
-                f"task_type MUST be one of {self._TASK_TYPES}. "
-                f"discipline MUST be one of {self._DISCIPLINES}. "
-                f"frequency MUST be one of {list(self._FREQUENCY_DAYS.keys())}. "
-                "frequency_days is the integer day count (null for Condition Based / One Time). "
-                "estimated_hours is a float labor estimate (0.1–24). "
-                "confidence_score is your overall confidence (0–100). "
-                "Translate the task to clear English regardless of source language. "
-                "Return ONLY a JSON object with key 'results' as a list keyed by index 'i'."
-            )
-            user_prompt = (
-                "Enrich these maintenance tasks. Reply with JSON only.\n\n"
-                + json.dumps(payload, ensure_ascii=False)
-            )
-            
             try:
-                raw = await ai_gateway_chat(
-                    messages=[
-                        {"role": "system", "content": sys_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    user_id="pm-import",
+                from services.ai_platform import execute_json_prompt
+
+                result = await execute_json_prompt(
+                    "pm_import.task_enrich",
+                    user={"id": "pm-import", "company_id": "default"},
+                    user_message=(
+                        "Enrich these maintenance tasks. Reply with JSON only.\n\n"
+                        + json.dumps(payload, ensure_ascii=False)
+                    ),
+                    variables={
+                        "task_types": str(self._TASK_TYPES),
+                        "disciplines": str(self._DISCIPLINES),
+                        "frequencies": str(list(self._FREQUENCY_DAYS.keys())),
+                    },
                     endpoint="pm_import.task_analysis.enrich",
                     model="gpt-4o",
                     temperature=0.1,
                     response_format={"type": "json_object"},
                 )
-                parsed = json.loads(raw)
+                parsed = result["parsed"] or {}
                 results = parsed.get("results") or parsed.get("tasks") or []
                 by_idx = {int(r.get("i")): r for r in results if "i" in r}
             except Exception as e:

@@ -20,7 +20,7 @@
 | Reliability graph sync (UAT) | **Pass** — `verify_reliability_graph_sync.py` |
 | Graph ownership / dedup | **Done (WS2)** — `reliability_graph_ownership.py`, architecture doc |
 | Canonical data models | **Done (WS3)** — `canonical_models.py`, `CANONICAL_DATA_MODELS.md` |
-| AI gateway | **Partial** — `ai_gateway.py` + WS5 `ai_platform.py` started |
+| AI gateway | **Done (WS5)** — unified `ai_platform` API; all vision/multimodal paths migrated |
 | Executive read models | **Partial** — some materializers exist; dashboards still mix operational reads |
 | Large-file modularization | **Done (WS4)** — zero service modules over 800 LOC |
 | R2 on UAT (AI scan photos) | **Open** — ops, not blocking Platform 1.0 code track |
@@ -35,7 +35,7 @@ Platform 1.0 is complete when:
 - [ ] Every domain has one canonical data model
 - [ ] The reliability graph has one owner per relationship
 - [x] All major files have been modularized (~800 line target)
-- [ ] Every AI feature uses the unified AI platform
+- [x] Every AI feature uses the unified AI platform
 - [ ] Executive dashboards use read models
 - [ ] Graph performance benchmarks completed
 - [ ] Engineering standards documented and CI-enforced
@@ -201,16 +201,18 @@ Provider Layer → Prompt Registry → Context Builder → Evidence Builder
 
 | Task | Status |
 |------|--------|
-| Centralize prompts | **Started** — `ai_prompt_registry.py` (3 bootstrap prompts) |
+| Centralize prompts | **Done** — `ai_prompt_registry.py` (56 prompts) |
 | Standardize context/evidence building | **Started** — `ai_context_builder.py` + `ai_evidence_pack.py` |
-| Provider abstraction | **Done** — `ai_gateway.py` |
-| Unified execution entry point | **Started** — `ai_platform.py` |
+| Provider abstraction | **Done** — `ai_gateway.py` (transport) |
+| Unified execution entry point | **Done** — `execute_prompt`, `execute_json_prompt`, `execute_vision_json_prompt`, `execute_multimodal_json_prompt`, `execute_grounded_prompt` |
+| Output validation | **Done** — `ai_output_validation.py` |
 | Prompt versioning | **Open** — registry versions only (no DB yet) |
 | Token efficiency / AI logging | **Partial** — `ai_cost_guard` |
+| Migrate application callers | **Done** — routes, FM, risk, vision, import, chat |
 
 **Docs:** [`AI_PLATFORM.md`](./AI_PLATFORM.md)
 
-**Definition of done:** Every AI feature uses the same platform entry points
+**Definition of done:** Every AI feature uses the same platform entry points — **met** (Whisper remains on gateway transport by design).
 
 ---
 

@@ -31,7 +31,6 @@ async def generate_ai_recommendations(
     user: Optional[dict] = None,
 ) -> List[MaintenanceProgramTask]:
     """Generate AI maintenance recommendations for an equipment program."""
-    from services.ai_gateway import chat as ai_gateway_chat
 
     program = await db.maintenance_programs_v2.find_one(
         maintenance_scoped(user, {"equipment_id": equipment_id})
@@ -72,72 +71,46 @@ async def generate_ai_recommendations(
             for fm in failure_modes:
                 fm_context += f"- {fm.get('failure_mode', 'Unknown')}\n"
 
-    prompt = f"""You are a maintenance engineering expert. Analyze the following equipment and recommend additional maintenance tasks.
-
-Equipment: {equipment.get('name', equipment_id)}
-Equipment Type: {equipment_type}
-Criticality: {criticality}
-
-Existing maintenance tasks:
-{chr(10).join([f'- {t}' for t in existing_tasks[:20]]) if existing_tasks else '- None currently defined'}
-{failure_context}
-{fm_context}
-
-Based on ISO 14224 standards and industry best practices, recommend up to {max_recommendations} additional maintenance tasks that are NOT already in the existing task list.
-
-For each recommendation, provide:
-1. Task title (concise, action-oriented)
-2. Description (brief explanation of what and why)
-3. Frequency (daily, weekly, monthly, quarterly, semi_annual, annual)
-4. Category (inspection, condition_monitoring, preventive_maintenance, lubrication, calibration, cleaning, safety_verification)
-5. Estimated duration in hours
-6. Reasoning (why this task is recommended)
-
-Format your response as JSON array:
-[
-  {{
-    "task_title": "...",
-    "description": "...",
-    "frequency": "...",
-    "category": "...",
-    "duration_hours": ...,
-    "reasoning": "..."
-  }}
-]
-
-Only include tasks that would genuinely improve reliability and are not redundant with existing tasks."""
+    existing_tasks_block = (
+        chr(10).join([f"- {t}" for t in existing_tasks[:20]])
+        if existing_tasks
+        else "- None currently defined"
+    )
 
     try:
-        response = await ai_gateway_chat(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a maintenance engineering expert specializing in ISO 14224 "
-                        "standards and reliability-centered maintenance."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-            user_id=user_id or "maintenance-program",
+        from services.ai_platform import execute_json_prompt
+        from services.ai_prompt_registry import render_prompt
+
+        user_message = render_prompt(
+            "maintenance.program_recommendations.user",
+            {
+                "equipment_name": equipment.get("name", equipment_id),
+                "equipment_type": equipment_type,
+                "criticality": criticality,
+                "existing_tasks_block": existing_tasks_block,
+                "failure_context": failure_context,
+                "fm_context": fm_context,
+                "max_recommendations": str(max_recommendations),
+            },
+        )
+        actor = user or {"id": user_id or "maintenance-program"}
+        result = await execute_json_prompt(
+            "maintenance.program_recommendations",
+            user=actor,
+            user_message=user_message,
             endpoint="maintenance_program.ai_recommendations",
             model="gpt-4o-mini",
+            temperature=0.2,
             response_format={"type": "json_object"},
         )
-
-        try:
-            if isinstance(response, str):
-                response_data = json.loads(response)
-            else:
-                response_data = response
-            if isinstance(response_data, dict):
-                recommendations = response_data.get("recommendations", response_data.get("tasks", []))
-                if not recommendations and "task_title" in response_data:
-                    recommendations = [response_data]
-            else:
-                recommendations = response_data
-        except json.JSONDecodeError:
-            logger.error("Failed to parse AI response: %s", str(response)[:500])
+        response_data = result["parsed"] or {}
+        if isinstance(response_data, dict):
+            recommendations = response_data.get("recommendations", response_data.get("tasks", []))
+            if not recommendations and "task_title" in response_data:
+                recommendations = [response_data]
+        elif isinstance(response_data, list):
+            recommendations = response_data
+        else:
             recommendations = []
 
         ai_tasks = []

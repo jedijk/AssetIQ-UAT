@@ -21,11 +21,6 @@ async def ai_plan_tasks(
     user: dict,
     request: Optional[AIScheduleRequest] = None,
 ) -> dict:
-    try:
-        from services.ai_gateway import chat, user_context
-    except ImportError:
-        raise HTTPException(status_code=500, detail="OpenAI service not available")
-
     api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:
         raise HTTPException(
@@ -85,23 +80,6 @@ async def ai_plan_tasks(
         "skills": tech.get("skills", []),
     } for tech in technicians]
 
-    system_message = (
-        "You are an industrial maintenance planning expert. Given a set of open "
-        "maintenance tasks and available technicians with their daily/weekly capacity, "
-        "produce a balanced optimised plan. For each task you must: "
-        "1) assign a technician (or leave null if none suitable / no technicians available), "
-        "2) propose a planned_date between start_date and end_date, "
-        "3) provide explicit short reasoning (criticality, due-date pressure, capacity, skill fit). "
-        "Respect daily capacity: never exceed a technician's daily_hours on any day. "
-        "Prioritise overdue and critical/high priority tasks earliest. Return ONLY valid JSON "
-        "matching this schema: "
-        '{"summary": "<2-3 sentence overall plan rationale>", '
-        '"recommendations": [{"task_id": "...", "assigned_technician_id": "..." | null, '
-        '"assigned_technician_name": "..." | null, "planned_date": "YYYY-MM-DD", '
-        '"reasoning": "..."}]} '
-        "Do NOT wrap in markdown code fences."
-    )
-
     user_payload = {
         "today": today,
         "start_date": request.start_date,
@@ -114,37 +92,28 @@ async def ai_plan_tasks(
     logger.debug("AI planner session %s", session_id)
 
     try:
-        uid, cid = user_context(user)
-        response_text = await chat(
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": json.dumps(user_payload)},
-            ],
-            model="gpt-4o",
-            response_format={"type": "json_object"},
-            user_id=uid,
-            company_id=cid,
+        from services.ai_platform import execute_json_prompt
+
+        result = await execute_json_prompt(
+            "maintenance.scheduler_plan",
+            user=user,
+            user_message=json.dumps(user_payload),
             endpoint="maintenance_scheduler.ai_plan",
+            model="gpt-4o",
+            temperature=0.2,
+            response_format={"type": "json_object"},
         )
+        parsed = result["parsed"]
     except Exception as e:
         logger.exception("AI planner LLM call failed")
         raise HTTPException(status_code=502, detail=f"AI planner failed: {str(e)}") from e
 
-    cleaned = response_text.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("```", 2)[1]
-        if cleaned.startswith("json"):
-            cleaned = cleaned[4:]
-        cleaned = cleaned.strip().rstrip("`").strip()
-
-    try:
-        parsed = json.loads(cleaned)
-    except Exception as e:
-        logger.error("Failed to parse AI response: %s", response_text[:500])
+    if not parsed:
+        logger.error("Failed to parse AI planner response")
         raise HTTPException(
             status_code=502,
-            detail=f"AI returned non-JSON response: {str(e)}",
-        ) from e
+            detail="AI returned non-JSON response",
+        )
 
     return {
         "message": "AI plan generated",

@@ -55,25 +55,18 @@ async def chat_analyze(
     check_injection_attempt({"message": message}, endpoint="/ai/chat-analyze")
 
     try:
-        uid, cid = user_context(actor)
-        ai_response = await chat(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a helpful AI assistant for industrial asset management "
-                        "and reliability engineering. Provide concise, actionable insights."
-                    ),
-                },
-                {"role": "user", "content": message},
-            ],
+        from services.ai_platform import execute_prompt
+
+        result = await execute_prompt(
+            "chat.general_assistant",
+            user=actor,
+            user_message=message,
+            endpoint="ai_routes.chat_analyze",
             model="gpt-4o",
             temperature=0.7,
             max_tokens=1000,
-            user_id=uid,
-            company_id=cid,
-            endpoint="ai_routes.chat_analyze",
         )
+        ai_response = result["content"]
 
         return {
             "success": True,

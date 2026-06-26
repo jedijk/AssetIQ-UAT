@@ -5,7 +5,6 @@ import logging
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Set
 
-from services.ai_gateway import chat as ai_gateway_chat
 from services.failure_modes.action_duplicate_similarity import actions_similar_for_duplicates
 
 logger = logging.getLogger(__name__)
@@ -205,16 +204,6 @@ class ActionsDuplicateScanMixin:
                 ),
             })
 
-        sys_prompt = (
-            "You are a maintenance reliability engineer. Group actions that describe the "
-            "SAME maintenance task and scope, even when wording, discipline tags, or "
-            "bracket labels differ (e.g. 'Check lubrication' vs 'Ensure proper lubrication "
-            "[Rotating]', 'Check oil condition' vs lubrication tasks, or 'Listen for bearing "
-            "noise' vs 'Check bearing temperatures'). "
-            "DO NOT group different maintenance intents: inspect vs replace/repair, "
-            "lubrication vs overhaul, or unrelated equipment scopes. "
-            "When unsure, return no groups. Return strict JSON only."
-        )
         user_msg = (
             f"Failure mode: {failure_mode_name}\n"
             f"Equipment: {equipment or '—'}\n\n"
@@ -227,21 +216,21 @@ class ActionsDuplicateScanMixin:
 
         data = None
         try:
-            content = await ai_gateway_chat(
-                [
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_msg},
-                ],
-                user_id=user_id,
-                company_id=company_id,
+            from services.ai_platform import execute_json_prompt
+
+            result = await execute_json_prompt(
+                "fm.confirm_duplicate_actions",
+                user={"id": user_id, "company_id": company_id},
+                user_message=user_msg,
                 endpoint="failure_modes.ai_confirm_duplicate_actions",
                 model="gpt-4o-mini",
                 temperature=0,
                 max_tokens=800,
                 response_format={"type": "json_object"},
             )
-            data = json.loads(content.strip())
-        except json.JSONDecodeError:
+            parsed = result["parsed"]
+            data = parsed if isinstance(parsed, dict) else None
+        except Exception:
             logger.warning("AI duplicate-actions JSON parse failed for %s", failure_mode_name)
         if not data:
             return []

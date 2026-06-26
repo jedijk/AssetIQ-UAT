@@ -320,19 +320,7 @@ async def generate_ai_prompt(
     combined_feedback = "\n\n".join(feedback_context)
     
     try:
-        # Generate prompt using GPT
-        system_prompt = """You are an expert at converting user feedback into clear, actionable prompts for a development AI agent.
-Your task is to analyze the provided feedback items and generate a single, comprehensive prompt that can be directly copied and pasted to an AI coding agent.
-
-The prompt should:
-1. Start with a clear action statement (e.g., "Fix the following issues:" or "Implement the following improvements:")
-2. List each issue/request as a numbered item with clear technical requirements
-3. Include any relevant context from the feedback messages
-4. Be specific and actionable
-5. Prioritize critical issues first, then high, medium, and low severity items
-6. Use professional technical language
-
-Keep the prompt concise but complete. Do not include any preamble or explanation - just output the ready-to-use prompt."""
+        from services.ai_platform import execute_prompt
 
         user_message = f"""Based on the following user feedback items, generate a prompt for an AI coding agent:
 
@@ -340,21 +328,19 @@ Keep the prompt concise but complete. Do not include any preamble or explanation
 
 Generate a clear, actionable prompt that can be directly used with an AI development agent."""
 
-        uid, cid = user_context(current_user)
-        generated_prompt = await ai_gateway_chat(
-            [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            user_id=uid,
-            company_id=cid,
+        from services.ai_platform import execute_prompt
+
+        generated_prompt = await execute_prompt(
+            "feedback.generate_agent_prompt",
+            user=current_user,
+            user_message=user_message,
             endpoint="feedback.generate_prompt",
             model="gpt-4o",
             temperature=0.5,
         )
-        
+
         return {
-            "prompt": generated_prompt,
+            "prompt": generated_prompt["content"],
             "feedback_count": len(feedback_items)
         }
         

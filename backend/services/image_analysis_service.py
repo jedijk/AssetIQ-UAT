@@ -118,28 +118,30 @@ async def analyze_image_for_damage(
             analysis_prompt += f"\n\nContext: {context}"
         if equipment_type:
             analysis_prompt += f"\nEquipment type: {equipment_type}"
-        
-        from services.ai_gateway import chat_with_images
 
-        full_prompt = f"{DAMAGE_ANALYSIS_PROMPT}\n\n{analysis_prompt}"
-        response_text = await chat_with_images(
-            full_prompt,
-            image_base64_list=[{"data": image_base64, "media_type": "image/jpeg"}],
+        from services.ai_platform import execute_vision_json_prompt
+
+        result = await execute_vision_json_prompt(
+            "vision.damage_analysis",
+            user={"id": user_id, "company_id": company_id},
+            user_message=analysis_prompt,
+            image_base64=image_base64,
+            endpoint="image_analysis.analyze_damage",
             model="gpt-4o",
             temperature=0.3,
-            user_id=user_id,
-            company_id=company_id,
-            endpoint="image_analysis.analyze_damage",
         )
+        response_text = result.get("content") or ""
         
         # Parse JSON response
         try:
-            # Try to extract JSON from the response
+            from services.ai_output_validation import parse_json_from_llm
+            import re
+
             json_match = re.search(r'\{[\s\S]*\}', response_text)
             if json_match:
-                result = json.loads(json_match.group())
+                result = parse_json_from_llm(json_match.group())
             else:
-                result = json.loads(response_text)
+                result = parse_json_from_llm(response_text)
             
             # Ensure all required fields are present
             result.setdefault("damage_detected", False)

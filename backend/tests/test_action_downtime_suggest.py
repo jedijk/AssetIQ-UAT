@@ -1,6 +1,6 @@
 """Tests for recommended action schema and AI downtime suggestion."""
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -44,19 +44,20 @@ def test_normalize_recommended_actions_list():
 
 @pytest.mark.asyncio
 async def test_suggest_action_downtime_requirements_parses_llm_response():
-    mock_response = MagicMock()
-    mock_response.choices = [
-        MagicMock(
-            message=MagicMock(
-                content='{"results": [{"i": 0, "requires_downtime": true, "reasoning": "Requires shutdown for seal replacement."}]}'
-            )
-        )
-    ]
-
     with patch(
-        "services.failure_modes.action_downtime_suggest.chat_completion_response",
+        "services.failure_modes.action_downtime_suggest.execute_json_prompt",
         new_callable=AsyncMock,
-        return_value=mock_response,
+        return_value={
+            "parsed": {
+                "results": [
+                    {
+                        "i": 0,
+                        "requires_downtime": True,
+                        "reasoning": "Requires shutdown for seal replacement.",
+                    }
+                ]
+            }
+        },
     ):
         results = await suggest_action_downtime_requirements(
             [
@@ -82,19 +83,20 @@ async def test_suggest_action_downtime_requirements_parses_llm_response():
 
 @pytest.mark.asyncio
 async def test_suggest_action_downtime_includes_fm_id_in_results():
-    mock_response = MagicMock()
-    mock_response.choices = [
-        MagicMock(
-            message=MagicMock(
-                content='{"results": [{"i": 0, "requires_downtime": false, "reasoning": "Visual round while running."}]}'
-            )
-        )
-    ]
-
     with patch(
-        "services.failure_modes.action_downtime_suggest.chat_completion_response",
+        "services.failure_modes.action_downtime_suggest.execute_json_prompt",
         new_callable=AsyncMock,
-        return_value=mock_response,
+        return_value={
+            "parsed": {
+                "results": [
+                    {
+                        "i": 0,
+                        "requires_downtime": False,
+                        "reasoning": "Visual round while running.",
+                    }
+                ]
+            }
+        },
     ):
         results = await suggest_action_downtime_requirements(
             [
@@ -130,13 +132,10 @@ async def test_classify_downtime_batch_rejects_oversized_batch():
 
 @pytest.mark.asyncio
 async def test_suggest_chunk_json_parse_fallback():
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock(message=MagicMock(content="not-json"))]
-
     with patch(
-        "services.failure_modes.action_downtime_suggest.chat_completion_response",
+        "services.failure_modes.action_downtime_suggest.execute_json_prompt",
         new_callable=AsyncMock,
-        return_value=mock_response,
+        return_value={"parsed": {}, "content": "not-json"},
     ):
         from services.failure_modes.action_downtime_suggest import _suggest_chunk
 

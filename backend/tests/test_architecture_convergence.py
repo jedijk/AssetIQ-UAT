@@ -771,14 +771,41 @@ def test_phase4_ai_convergence_modules_exist():
 
 def test_ws5_ai_platform_modules_exist():
     """WS5 — unified AI platform entry points and prompt registry."""
-    from services.ai_platform import execute_grounded_prompt, execute_prompt, list_prompts
+    from services.ai_platform import (
+        execute_grounded_prompt,
+        execute_json_prompt,
+        execute_multimodal_json_prompt,
+        execute_prompt,
+        execute_vision_json_prompt,
+        list_prompts,
+    )
     from services.ai_prompt_registry import get_prompt, render_prompt
     from services.ai_context_builder import build_ai_context
+    from services.ai_output_validation import parse_json_from_llm
 
     assert callable(execute_prompt)
+    assert callable(execute_json_prompt)
     assert callable(execute_grounded_prompt)
+    assert callable(execute_vision_json_prompt)
+    assert callable(execute_multimodal_json_prompt)
     assert callable(build_ai_context)
-    assert "chat.threat_extraction" in list_prompts()
+    assert callable(parse_json_from_llm)
+    prompts = list_prompts()
+    assert "chat.threat_extraction" in prompts
+    assert "risk.analysis" in prompts
+    assert "investigation.defensive_reasoning" in prompts
+    assert "fm.failure_mode_mapping" in prompts
+    assert "vision.damage_analysis" in prompts
+    assert "maintenance.strategy_generation" in prompts
+    assert "chat.issue_summary" in prompts
+    assert "production.log_parse" in prompts
+    assert "production.daily_insights" in prompts
+    assert "ril.copilot_assistant" in prompts
+    assert "insights.recommendations" in prompts
+    assert "maintenance.scheduler_plan" in prompts
+    assert "reports.investigation_summary" in prompts
+    assert "vision.field_extraction" in prompts
+    assert len(prompts) >= 56
     assert get_prompt("reliability.grounded_assistant").version == "1.0"
     assert "AssetIQ reliability AI" in render_prompt("reliability.grounded_assistant")
 

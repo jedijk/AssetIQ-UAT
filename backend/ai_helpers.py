@@ -60,28 +60,6 @@ def get_openai_client():
 
     return _get_client()
 
-
-async def _gateway_completion(
-    endpoint: str,
-    messages: list,
-    *,
-    model: Optional[str] = None,
-    user_id: str = "system",
-    company_id: str = "default",
-    **kwargs,
-):
-    """Async chat completion via the shared AI gateway (cost guard + usage logging)."""
-    from services.ai_gateway import chat_completion_response
-
-    return await chat_completion_response(
-        messages,
-        user_id=user_id,
-        company_id=company_id,
-        endpoint=endpoint,
-        model=model or os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
-        **kwargs,
-    )
-
 # ============= SYSTEM PROMPTS =============
 
 THREAT_ANALYSIS_SYSTEM_PROMPT = """You are AssetIQ AI extracting equipment failures from user messages.
@@ -205,24 +183,21 @@ async def classify_user_intent(message: str, session_id: str) -> dict:
 
     # Only use AI for ambiguous cases
     try:
-        response = await _gateway_completion(
-            "ai_helpers.classify_user_intent",
-            [
-                {"role": "system", "content": QUERY_CLASSIFIER_PROMPT},
-                {"role": "user", "content": message},
-            ],
+        from services.ai_platform import execute_json_prompt
+
+        result = await execute_json_prompt(
+            "chat.query_classifier",
+            user={"id": "system", "company_id": "default"},
+            user_message=message,
+            endpoint="ai_helpers.classify_user_intent",
             model="gpt-4o-mini",
             temperature=0.3,
+            default={"is_data_query": False, "confidence": 0.5},
         )
-
-        clean_response = response.choices[0].message.content.strip()
-        if clean_response.startswith("```"):
-            clean_response = clean_response.split("```")[1]
-            if clean_response.startswith("json"):
-                clean_response = clean_response[4:]
-        clean_response = clean_response.strip()
-
-        return json.loads(clean_response)
+        parsed = result["parsed"]
+        if isinstance(parsed, dict) and parsed:
+            return parsed
+        return {"is_data_query": False, "confidence": 0.5}
     except Exception as e:
         logger.error(f"Intent classification failed: {e}")
         return {"is_data_query": False, "confidence": 0.5}
@@ -233,7 +208,6 @@ async def summarize_issue_description(text: str, language: str = "en") -> str:
     Rewrite the operator's issue description as a professional reliability engineer would.
     Supports mixed-language operator input (mirrors their language mix in the summary).
     """
-    from services.ai_gateway import chat as ai_gateway_chat
     from utils.text_language import ai_language_instruction
 
     t = (text or "").strip()
@@ -241,34 +215,20 @@ async def summarize_issue_description(text: str, language: str = "en") -> str:
         return ""
     
     try:
+        from services.ai_platform import execute_prompt
+        from services.ai_prompt_registry import render_prompt
         lang_rule = ai_language_instruction(t, fallback=language or "en")
-        out = await ai_gateway_chat(
-            [
-                {
-                    "role": "system",
-                    "content": f"""You are a reliability engineer creating a professional observation summary.
-
-{lang_rule}
-
-Output format (use the same language(s) as the operator):
-**Equipment:** [Identified equipment name/tag, or "To be confirmed" if unclear]
-**Description:** [1-2 sentences professionally describing the issue]
-
-Rules:
-- Extract equipment name/tag if mentioned (e.g., "Pump P-101", "Compressor C-201")
-- Write the description as a reliability engineer would document it
-- Do not include a separate failure mode or issue type line
-- Keep it concise - max 2 lines total
-- Output only the formatted summary, no preamble""",
-                },
-                {"role": "user", "content": t[:4000]},
-            ],
+        result = await execute_prompt(
+            "chat.issue_summary",
+            user={"id": "system", "company_id": "default"},
+            user_message=t[:4000],
+            variables={"lang_rule": lang_rule},
             endpoint="ai_helpers.summarize_issue_description",
             model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
             temperature=0.2,
             max_tokens=250,
         )
-        out = (out or "").strip()
+        out = (result["content"] or "").strip()
         if out:
             return out
     except Exception as e:
@@ -297,37 +257,24 @@ async def merge_issue_description_with_edit(
         return ed
 
     try:
-        from utils.text_language import ai_language_instruction
+        from services.ai_platform import execute_prompt
 
         lang_rule = ai_language_instruction(f"{ci}\n{ed}", fallback=language or "en")
-        response = await _gateway_completion(
-            "ai_helpers.merge_issue_description_with_edit",
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        f"You merge an equipment-issue report with the operator's correction. "
-                        f"{lang_rule} "
-                        "Return exactly one paragraph: the full updated issue report after applying their "
-                        "instruction. Preserve technical details (tags, equipment names) unless the "
-                        "correction says otherwise. If they give a completely new description, use that as "
-                        "the basis. Output only the updated report text, no preamble or quotes."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"ISSUE REPORT:\n{ci[:3500]}\n\n"
-                        f"SHORT SUMMARY (for context):\n{(current_summary or '(none)')[:800]}\n\n"
-                        f"OPERATOR CORRECTION / WHAT TO CHANGE:\n{ed[:2000]}\n\n"
-                        "Updated full issue report:"
-                    ),
-                },
-            ],
+        result = await execute_prompt(
+            "chat.issue_merge_edit",
+            user={"id": "system", "company_id": "default"},
+            user_message=(
+                f"ISSUE REPORT:\n{ci[:3500]}\n\n"
+                f"SHORT SUMMARY (for context):\n{(current_summary or '(none)')[:800]}\n\n"
+                f"OPERATOR CORRECTION / WHAT TO CHANGE:\n{ed[:2000]}\n\n"
+                "Updated full issue report:"
+            ),
+            variables={"lang_rule": lang_rule},
+            endpoint="ai_helpers.merge_issue_description_with_edit",
             temperature=0.2,
             max_tokens=500,
         )
-        out = (response.choices[0].message.content or "").strip()
+        out = (result["content"] or "").strip()
         if out:
             return out
     except Exception as e:
@@ -349,8 +296,6 @@ async def generate_observation_description(
     use_ai: When True, uses AI for better descriptions (slower).
             When False, uses simple template expansion (fast).
     """
-    from services.ai_gateway import chat as ai_gateway_chat
-    
     t = (user_input or "").strip()
     if not t:
         return ""
@@ -358,10 +303,10 @@ async def generate_observation_description(
     # If AI mode is enabled, use GPT for better descriptions
     if use_ai:
         try:
+            from services.ai_platform import execute_prompt
             from utils.text_language import ai_language_instruction
 
             lang_rule = ai_language_instruction(t, fallback=language or "en")
-            
             context_parts = []
             if equipment_name and equipment_name.lower() not in ["unknown", "to be confirmed"]:
                 context_parts.append(f"Equipment: {equipment_name}")
@@ -369,26 +314,17 @@ async def generate_observation_description(
                 context_parts.append(f"Failure mode: {failure_mode}")
             context = "\n".join(context_parts) if context_parts else ""
             
-            out = await ai_gateway_chat(
-                [
-                    {
-                        "role": "system",
-                        "content": (
-                            f"Write a 2-3 sentence professional technical description for a maintenance "
-                            f"observation record. {lang_rule} Be concise and use engineering terminology."
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Issue report: {t[:1000]}\n{context}".strip(),
-                    },
-                ],
+            result = await execute_prompt(
+                "chat.observation_description",
+                user={"id": "system", "company_id": "default"},
+                user_message=f"Issue report: {t[:1000]}\n{context}".strip(),
+                variables={"lang_rule": lang_rule},
                 endpoint="ai_helpers.generate_observation_description",
                 model="gpt-4o-mini",
                 temperature=0.3,
                 max_tokens=150,
             )
-            out = (out or "").strip()
+            out = (result["content"] or "").strip()
             if out:
                 return out
         except Exception as e:
@@ -472,19 +408,17 @@ async def translate_to_english_for_record(text: str, purpose: str = "threat regi
         return t  # Already English, return as-is
     
     try:
-        response = await _gateway_completion(
-            "ai_helpers.translate_to_english_for_record",
-            [
-                {
-                    "role": "system",
-                    "content": f"Translate to English for maintenance record. Output only the translation.",
-                },
-                {"role": "user", "content": t[:500]},
-            ],
+        from services.ai_platform import execute_prompt
+
+        result = await execute_prompt(
+            "chat.translate_record",
+            user={"id": "system", "company_id": "default"},
+            user_message=t[:500],
+            endpoint="ai_helpers.translate_to_english_for_record",
             temperature=0.1,
             max_tokens=100,
         )
-        out = (response.choices[0].message.content or "").strip()
+        out = (result["content"] or "").strip()
         if out:
             return out
     except Exception as e:
@@ -562,27 +496,23 @@ Recent Threats (last 10):
 
 async def answer_data_query(message: str, session_id: str, data_context: str) -> dict:
     """Answer a data query using the provided context."""
-    from services.ai_gateway import chat as ai_gateway_chat
+    from services.ai_platform import execute_json_prompt
 
     try:
-        prompt = DATA_QUERY_SYSTEM_PROMPT.format(data_context=data_context)
-
-        clean_response = (await ai_gateway_chat(
-            [
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": message},
-            ],
+        result = await execute_json_prompt(
+            "chat.data_query",
+            user={"id": "system", "company_id": "default"},
+            user_message=message,
+            variables={"data_context": data_context},
             endpoint="ai_helpers.answer_data_query",
             model="gpt-4o-mini",
             temperature=0.5,
-        )).strip()
-        if clean_response.startswith("```"):
-            clean_response = clean_response.split("```")[1]
-            if clean_response.startswith("json"):
-                clean_response = clean_response[4:]
-        clean_response = clean_response.strip()
-
-        return json.loads(clean_response)
+            default={"answer": "I'm sorry, I couldn't process your question. Please try rephrasing it.", "is_data_query": True},
+        )
+        parsed = result["parsed"]
+        if isinstance(parsed, dict) and parsed:
+            return parsed
+        return {"answer": "I'm sorry, I couldn't process your question. Please try rephrasing it.", "is_data_query": True}
     except Exception as e:
         logger.error(f"Data query answer failed: {e}")
         return {"answer": "I'm sorry, I couldn't process your question. Please try rephrasing it.", "is_data_query": True}
@@ -593,6 +523,8 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
     try:
         image_context = ""
         if image_base64:
+            from services.ai_platform import execute_multimodal_json_prompt
+
             image_content = [
                 {
                     "type": "image_url",
@@ -604,38 +536,31 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
                 },
             ]
 
-            image_response = await _gateway_completion(
-                "ai_helpers.analyze_threat_image",
-                [
-                    {"role": "system", "content": IMAGE_ANALYSIS_SYSTEM_PROMPT},
-                    {"role": "user", "content": image_content},
-                ],
+            image_result = await execute_multimodal_json_prompt(
+                "chat.image_analysis",
+                user={"id": "system", "company_id": "default"},
+                user_content=image_content,
+                endpoint="ai_helpers.analyze_threat_image",
                 model="gpt-4o-mini",
                 temperature=0.5,
             )
-            image_analysis = image_response.choices[0].message.content
+            image_analysis = (image_result.get("content") or "").strip()
             image_context = f"\n\nImage Analysis: {image_analysis}"
 
         full_message = message + image_context
 
-        response = await _gateway_completion(
-            "ai_helpers.analyze_threat_with_ai",
-            [
-                {"role": "system", "content": THREAT_ANALYSIS_SYSTEM_PROMPT},
-                {"role": "user", "content": full_message},
-            ],
+        from services.ai_platform import execute_json_prompt
+
+        result = await execute_json_prompt(
+            "chat.threat_extraction",
+            user={"id": "system", "company_id": "default"},
+            user_message=full_message,
+            endpoint="ai_helpers.analyze_threat_with_ai",
             model="gpt-4o",
             temperature=0.5,
         )
-
-        clean_response = response.choices[0].message.content.strip()
-        if clean_response.startswith("```"):
-            clean_response = clean_response.split("```")[1]
-            if clean_response.startswith("json"):
-                clean_response = clean_response[4:]
-        clean_response = clean_response.strip()
-
-        return json.loads(clean_response)
+        parsed = result["parsed"]
+        return parsed if isinstance(parsed, dict) and parsed else {}
     except Exception as e:
         error_str = str(e)
         logger.error(f"AI analysis error: {e}")
@@ -681,46 +606,26 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
 async def analyze_attachment_image(image_base64: str, threat_context: str) -> dict:
     """Analyze an image attachment for an existing observation and return findings + action recommendations."""
     try:
-        messages = [
-            {"role": "system", "content": (
-                "You are an equipment reliability AI. Analyze this photo attached to an observation. "
-                "The observation context is provided below.\n\n"
-                "Return JSON with:\n"
-                "{\n"
-                '  "image_description": "What you see in the image (2-3 sentences)",\n'
-                '  "visible_damage": ["list of visible damage/issues"],\n'
-                '  "severity": "low|medium|high|critical",\n'
-                '  "safety_concerns": ["any safety issues spotted"],\n'
-                '  "recommended_actions": [\n'
-                '    {"action": "description of action", "priority": "high|medium|low", "type": "CM|PM|inspection"}\n'
-                "  ]\n"
-                "}\n"
-                "Be concise and technical. Only flag what you can actually see."
-            )},
-            {"role": "user", "content": [
-                {"type": "text", "text": f"Observation context: {threat_context}"},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
-            ]},
-        ]
+        from services.ai_platform import execute_multimodal_json_prompt
 
-        response = await _gateway_completion(
-            "ai_helpers.analyze_attachment_image",
-            messages,
+        user_content = [
+            {"type": "text", "text": f"Observation context: {threat_context}"},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
+        ]
+        result = await execute_multimodal_json_prompt(
+            "chat.attachment_analysis",
+            user={"id": "system", "company_id": "default"},
+            user_content=user_content,
+            endpoint="ai_helpers.analyze_attachment_image",
             model="gpt-4o",
             temperature=0.3,
             max_tokens=500,
         )
-
-        raw = response.choices[0].message.content.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        raw = raw.strip().rstrip("```")
-
-        result = json.loads(raw)
-        logger.info(f"Image analysis complete: severity={result.get('severity')}, actions={len(result.get('recommended_actions', []))}")
-        return result
+        parsed = result.get("parsed")
+        if not parsed or not isinstance(parsed, dict):
+            raise ValueError("empty JSON from attachment analysis")
+        logger.info(f"Image analysis complete: severity={parsed.get('severity')}, actions={len(parsed.get('recommended_actions', []))}")
+        return parsed
 
     except Exception as e:
         logger.error(f"Image analysis failed: {e}")

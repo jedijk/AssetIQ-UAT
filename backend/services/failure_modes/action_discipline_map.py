@@ -6,7 +6,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from models.disciplines import DISCIPLINE_LIST, normalize_discipline as legacy_normalize
-from services.ai_gateway import chat_completion_response
+from services.ai_platform import execute_json_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -133,14 +133,16 @@ def normalize_discipline_value(
 
 
 def build_discipline_system_prompt(taxonomy: List[Dict[str, Any]]) -> str:
-    lines = [
-        "You are an industrial reliability engineer responsible for routing maintenance work orders to the right discipline crew.",
-        "",
-        "Given a list of recommended maintenance actions, classify EACH one into exactly ONE discipline from the tenant taxonomy below.",
-        "Return the lowercase `value` key in JSON (not the human label).",
-        "",
-        "Allowed disciplines:",
-    ]
+    from services.ai_prompt_registry import render_prompt
+
+    return render_prompt(
+        "fm.action_discipline_map",
+        {"taxonomy_block": _taxonomy_block(taxonomy)},
+    )
+
+
+def _taxonomy_block(taxonomy: List[Dict[str, Any]]) -> str:
+    taxonomy_lines = []
     for row in taxonomy:
         value = row.get("value", "")
         label = row.get("label", value)
@@ -148,23 +150,12 @@ def build_discipline_system_prompt(taxonomy: List[Dict[str, Any]]) -> str:
         guidance = _STANDARD_GUIDANCE.get(value, "")
         alias_text = f" Aliases: {', '.join(aliases)}." if aliases else ""
         if guidance:
-            lines.append(f"- {value} ({label}): {guidance}{alias_text}")
+            taxonomy_lines.append(f"- {value} ({label}): {guidance}{alias_text}")
         else:
-            lines.append(f"- {value} ({label}): assign work performed by this crew.{alias_text}")
-
-    lines.extend(
-        [
-            "",
-            "Rules:",
-            "1. JSON output: use the lowercase value key only.",
-            "2. Human reasoning: use the discipline label (e.g. Rotating work).",
-            "3. Use the action text first, then action_type (PM/CM/PDM) as a tiebreaker.",
-            "4. If ambiguous, prefer the discipline that does the physical work.",
-            "5. Never invent a discipline outside the allowed list.",
-            "6. Output STRICT JSON only — one array entry per input, in the SAME order.",
-        ]
-    )
-    return "\n".join(lines)
+            taxonomy_lines.append(
+                f"- {value} ({label}): assign work performed by this crew.{alias_text}"
+            )
+    return "\n".join(taxonomy_lines)
 
 
 async def _classify_action_chunk(
@@ -206,22 +197,19 @@ Actions:
 Return JSON: {{"results": [{{"i": 0, "discipline": "rotating", "reason": "..."}}]}}"""
 
     max_tokens = min(1800, max(400, len(actions) * 90 + 120))
-    response = await chat_completion_response(
-        user_id=user_id,
-        company_id=company_id,
+    result = await execute_json_prompt(
+        "fm.action_discipline_map",
+        user={"id": user_id, "company_id": company_id},
+        user_message=user_prompt,
+        variables={"taxonomy_block": _taxonomy_block(taxonomy)},
         endpoint=endpoint,
-        max_retries=2,
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": build_discipline_system_prompt(taxonomy)},
-            {"role": "user", "content": user_prompt},
-        ],
         temperature=0,
         max_tokens=max_tokens,
         seed=42,
         response_format={"type": "json_object"},
     )
-    data = json.loads(response.choices[0].message.content.strip())
+    data = result["parsed"] or {}
     raw_results = data.get("results") or []
 
     by_index: Dict[int, Dict[str, Any]] = {}
