@@ -1,7 +1,9 @@
 """Helpers for showing program-disabled tasks on the maintenance schedule."""
 from __future__ import annotations
 
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+from services.maintenance_tenant_scope import maintenance_scoped, maintenance_scoped_job
 
 from services.pm_import_constants import (
     is_pm_import_review_accepted,
@@ -55,6 +57,8 @@ def task_disabled_in_program(
 
 async def load_inactive_program_task_keys(
     equipment_ids: List[str],
+    *,
+    user: Optional[dict] = None,
 ) -> Set[ProgramTaskKey]:
     """Program tasks currently disabled for the given equipment ids."""
     from database import db
@@ -62,12 +66,14 @@ async def load_inactive_program_task_keys(
     if not equipment_ids:
         return set()
 
+    scope = (lambda q: maintenance_scoped(user, q)) if user else maintenance_scoped_job
+
     keys: Set[ProgramTaskKey] = set()
     id_set = set(equipment_ids)
     v2_pm_active: Dict[ProgramTaskKey, bool] = {}
 
     async for doc in db.maintenance_programs_v2.find(
-        {"equipment_id": {"$in": equipment_ids}},
+        scope({"equipment_id": {"$in": equipment_ids}}),
         {"_id": 0, "equipment_id": 1, "tasks": 1},
     ):
         equipment_id = doc.get("equipment_id")
@@ -89,7 +95,7 @@ async def load_inactive_program_task_keys(
                 keys.add((equipment_id, str(pm_ref)))
 
     async for session in db.pm_import_sessions.find(
-        {},
+        scope({}),
         {"_id": 0, "session_id": 1, "tasks_extracted": 1},
     ):
         session_id = session.get("session_id")
@@ -114,7 +120,11 @@ async def load_inactive_program_task_keys(
     return keys
 
 
-async def load_incorporated_pm_import_refs(pm_refs: Set[str]) -> Set[str]:
+async def load_incorporated_pm_import_refs(
+    pm_refs: Set[str],
+    *,
+    user: Optional[dict] = None,
+) -> Set[str]:
     """PM import task refs merged or applied into the failure-mode strategy library."""
     from database import db
 
@@ -122,8 +132,9 @@ async def load_incorporated_pm_import_refs(pm_refs: Set[str]) -> Set[str]:
         return set()
 
     incorporated: Set[str] = set()
+    scope = (lambda q: maintenance_scoped(user, q)) if user else maintenance_scoped_job
     async for session in db.pm_import_sessions.find(
-        {},
+        scope({}),
         {"_id": 0, "session_id": 1, "tasks_extracted": 1},
     ):
         session_id = session.get("session_id")
@@ -157,9 +168,13 @@ def annotate_incorporated_pm_import_tasks(
             task["task_source"] = "strategy_generated"
 
 
-async def annotate_scheduled_task_sources(tasks: List[Dict[str, Any]]) -> None:
+async def annotate_scheduled_task_sources(
+    tasks: List[Dict[str, Any]],
+    *,
+    user: Optional[dict] = None,
+) -> None:
     pm_refs = {str(t["pm_import_task_id"]) for t in tasks if t.get("pm_import_task_id")}
-    incorporated = await load_incorporated_pm_import_refs(pm_refs)
+    incorporated = await load_incorporated_pm_import_refs(pm_refs, user=user)
     annotate_incorporated_pm_import_tasks(tasks, incorporated)
 
 

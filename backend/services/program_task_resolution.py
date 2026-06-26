@@ -5,6 +5,7 @@ and optional legacy flat programs.
 from typing import Any, Dict, List, Optional, Set
 
 from database import db
+from services.maintenance_tenant_scope import maintenance_scoped_job
 
 
 async def v2_task_ids_for_template(
@@ -14,7 +15,7 @@ async def v2_task_ids_for_template(
     """V2 task ids whose traceability links to a strategy task template."""
     ids: List[str] = []
     async for prog in db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"tasks": 1, "_id": 0},
     ):
         for task in prog.get("tasks") or []:
@@ -33,7 +34,7 @@ async def v2_task_ids_for_failure_mode(
 ) -> List[str]:
     ids: List[str] = []
     async for prog in db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"tasks": 1, "_id": 0},
     ):
         for task in prog.get("tasks") or []:
@@ -53,10 +54,10 @@ async def legacy_program_ids_for_template(
     return [
         p["id"]
         async for p in db.maintenance_programs.find(
-            {
+            maintenance_scoped_job({
                 "equipment_type_id": equipment_type_id,
                 "task_template_id": task_template_id,
-            },
+            }),
             {"id": 1, "_id": 0},
         )
         if p.get("id")
@@ -70,10 +71,10 @@ async def legacy_program_ids_for_failure_mode(
     return [
         p["id"]
         async for p in db.maintenance_programs.find(
-            {
+            maintenance_scoped_job({
                 "equipment_type_id": equipment_type_id,
                 "failure_mode_id": failure_mode_id,
-            },
+            }),
             {"id": 1, "_id": 0},
         )
         if p.get("id")
@@ -84,7 +85,7 @@ async def legacy_program_ids_for_equipment_type(equipment_type_id: str) -> List[
     return [
         p["id"]
         async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id},
+            maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
             {"id": 1, "_id": 0},
         )
         if p.get("id")
@@ -123,14 +124,14 @@ async def resolve_program_task_id(scheduled_task: Dict[str, Any]) -> Optional[st
         return str(mp_id)
 
     v2_hit = await db.maintenance_programs_v2.find_one(
-        {"tasks.id": mp_id},
+        maintenance_scoped_job({"tasks.id": mp_id}),
         {"_id": 0, "tasks.id": 1},
     )
     if v2_hit:
         return str(mp_id)
 
     legacy = await db.maintenance_programs.find_one(
-        {"id": mp_id},
+        maintenance_scoped_job({"id": mp_id}),
         {"_id": 0, "v2_task_id": 1},
     )
     if legacy and legacy.get("v2_task_id"):
@@ -140,7 +141,7 @@ async def resolve_program_task_id(scheduled_task: Dict[str, Any]) -> Optional[st
     task_name = (scheduled_task.get("task_name") or "").strip()
     if equipment_id and task_name:
         prog = await db.maintenance_programs_v2.find_one(
-            {"equipment_id": equipment_id},
+            maintenance_scoped_job({"equipment_id": equipment_id}),
             {"_id": 0, "tasks": 1},
         )
         if prog:
@@ -189,7 +190,7 @@ async def count_active_maintenance_programs_for_task_template(
     """Count equipment maintenance programs with an active linked strategy task."""
     equipment_ids: Set[str] = set()
     async for prog in db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"_id": 0, "equipment_id": 1, "status": 1, "tasks": 1},
     ):
         status = (prog.get("status") or "active").lower()
@@ -211,11 +212,11 @@ async def count_active_maintenance_programs_for_task_template(
 
     if should_read_legacy_maintenance_programs():
         async for prog in db.maintenance_programs.find(
-            {
+            maintenance_scoped_job({
                 "equipment_type_id": equipment_type_id,
                 "task_template_id": task_template_id,
                 "is_active": True,
-            },
+            }),
             {"equipment_id": 1, "_id": 0},
         ):
             if prog.get("equipment_id"):
@@ -231,7 +232,7 @@ async def scheduler_program_ids_for_equipment_type(
 ) -> List[str]:
     ids: List[str] = []
     async for prog in db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"tasks.id": 1, "_id": 0},
     ):
         for task in prog.get("tasks") or []:
@@ -255,7 +256,7 @@ async def strategy_program_task_ids_for_equipment_type(
 
     ids: List[str] = []
     async for prog in db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"tasks": 1, "_id": 0},
     ):
         for task in prog.get("tasks") or []:
@@ -267,7 +268,7 @@ async def strategy_program_task_ids_for_equipment_type(
 
     if include_legacy and should_read_legacy_maintenance_programs():
         async for prog in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id},
+            maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
             {"id": 1, "task_source": 1, "pm_import_task_id": 1, "_id": 0},
         ):
             if not program_is_strategy_backed(prog):

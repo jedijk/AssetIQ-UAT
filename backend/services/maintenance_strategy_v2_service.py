@@ -212,7 +212,7 @@ async def get_equipment_type_strategy(
     equipment_with_strategy_applied = len(set([p.get("equipment_id") for p in programs_with_strategy if p.get("equipment_id")]))
     strategy["equipment_with_strategy_applied_count"] = equipment_with_strategy_applied
     strategy["strategy_needs_apply"] = await enrich_strategy_needs_apply(
-        equipment_type_id, strategy
+        equipment_type_id, strategy, user=current_user
     )
     
     # Persist only safe backfills — never rewrite the full FM list from a stale GET snapshot

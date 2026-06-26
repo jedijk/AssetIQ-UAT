@@ -300,7 +300,8 @@ async def create_maintenance_program(
             try:
                 ai_recommendations = await MaintenanceProgramService.generate_ai_recommendations(
                     equipment_id=equipment_id,
-                    user_id=_current_user_id(current_user)
+                    user_id=_current_user_id(current_user),
+                    user=current_user,
                 )
             except Exception as e:
                 logger.warning(f"AI recommendations failed: {e}")
@@ -661,7 +662,8 @@ async def generate_ai_recommendations(
             include_failure_history=request.include_failure_history,
             include_industry_standards=request.include_industry_standards,
             max_recommendations=request.max_recommendations,
-            user_id=_current_user_id(current_user)
+            user_id=_current_user_id(current_user),
+            user=current_user,
         )
         
         return {
@@ -690,7 +692,8 @@ async def accept_ai_recommendation(
         result_task, new_version = await MaintenanceProgramService.accept_ai_recommendation(
             equipment_id=equipment_id,
             task=task_obj,
-            user_id=_current_user_id(current_user)
+            user_id=_current_user_id(current_user),
+            user=current_user,
         )
         
         return {

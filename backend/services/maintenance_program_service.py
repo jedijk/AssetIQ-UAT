@@ -1383,7 +1383,8 @@ class MaintenanceProgramService:
         include_failure_history: bool = True,
         include_industry_standards: bool = True,
         max_recommendations: int = 10,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        user: Optional[dict] = None,
     ) -> List[MaintenanceProgramTask]:
         from services.maintenance_program_ai_recommendations import generate_ai_recommendations as _generate
 
@@ -1393,17 +1394,19 @@ class MaintenanceProgramService:
             include_industry_standards=include_industry_standards,
             max_recommendations=max_recommendations,
             user_id=user_id,
+            user=user,
         )
 
     @staticmethod
     async def accept_ai_recommendation(
         equipment_id: str,
         task: MaintenanceProgramTask,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        user: Optional[dict] = None,
     ) -> Tuple[MaintenanceProgramTask, str]:
         from services.maintenance_program_ai_recommendations import accept_ai_recommendation as _accept
 
-        return await _accept(equipment_id, task, user_id=user_id)
+        return await _accept(equipment_id, task, user_id=user_id, user=user)
     
     # ============= Custom PM Import (hierarchy program view) =============
 

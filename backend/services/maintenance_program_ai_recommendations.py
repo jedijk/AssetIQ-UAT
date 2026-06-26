@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 
 from database import db
+from services.maintenance_tenant_scope import maintenance_scoped
 from models.maintenance_program import (
     MaintenanceProgramTask,
     TaskCategory,
@@ -27,15 +28,21 @@ async def generate_ai_recommendations(
     include_industry_standards: bool = True,
     max_recommendations: int = 10,
     user_id: Optional[str] = None,
+    user: Optional[dict] = None,
 ) -> List[MaintenanceProgramTask]:
     """Generate AI maintenance recommendations for an equipment program."""
     from services.ai_gateway import chat as ai_gateway_chat
 
-    program = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id})
+    program = await db.maintenance_programs_v2.find_one(
+        maintenance_scoped(user, {"equipment_id": equipment_id})
+    )
     if not program:
         raise ValueError(f"No maintenance program found for equipment: {equipment_id}")
 
-    equipment = await db.equipment_nodes.find_one({"id": equipment_id}, {"_id": 0})
+    equipment = await db.equipment_nodes.find_one(
+        maintenance_scoped(user, {"id": equipment_id}),
+        {"_id": 0},
+    )
     if not equipment:
         raise ValueError(f"Equipment not found: {equipment_id}")
 
@@ -46,7 +53,7 @@ async def generate_ai_recommendations(
     failure_context = ""
     if include_failure_history:
         observations = await db.observations.find(
-            {"equipment_id": equipment_id},
+            maintenance_scoped(user, {"equipment_id": equipment_id}),
             {"title": 1, "description": 1, "failure_mode": 1, "_id": 0},
         ).sort("created_at", -1).limit(20).to_list(20)
         if observations:
@@ -170,7 +177,7 @@ Only include tasks that would genuinely improve reliability and are not redundan
 
         if ai_tasks:
             await db.maintenance_programs_v2.update_one(
-                {"equipment_id": equipment_id},
+                maintenance_scoped(user, {"equipment_id": equipment_id}),
                 {
                     "$set": {
                         "last_ai_analysis_date": datetime.utcnow().isoformat(),
@@ -197,6 +204,7 @@ async def accept_ai_recommendation(
     equipment_id: str,
     task: MaintenanceProgramTask,
     user_id: Optional[str] = None,
+    user: Optional[dict] = None,
 ) -> Tuple[MaintenanceProgramTask, str]:
     """Accept an AI recommendation and add it to the program."""
     from services.maintenance_program_service import MaintenanceProgramService
@@ -217,7 +225,7 @@ async def accept_ai_recommendation(
         user_id=user_id,
     )
     await db.maintenance_programs_v2.update_one(
-        {"equipment_id": equipment_id},
+        maintenance_scoped(user, {"equipment_id": equipment_id}),
         {"$inc": {"ai_recommendations_pending": -1}},
     )
     return result_task, new_version

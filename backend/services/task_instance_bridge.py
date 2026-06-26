@@ -69,11 +69,11 @@ async def _get_program_discipline(program_id: Optional[str]) -> Optional[str]:
     if not program_id:
         return None
     prog = await db.maintenance_programs_v2.find_one(
-        {"id": program_id}, {"_id": 0, "discipline": 1}
+        maintenance_scoped_job({"id": program_id}), {"_id": 0, "discipline": 1}
     )
     if not prog and should_read_legacy_maintenance_programs():
         prog = await db.maintenance_programs.find_one(
-            {"id": program_id}, {"_id": 0, "discipline": 1}
+            maintenance_scoped_job({"id": program_id}), {"_id": 0, "discipline": 1}
         )
     return prog.get("discipline") if prog else None
 
@@ -92,7 +92,7 @@ async def _build_default_assignees() -> Dict[str, Dict[str, Optional[str]]]:
     users_by_id: Dict[str, Dict[str, Any]] = {}
     if user_ids:
         users = await db.users.find(
-            {"id": {"$in": user_ids}},
+            maintenance_scoped_job({"id": {"$in": user_ids}}),
             {"_id": 0, "id": 1, "name": 1, "email": 1},
         ).to_list(len(user_ids))
         users_by_id = {u["id"]: u for u in users if u.get("id")}
@@ -250,7 +250,9 @@ async def ensure_task_instance_for_scheduled_task(
     signature to preserve the call sites that still pass it.
     """
     _ = triggered_by_user_id  # noqa: F841 — preserved for caller compatibility
-    return await db.task_instances.find_one({"scheduled_task_id": scheduled_task_id})
+    return await db.task_instances.find_one(
+        maintenance_scoped_job({"scheduled_task_id": scheduled_task_id})
+    )
 
 
 async def resolve_task_instance(
@@ -269,11 +271,13 @@ async def resolve_task_instance(
         )
 
     if ObjectId.is_valid(task_id):
-        doc = await db.task_instances.find_one({"_id": ObjectId(task_id)})
+        doc = await db.task_instances.find_one(
+            maintenance_scoped_job({"_id": ObjectId(task_id)})
+        )
         if doc:
             return doc
 
-    return await db.task_instances.find_one({"id": task_id})
+    return await db.task_instances.find_one(maintenance_scoped_job({"id": task_id}))
 
 
 async def sync_scheduled_tasks_to_instances(
@@ -298,10 +302,10 @@ async def sync_scheduled_tasks_to_instances(
 
     # Pull every scheduled_task in the window that is still open
     cursor = db.scheduled_tasks.find(
-        {
+        maintenance_scoped_job({
             "due_date": {"$gte": week_start_iso, "$lte": week_end_iso},
             "status": {"$nin": ["completed", "cancelled"]},
-        },
+        }),
         {"_id": 0},
     )
     candidate_tasks = await cursor.to_list(10000)
@@ -311,7 +315,7 @@ async def sync_scheduled_tasks_to_instances(
     existing_set: set = set()
     if candidate_ids:
         existing = await db.task_instances.find(
-            {"scheduled_task_id": {"$in": candidate_ids}},
+            maintenance_scoped_job({"scheduled_task_id": {"$in": candidate_ids}}),
             {"_id": 0, "scheduled_task_id": 1},
         ).to_list(len(candidate_ids))
         existing_set = {e["scheduled_task_id"] for e in existing if e.get("scheduled_task_id")}
@@ -417,7 +421,7 @@ async def sync_all_unbridged_scheduled_tasks(
 
     bridged_ids: set[str] = set()
     async for row in db.task_instances.find(
-        {"scheduled_task_id": {"$exists": True, "$nin": [None, ""]}},
+        maintenance_scoped_job({"scheduled_task_id": {"$exists": True, "$nin": [None, ""]}}),
         {"scheduled_task_id": 1, "_id": 0},
     ):
         sid = row.get("scheduled_task_id")
@@ -425,7 +429,7 @@ async def sync_all_unbridged_scheduled_tasks(
             bridged_ids.add(str(sid))
 
     cursor = db.scheduled_tasks.find(
-        {"status": {"$nin": ["completed", "cancelled", "cancelled_offline"]}},
+        maintenance_scoped_job({"status": {"$nin": ["completed", "cancelled", "cancelled_offline"]}}),
         {"_id": 0},
     )
     candidate_tasks = await cursor.to_list(10000)

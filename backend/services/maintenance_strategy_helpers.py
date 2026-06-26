@@ -8,6 +8,7 @@ from difflib import SequenceMatcher
 from bson import ObjectId
 
 from database import db
+from services.maintenance_tenant_scope import maintenance_scoped, maintenance_scoped_job
 from models.maintenance_strategy_v2 import (
     CriticalityFrequency,
     CriticalityLevel,
@@ -99,6 +100,7 @@ async def clear_strategy_needs_apply(
 async def enrich_strategy_needs_apply(
     equipment_type_id: str,
     strategy: Dict[str, Any],
+    user: Optional[dict] = None,
 ) -> bool:
     """Return persisted flag, optionally augmented by version drift on v2 programs."""
     if strategy.get("strategy_needs_apply"):
@@ -106,15 +108,16 @@ async def enrich_strategy_needs_apply(
     strategy_version = strategy.get("version")
     if not strategy_version:
         return False
+    scope = (lambda q: maintenance_scoped(user, q)) if user else maintenance_scoped_job
     drift = await db.maintenance_programs_v2.find_one(
-        {
+        scope({
             "equipment_type_id": equipment_type_id,
             "strategy_tasks": {"$gt": 0},
             "$or": [
                 {"source_strategy_version": {"$ne": strategy_version}},
                 {"source_strategy_version": None},
             ],
-        },
+        }),
         {"_id": 0, "id": 1},
     )
     return drift is not None

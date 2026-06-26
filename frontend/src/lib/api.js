@@ -25,7 +25,15 @@ export { productionAPI, getErrorMessage } from "./apis/production";
 export { gdprAPI } from "./apis/gdpr";
 export { labelsAPI } from "./apis/labels";
 export { granulometryAPI } from "./apis/granulometry";
-export { observationWorkspaceAPI, refreshObservationWorkspace } from "./apis/observationWorkspace";
+export {
+  observationWorkspaceAPI,
+  refreshObservationWorkspace,
+  reconcileObservationWorkspace,
+  appendActionToWorkspaceCache,
+  updateActionInWorkspaceCache,
+  removeActionFromWorkspaceCache,
+  mapCentralActionToPlanItem,
+} from "./apis/observationWorkspace";
 export { pushNotificationsAPI } from "./apis/pushNotifications";
 
 export { api as default } from "./apiClient";

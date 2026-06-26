@@ -14,7 +14,7 @@
 |-----------|--------|----------|
 | Every verification script passes | **Done (UAT)** | `phase1_data_integrity_report.py`, `verify_uat_gates.py` — all OK |
 | No dual-write paths in active workflows | **Done (config)** | Legacy program flags off; legacy rows still exist (read-only) |
-| All maintenance data tenant scoped | **Partial** | Core scheduler/program cluster scoped; support services remain |
+| All maintenance data tenant scoped | **Done (B1)** | Maintenance domain services pass `tenant_service_filter_audit.py` |
 | All scheduled work visible to users | **Done (UAT)** | 0 unbridged open `scheduled_tasks` after backfill |
 | Reliability graph fully synchronized | **Done (UAT)** | Graph sync gate passes; maintenance + reactive backfill complete |
 | UAT 48h soak without critical issues | **Pending** | Strict mode on; soak not started |
@@ -92,11 +92,15 @@ cd backend && MONGO_URL=... python3 scripts/seed_failure_modes.py
 | Service cluster | Status |
 |-----------------|--------|
 | `maintenance_scheduler_sync`, `maintenance_program_*`, `maintenance_strategy_v2_service`, `scheduler_program_source`, `maintenance_routes_service` | **Done** (`maintenance_tenant_scope.py`) |
-| `maintenance_strategy_propagation` | **Open** |
-| `maintenance_readiness` | **Open** |
-| `maintenance_strategy_v2_task_templates` | **Open** |
-| `maintenance_program_ai_recommendations` | **Open** |
-| `task_instance_bridge` | **Open** |
+| `maintenance_strategy_propagation` | **Done** |
+| `maintenance_readiness` | **Done** |
+| `maintenance_strategy_v2_task_templates` | **Done** |
+| `maintenance_program_ai_recommendations` | **Done** |
+| `maintenance_scheduler_disabled` | **Done** |
+| `maintenance_strategy_helpers` | **Done** (v2 drift reads; FM library reads are global catalog) |
+| `task_instance_bridge` | **Done** |
+| `apply_strategy_service` | **Done** |
+| `program_task_resolution` | **Done** |
 
 ### B2. Service layer audit
 

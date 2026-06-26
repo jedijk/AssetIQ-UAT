@@ -74,7 +74,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { observationWorkspaceAPI, actionsAPI, refreshObservationWorkspace } from "../lib/api";
+import { observationWorkspaceAPI, actionsAPI, refreshObservationWorkspace, appendActionToWorkspaceCache, updateActionInWorkspaceCache, removeActionFromWorkspaceCache, reconcileObservationWorkspace } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import { aiRiskAPI } from "../lib/apis/aiRisk";
 import { showAiMutationError } from "../lib/aiMutationErrors";
@@ -195,9 +195,10 @@ const ObservationWorkspacePage = () => {
   // Add recommendation to plan mutation
   const addRecommendationMutation = useMutation({
     mutationFn: (recommendation) => observationWorkspaceAPI.addRecommendation(id, recommendation),
-    onSuccess: async (data) => {
-      await refreshWorkspace();
+    onSuccess: (data, recommendation) => {
+      appendActionToWorkspaceCache(queryClient, id, data?.action || data, recommendation?.id);
       queryClient.invalidateQueries({ queryKey: ["actions"] });
+      reconcileObservationWorkspace(queryClient, id);
       toast.success(data.message || t("observationWorkspace.actionAddedToPlan"));
     },
     onError: () => {
@@ -208,9 +209,10 @@ const ObservationWorkspacePage = () => {
   // Update action mutation
   const updateActionMutation = useMutation({
     mutationFn: ({ actionId, updates }) => actionsAPI.update(actionId, updates),
-    onSuccess: async () => {
-      await refreshWorkspace();
+    onSuccess: (updated, { actionId, updates }) => {
+      updateActionInWorkspaceCache(queryClient, id, actionId, updated || updates);
       queryClient.invalidateQueries({ queryKey: ["actions"] });
+      reconcileObservationWorkspace(queryClient, id);
       toast.success(t("observationWorkspace.actionUpdated"));
     },
     onError: (err) => {
@@ -221,9 +223,10 @@ const ObservationWorkspacePage = () => {
   // Delete action mutation
   const deleteActionMutation = useMutation({
     mutationFn: (actionId) => actionsAPI.delete(actionId),
-    onSuccess: async () => {
-      await refreshWorkspace();
+    onSuccess: (_, actionId) => {
+      removeActionFromWorkspaceCache(queryClient, id, actionId);
       queryClient.invalidateQueries({ queryKey: ["actions"] });
+      reconcileObservationWorkspace(queryClient, id);
       toast.success(t("observationWorkspace.actionRemovedFromPlan"));
     },
     onError: (err) => {
@@ -246,9 +249,10 @@ const ObservationWorkspacePage = () => {
       due_date: data.due_date,
       comments: data.comments || "",
     }),
-    onSuccess: async () => {
-      await refreshWorkspace();
+    onSuccess: (created) => {
+      appendActionToWorkspaceCache(queryClient, id, created);
       queryClient.invalidateQueries({ queryKey: ["actions"] });
+      reconcileObservationWorkspace(queryClient, id);
       toast.success(t("observationWorkspace.actionAddedToPlan"));
     },
     onError: (err) => {
@@ -560,6 +564,7 @@ const ObservationWorkspacePage = () => {
           {/* Column 2: Recommended Actions */}
           <RecommendedActionsPanel 
             recommendations={recommended_actions}
+            actionPlan={action_plan}
             onAddToPlan={handleAddToPlan}
             onAddToStrategy={handleAddToStrategy}
             onGenerateAI={handleGenerateAI}

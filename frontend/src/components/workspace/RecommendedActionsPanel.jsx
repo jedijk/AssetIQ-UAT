@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, Lightbulb, Loader2, Plus, Sparkles } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -88,9 +88,34 @@ function RecommendedActionCard({ action, onAddToPlan, onAddToStrategy, isAdding,
 /**
  * Recommended Actions Panel
  */
-export function RecommendedActionsPanel({ recommendations, onAddToPlan, onAddToStrategy, onGenerateAI, isGeneratingAI }) {
+export function RecommendedActionsPanel({
+  recommendations,
+  actionPlan,
+  onAddToPlan,
+  onAddToStrategy,
+  onGenerateAI,
+  isGeneratingAI,
+}) {
   const { t } = useLanguage();
   const [addingId, setAddingId] = useState(null);
+
+  const inPlanLookup = useMemo(() => {
+    const ids = new Set();
+    const titles = new Set();
+    for (const item of actionPlan || []) {
+      if (item.recommendation_id) ids.add(item.recommendation_id);
+      const title = (item.title || "").trim().toLowerCase();
+      if (title) titles.add(title);
+    }
+    return { ids, titles };
+  }, [actionPlan]);
+
+  const isRecommendationInPlan = (rec) => {
+    if (rec.in_plan) return true;
+    if (inPlanLookup.ids.has(rec.id)) return true;
+    const title = (rec.title || rec.description || rec.action || "").trim().toLowerCase();
+    return Boolean(title && inPlanLookup.titles.has(title));
+  };
 
   // Separate by source
   const libraryActions = recommendations?.filter(r => r.source === "failure_mode_library") || [];
@@ -176,6 +201,7 @@ export function RecommendedActionsPanel({ recommendations, onAddToPlan, onAddToS
                 onAddToPlan={handleAddToPlan}
                 onAddToStrategy={onAddToStrategy}
                 isAdding={addingId === action.id}
+                isInPlan={isRecommendationInPlan(action)}
               />
             ))}
           </div>
@@ -200,6 +226,7 @@ export function RecommendedActionsPanel({ recommendations, onAddToPlan, onAddToS
                 onAddToPlan={handleAddToPlan}
                 onAddToStrategy={onAddToStrategy}
                 isAdding={addingId === action.id}
+                isInPlan={isRecommendationInPlan(action)}
               />
             ))}
           </div>

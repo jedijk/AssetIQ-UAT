@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from database import db
 from models.maintenance_scheduler import ApplyStrategyRequest
 from services.maintenance_scheduler_sync import refresh_equipment_schedule
+from services.maintenance_tenant_scope import maintenance_scoped
 from services.tenant_schema import tenant_id_from_user
 
 logger = logging.getLogger(__name__)
@@ -17,9 +18,9 @@ async def apply_strategy_to_equipment(
     request: ApplyStrategyRequest,
     current_user: dict,
 ):
-    strategy = await db.equipment_type_strategies.find_one({
-        "equipment_type_id": equipment_type_id
-    })
+    strategy = await db.equipment_type_strategies.find_one(
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id})
+    )
 
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
@@ -27,10 +28,12 @@ async def apply_strategy_to_equipment(
     if strategy.get("status") != "active":
         raise HTTPException(status_code=400, detail="Strategy must be active to apply")
 
-    equipment_list = await db.equipment_nodes.find({
-        "id": {"$in": request.equipment_ids},
-        "equipment_type_id": equipment_type_id,
-    }).to_list(500)
+    equipment_list = await db.equipment_nodes.find(
+        maintenance_scoped(current_user, {
+            "id": {"$in": request.equipment_ids},
+            "equipment_type_id": equipment_type_id,
+        }),
+    ).to_list(500)
 
     if not equipment_list:
         raise HTTPException(status_code=404, detail="No matching equipment found")
@@ -44,7 +47,7 @@ async def apply_strategy_to_equipment(
     # should have its previously-generated maintenance programs and scheduled tasks
     # removed so the dialog acts as the single source of truth for strategy coverage.
     all_type_equipment = await db.equipment_nodes.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id}),
         {"_id": 0, "id": 1},
     ).to_list(2000)
     all_type_equipment_ids = {e.get("id") for e in all_type_equipment if e.get("id")}
@@ -54,22 +57,28 @@ async def apply_strategy_to_equipment(
     deselected_programs_removed = 0
     deselected_v2_programs_removed = 0
     if deselected_equipment_ids:
-        sched_del = await db.scheduled_tasks.delete_many({
-            "equipment_id": {"$in": deselected_equipment_ids},
-            "equipment_type_id": equipment_type_id,
-        })
+        sched_del = await db.scheduled_tasks.delete_many(
+            maintenance_scoped(current_user, {
+                "equipment_id": {"$in": deselected_equipment_ids},
+                "equipment_type_id": equipment_type_id,
+            })
+        )
         deselected_scheduled_tasks_removed = sched_del.deleted_count
 
-        prog_del = await db.maintenance_programs.delete_many({
-            "equipment_id": {"$in": deselected_equipment_ids},
-            "equipment_type_id": equipment_type_id,
-        })
+        prog_del = await db.maintenance_programs.delete_many(
+            maintenance_scoped(current_user, {
+                "equipment_id": {"$in": deselected_equipment_ids},
+                "equipment_type_id": equipment_type_id,
+            })
+        )
         deselected_programs_removed = prog_del.deleted_count
 
-        v2_del = await db.maintenance_programs_v2.delete_many({
-            "equipment_id": {"$in": deselected_equipment_ids},
-            "equipment_type_id": equipment_type_id,
-        })
+        v2_del = await db.maintenance_programs_v2.delete_many(
+            maintenance_scoped(current_user, {
+                "equipment_id": {"$in": deselected_equipment_ids},
+                "equipment_type_id": equipment_type_id,
+            })
+        )
         deselected_v2_programs_removed = v2_del.deleted_count
 
     from services.maintenance_program_service import MaintenanceProgramService
