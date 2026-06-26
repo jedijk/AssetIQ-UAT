@@ -14,6 +14,16 @@ function equipmentLinkLabel(link) {
   return link?.equipment_tag || link?.tag || link?.equipment_name || link?.equipment_id || "—";
 }
 
+function hierarchySearchQuery(link) {
+  return link?.equipment_tag || link?.tag || link?.equipment_name || "";
+}
+
+function openHierarchySearch(query) {
+  const q = String(query || "").trim();
+  if (!q) return;
+  window.dispatchEvent(new CustomEvent("open-hierarchy-with-search", { detail: { query: q } }));
+}
+
 export default function SparePartDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -112,14 +122,15 @@ export default function SparePartDetailPage() {
               {(part.linked_equipment || []).length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {(part.linked_equipment || []).map((link) => (
-                    <Link
+                    <button
                       key={link.equipment_id}
-                      to={`/equipment-manager?node=${link.equipment_id}`}
-                      className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-mono text-slate-700 hover:bg-slate-200"
-                      title={link.equipment_name || undefined}
+                      type="button"
+                      onClick={() => openHierarchySearch(hierarchySearchQuery(link))}
+                      className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-mono text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer"
+                      title={t("observationWorkspace.clickToFindInHierarchy") || "Click to find in hierarchy"}
                     >
                       {equipmentLinkLabel(link)}
-                    </Link>
+                    </button>
                   ))}
                 </div>
               )}
@@ -206,20 +217,28 @@ export default function SparePartDetailPage() {
             <ul className="divide-y divide-slate-100">
               {(part.linked_equipment || []).map((link) => (
                 <li key={link.equipment_id} className="py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm">
-                  <Link to={`/equipment-manager?node=${link.equipment_id}`} className="hover:underline min-w-0">
+                  <div className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                     {link.equipment_tag ? (
-                      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-xs">
-                          {link.equipment_tag}
-                        </span>
-                        {link.equipment_name && (
-                          <span className="font-medium text-blue-700">{link.equipment_name}</span>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="font-medium text-blue-700">{link.equipment_name || link.equipment_id}</span>
+                      <button
+                        type="button"
+                        onClick={() => openHierarchySearch(link.equipment_tag)}
+                        className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-xs hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer"
+                        title={t("observationWorkspace.clickToFindInHierarchy") || "Click to find in hierarchy"}
+                      >
+                        {link.equipment_tag}
+                      </button>
+                    ) : null}
+                    {(link.equipment_name || (!link.equipment_tag && link.equipment_id)) && (
+                      <button
+                        type="button"
+                        onClick={() => openHierarchySearch(hierarchySearchQuery(link))}
+                        className="font-medium text-blue-700 hover:underline text-left"
+                        title={t("observationWorkspace.clickToFindInHierarchy") || "Click to find in hierarchy"}
+                      >
+                        {link.equipment_name || link.equipment_id}
+                      </button>
                     )}
-                  </Link>
+                  </div>
                   <span className="text-slate-500 shrink-0">{link.component_position || link.equipment_type || ""}</span>
                 </li>
               ))}

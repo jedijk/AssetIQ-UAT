@@ -5,7 +5,12 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 
 from services.permissions_defaults import backfill_permissions
 from services.spare_parts_import_service import _map_headers, build_import_template_bytes
-from services.spare_parts_service import _build_linked_equipment_preview, _build_list_query, _normalize_key
+from services.spare_parts_service import (
+    _build_linked_equipment_preview,
+    _build_list_query,
+    _iter_equipment_link_dicts,
+    _normalize_key,
+)
 
 
 def test_duplicate_key_normalizes_description_and_type_model():
@@ -68,6 +73,19 @@ def test_build_linked_equipment_preview_prefers_tag():
     assert preview[0]["equipment_name"] == "Feed Pump"
     assert preview[1]["equipment_tag"] is None
     assert preview[1]["equipment_name"] == "Compressor"
+
+
+def test_iter_equipment_link_dicts_handles_malformed_values():
+    assert _iter_equipment_link_dicts(None) == []
+    assert _iter_equipment_link_dicts("bad") == []
+    assert _iter_equipment_link_dicts(["eq-1"]) == [{"equipment_id": "eq-1"}]
+    assert _iter_equipment_link_dicts([
+        {"equipment_id": "eq-1", "component_position": "Drive end"},
+        "eq-2",
+    ]) == [
+        {"equipment_id": "eq-1", "component_position": "Drive end"},
+        {"equipment_id": "eq-2"},
+    ]
 
 
 def test_build_list_query_combines_search_with_tenant_filter(monkeypatch):

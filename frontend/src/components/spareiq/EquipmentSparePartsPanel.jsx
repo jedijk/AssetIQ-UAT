@@ -38,23 +38,25 @@ export default function EquipmentSparePartsPanel({ equipmentId, equipmentName })
   const [editPart, setEditPart] = useState(null);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkSearch, setLinkSearch] = useState("");
+  const canRead = hasPermission("spareiq", "read");
   const canWrite = hasPermission("spareiq", "write");
 
   const { data, isLoading } = useQuery({
     queryKey: ["spare-parts", "equipment", equipmentId],
     queryFn: () => sparePartsAPI.list({ equipment_id: equipmentId }),
-    enabled: Boolean(equipmentId),
+    enabled: Boolean(equipmentId) && canRead,
   });
 
   const { data: categoriesData } = useQuery({
     queryKey: ["spare-categories"],
     queryFn: () => sparePartsAPI.listCategories(),
+    enabled: canRead,
   });
 
   const { data: linkCatalogData, isLoading: linkCatalogLoading } = useQuery({
     queryKey: ["spare-parts", "link-catalog", linkSearch],
     queryFn: () => sparePartsAPI.list({ search: linkSearch || undefined, sort_by: "description", sort_dir: 1 }),
-    enabled: linkOpen,
+    enabled: linkOpen && canRead,
   });
 
   const invalidateEquipmentParts = () => {
@@ -119,6 +121,10 @@ export default function EquipmentSparePartsPanel({ equipmentId, equipmentName })
     equipment_links: [{ equipment_id: equipmentId }],
     linked_equipment: [{ equipment_id: equipmentId, equipment_name: equipmentName }],
   };
+
+  if (!canRead) {
+    return null;
+  }
 
   return (
     <TooltipProvider delayDuration={200}>

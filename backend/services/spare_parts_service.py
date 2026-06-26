@@ -1,6 +1,7 @@
 """SpareIQ spare parts register — CRUD with duplicate merge on description + type/model."""
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -15,6 +16,8 @@ from services.spare_parts_graph_sync import retire_spare_part_graph, sync_spare_
 from services.tenant_schema import merge_tenant_filter, tenant_id_from_user, with_tenant_id
 from utils.mongo_regex import or_search_fields
 
+logger = logging.getLogger(__name__)
+
 
 def _normalize_key(description: str, type_model: str) -> str:
     desc = re.sub(r"\s+", " ", (description or "").strip().lower())
@@ -22,17 +25,59 @@ def _normalize_key(description: str, type_model: str) -> str:
     return f"{desc}::{model}"
 
 
+def _coerce_equipment_id(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _iter_equipment_link_dicts(links: Any) -> List[dict]:
+    """Normalize equipment_links from Mongo into a list of link dicts."""
+    if not links:
+        return []
+    if isinstance(links, dict):
+        if links.get("equipment_id"):
+            return [{**links, "equipment_id": _coerce_equipment_id(links.get("equipment_id"))}]
+        normalized = []
+        for key, value in links.items():
+            if isinstance(value, dict):
+                equipment_id = _coerce_equipment_id(value.get("equipment_id") or key)
+            else:
+                equipment_id = _coerce_equipment_id(key)
+            if equipment_id:
+                normalized.append({
+                    "equipment_id": equipment_id,
+                    "component_position": value.get("component_position") if isinstance(value, dict) else None,
+                })
+        return normalized
+    if not isinstance(links, list):
+        return []
+    normalized: List[dict] = []
+    for link in links:
+        if isinstance(link, dict):
+            equipment_id = _coerce_equipment_id(link.get("equipment_id"))
+            if not equipment_id:
+                continue
+            normalized.append({**link, "equipment_id": equipment_id})
+        elif isinstance(link, str):
+            equipment_id = _coerce_equipment_id(link)
+            if equipment_id:
+                normalized.append({"equipment_id": equipment_id})
+    return normalized
+
+
 def _serialize_links(links: List[dict]) -> List[dict]:
     out = []
     seen = set()
-    for link in links or []:
-        equipment_id = (link.get("equipment_id") or "").strip()
+    for link in _iter_equipment_link_dicts(links):
+        equipment_id = link.get("equipment_id") or ""
+        component_position = link.get("component_position")
         if not equipment_id or equipment_id in seen:
             continue
         seen.add(equipment_id)
         out.append({
             "equipment_id": equipment_id,
-            "component_position": (link.get("component_position") or "").strip() or None,
+            "component_position": (str(component_position).strip() or None) if component_position else None,
         })
     return out
 
@@ -44,7 +89,7 @@ async def _validate_equipment_ids(user: dict, equipment_ids: List[str]) -> None:
         merge_tenant_filter({"id": {"$in": equipment_ids}}, user),
         {"_id": 0, "id": 1},
     ).to_list(len(equipment_ids))
-    found_ids = {d["id"] for d in found}
+    found_ids = {d["id"] for d in found if d.get("id")}
     missing = [eid for eid in equipment_ids if eid not in found_ids]
     if missing:
         raise HTTPException(status_code=400, detail=f"Equipment not found: {', '.join(missing[:5])}")
@@ -101,16 +146,16 @@ async def _load_equipment_map(user: dict, equipment_ids: List[str]) -> Dict[str,
         merge_tenant_filter({"id": {"$in": unique_ids}}, user),
         {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type_id": 1, "equipment_type": 1},
     ).to_list(len(unique_ids))
-    return {n["id"]: n for n in nodes}
+    return {n["id"]: n for n in nodes if n.get("id")}
 
 
-def _build_linked_equipment_preview(links: List[dict], equipment_map: Dict[str, dict]) -> List[dict]:
+def _build_linked_equipment_preview(links: Any, equipment_map: Dict[str, dict]) -> List[dict]:
     preview = []
-    for link in links or []:
+    for link in _iter_equipment_link_dicts(links):
         equipment_id = link.get("equipment_id")
         if not equipment_id:
             continue
-        eq = equipment_map.get(equipment_id, {})
+        eq = equipment_map.get(equipment_id) or equipment_map.get(str(equipment_id), {})
         preview.append({
             "equipment_id": equipment_id,
             "equipment_tag": eq.get("tag"),
@@ -128,7 +173,7 @@ async def _enrich_list_item(
     spare_part_id = doc.get("id")
     if not spare_part_id:
         return None
-    equipment_links = doc.get("equipment_links") or []
+    equipment_links = _iter_equipment_link_dicts(doc.get("equipment_links"))
     file_count = await db.spare_part_files.count_documents(
         merge_tenant_filter({"spare_part_id": spare_part_id}, user),
     )
@@ -164,14 +209,18 @@ async def list_spare_parts(
     items = await cursor.to_list(500)
     equipment_ids: List[str] = []
     for doc in items:
-        for link in doc.get("equipment_links") or []:
+        for link in _iter_equipment_link_dicts(doc.get("equipment_links")):
             eid = link.get("equipment_id")
             if eid:
                 equipment_ids.append(eid)
     equipment_map = await _load_equipment_map(user, equipment_ids)
     enriched = []
     for doc in items:
-        item = await _enrich_list_item(user, doc, equipment_map)
+        try:
+            item = await _enrich_list_item(user, doc, equipment_map)
+        except Exception as exc:
+            logger.warning("Skipping spare part %s during list enrichment: %s", doc.get("id"), exc)
+            continue
         if item:
             enriched.append(item)
     return {"spare_parts": enriched, "total": len(enriched)}
@@ -184,10 +233,10 @@ async def get_spare_part(user: dict, spare_part_id: str) -> dict:
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Spare part not found")
-    equipment_ids = [l["equipment_id"] for l in doc.get("equipment_links") or []]
+    equipment_ids = [link["equipment_id"] for link in _iter_equipment_link_dicts(doc.get("equipment_links"))]
     equipment_map = await _load_equipment_map(user, equipment_ids)
     linked_equipment = []
-    for link in doc.get("equipment_links") or []:
+    for link in _iter_equipment_link_dicts(doc.get("equipment_links")):
         eq = equipment_map.get(link["equipment_id"], {})
         linked_equipment.append({
             **link,
@@ -413,15 +462,17 @@ async def unlink_equipment(user: dict, spare_part_id: str, equipment_id: str) ->
     )
     if not part:
         raise HTTPException(status_code=404, detail="Spare part not found")
-    links = [l for l in (part.get("equipment_links") or []) if l.get("equipment_id") != equipment_id]
-    if len(links) == len(part.get("equipment_links") or []):
+    existing_links = _iter_equipment_link_dicts(part.get("equipment_links"))
+    links = [l for l in existing_links if l.get("equipment_id") != equipment_id]
+    if len(links) == len(existing_links):
         raise HTTPException(status_code=404, detail="Equipment link not found")
     if not links:
         raise HTTPException(status_code=400, detail="Spare part must remain linked to at least one equipment")
+    serialized_links = _serialize_links(links)
     await db.spare_parts.update_one(
         merge_tenant_filter({"id": spare_part_id}, user),
         {"$set": {
-            "equipment_links": _serialize_links(links),
+            "equipment_links": serialized_links,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }},
     )
@@ -432,7 +483,7 @@ async def unlink_equipment(user: dict, spare_part_id: str, equipment_id: str) ->
     try:
         await sync_spare_part_equipment_links(
             spare_part_id=spare_part_id,
-            equipment_links=links,
+            equipment_links=serialized_links,
             tenant_id=tenant_id_from_user(user),
         )
     except Exception:
