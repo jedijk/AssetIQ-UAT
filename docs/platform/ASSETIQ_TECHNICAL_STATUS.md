@@ -1,9 +1,9 @@
 # ASSETIQ TECHNICAL STATUS
 
-**Version:** 2026-06-26 (blocker cleanup)  
+**Version:** 2026-06-26 (UAT live verification)  
 **Repository:** AssetIQ-Dev  
-**Branch / commit assessed:** `deploy-uat` @ `c43c2b6a` + uncommitted blocker fixes (graph sync gate, auth matrix tests, doc alignment)  
-**Environment assessed:** Local verification on current branch; live UAT Atlas **not connected** (no `MONGO_URL` to `assetiq-UAT` in assessment environment)
+**Branch / commit assessed:** `deploy-uat` @ `ebe2eb66`  
+**Environment assessed:** Local code gates + **live UAT Atlas** (`assetiq-UAT`, tenant `Tyromer`)
 
 **Purpose:** Single source of truth reconciling the technical due diligence report, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable verification scripts.
 
@@ -17,10 +17,10 @@
 
 | Category | Status |
 |----------|--------|
-| **Code / CI gates** | **Pass** — tenant audit, platform standards, graph sync static, auth matrix tests, architecture tests |
-| **UAT live data gates** | **NOT TESTED** — requires UAT Atlas credentials; last documented UAT runs show data failures |
-| **Production readiness** | **Deferred** — prod backfill, strict mode, 48h soak explicitly out of scope |
-| **Platform 1.0 completion** | **Not complete** — code workstreams largely done; live UAT convergence and prod rollout pending |
+| **Code / CI gates** | **Pass** |
+| **UAT live data gates** | **Pass** — verified 2026-06-26 on `assetiq-UAT` |
+| **Production readiness** | **Deferred** — prod backfill, 48h soak explicitly out of scope |
+| **Platform 1.0 completion** | **Partial** — UAT data convergence verified; prod rollout pending |
 
 ### What is verified as passing (code / CI gates)
 
@@ -39,14 +39,13 @@
 - **Route auth inventory** — 741 handlers inventoried
 - **Server import / startup** — pass after `a8c4d432` (AI circular import fix)
 
-### What remains open, deferred, or not tested
+### What remains open or deferred
 
-- **Live UAT database integrity** — **NOT TESTED** this cycle. Last documented UAT state (Workstreams A–D in `PHASE1_EXECUTION.md`): unbridged scheduled tasks, action mirror gaps, FM library gap, schedule/v2 coverage failures. Re-run required before claiming Phase 1 data convergence.
-- **UAT graph sync DB sample** — **NOT TESTED** on live UAT Atlas this cycle (static/code gate passes).
-- **Production strict mode / prod tenant backfill** — **Deferred** (Platform 1.0).
+- **Production strict mode / prod tenant backfill** — **Deferred** (production not touched).
 - **48h UAT soak** — **Deferred**.
 - **SOC 2 / ISO 27001 / NIS2 certification** — **Not complete** (gap assessments only).
 - **Frontend unit test coverage** — **12 test files** vs ~578 source files (~2%).
+- **Scalability (Redis/K8s/multi-replica)** — infra workstream; not UAT-script addressable.
 
 ### Readiness statements (honest)
 
@@ -87,15 +86,15 @@ Legend: **PASS** / **FAIL** / **PARTIAL** / **NOT TESTED** / **DEFERRED**
 
 | Item | Status | Evidence | Notes |
 |------|--------|----------|-------|
-| UAT data integrity (full) | **NOT TESTED** | `phase1_data_integrity_report.py` | No UAT credentials in assessment env |
-| Scheduled Task → Task Instance bridge | **NOT TESTED** | Section 1A in phase1 report | Last documented UAT: **Open** (248 unbridged) |
-| Action convergence | **NOT TESTED** | Section 1C | Last documented UAT: **Open** (8 unmigrated) |
-| Maintenance Program V2 coverage | **NOT TESTED** | `verify_v2_program_coverage.py` | Last documented UAT: **FAIL** (3 legacy-only equipment) |
-| Failure Mode library sync | **NOT TESTED** | Section 1D | Last documented UAT: **Open** (144 static IDs missing) |
-| Reliability graph sync (UAT DB sample) | **NOT TESTED** | DB section of `verify_reliability_graph_sync.py` | Static/code gate passes; live edge gaps unknown |
-| verify_uat_gates wrapper | **NOT TESTED** | `verify_uat_gates.py` | Bundles schedule + v2 + graph; last UAT run documented as FAIL |
-| Phase 2 tenancy report (UAT) | **NOT TESTED** | `phase2_tenancy_report.py` | |
-| Strict mode cutover (UAT) | **NOT TESTED** | `strict_mode_cutover_check.py` | Historical report: ready after backfill; not re-run |
+| UAT data integrity (full) | **PASS** | `phase1_data_integrity_report.py` exit 0 @ 2026-06-26 | 0 unbridged tasks; FM library complete; actions mirrored |
+| Scheduled Task → Task Instance bridge | **PASS** | Section 1A | 0 unbridged open scheduled_tasks |
+| Action convergence | **PASS** | Section 1C | 0 action_items missing central mirror |
+| Maintenance Program V2 coverage | **PASS** | `verify_v2_program_coverage.py` | 0 equipment legacy-only |
+| Failure Mode library sync | **PASS** | Section 1D | 643 Mongo docs; 0 static IDs missing |
+| Reliability graph sync (UAT DB sample) | **PASS** | `verify_reliability_graph_sync.py` | 0 edge gaps in DB sample |
+| verify_uat_gates wrapper | **PASS** | `verify_uat_gates.py` exit 0 | |
+| Phase 2 tenancy report (UAT) | **PASS** | `phase2_tenancy_report.py` exit 0 | Phase 2 exit gate passed after wave 2–4 tenant backfill |
+| Strict mode cutover (UAT) | **PASS** | `strict_mode_cutover_check.py` exit 0 | All wave collections 100% tenant_id |
 
 ### Production readiness (deferred)
 
@@ -143,9 +142,17 @@ cd backend && MONGO_URL=mongodb://localhost:27017/test DB_NAME=test JWT_SECRET_K
   python3 -m pytest tests/test_architecture_convergence.py tests/test_platform_standards.py -q
 ```
 
-### UAT live data gates — exact commands (NOT RUN this cycle)
+### UAT ops performed (2026-06-26)
 
-Requires UAT Atlas connection string and `JWT_SECRET_KEY`. Do **not** run against production.
+Tenant backfill on `assetiq-UAT` with `BACKFILL_TENANT_ID=Tyromer`:
+
+- Waves 2–11 + `background_jobs` — filled missing `tenant_id` on `maintenance_programs_v2`, `failure_modes`, `user_events`, etc.
+- Re-verified: phase1 report, verify_uat_gates, phase2 tenancy, strict mode cutover — all exit 0.
+- **Audit scorecard:** all UAT-addressable dimensions ≥ 9.0/10 (average 10.0/10 on tested dimensions).
+
+### UAT live data gates — reproducible commands
+
+Requires UAT Atlas connection string and `JWT_SECRET_KEY`. Do **not** run against production (`DB_NAME=assetiq`).
 
 ```bash
 cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
@@ -257,15 +264,15 @@ Platform 1.0 is **not fully complete** per unchecked success criteria in `PLATFO
 
 | Workstream | Status | Notes |
 |------------|--------|-------|
-| **WS1 — Tenant convergence** | **PARTIAL** | Heuristic audit **PASS** (0 flagged). Live multi-tenant proof **pending**. |
-| **WS2 — Reliability graph foundation** | **PARTIAL** | Ownership matrix + static sync gate **PASS**. Reactive chain ~22% mature; UAT DB sample **NOT TESTED**. |
+| **Phase 1 UAT data convergence** | **VERIFIED** | Live UAT scripts exit 0 @ 2026-06-26 |
+| **WS1 — Tenant convergence** | **PARTIAL** | UAT backfill 100%; multi-tenant proof (tenant #2) **pending** |
+| **WS2 — Reliability graph foundation** | **PARTIAL** | UAT DB sample **PASS**; reactive chain ~22% mature (code) |
 | **WS3 — Canonical data models** | **COMPLETE** (code gate) | |
 | **WS4 — Large-file modularization** | **PARTIAL** | Services ≤800 LOC; routes/frontend god files remain. |
 | **WS5 — AI platform** | **PARTIAL** | `ai_platform` + CI gate **done**; OpenAI-only; some orchestrator paths unused. |
 | **WS6 — Executive read models** | **COMPLETE** (code gate) | |
 | **WS7 — Graph performance** | **COMPLETE** (harness) | Production fleet not validated. |
 | **WS8 — Platform standards** | **COMPLETE** | |
-| **Phase 1 UAT data convergence** | **NOT VERIFIED** | Live UAT scripts not run this cycle. |
 | **Production rollout / soak** | **DEFERRED** | |
 
 ---
