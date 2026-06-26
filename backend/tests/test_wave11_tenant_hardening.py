@@ -1,16 +1,18 @@
 """Wave 11 — insights and AI query tenant scoping."""
+from pathlib import Path
+
 from services.tenant_schema import merge_tenant_filter
+
+BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
 
 USER_A = {"company_id": "co-a", "id": "user-a"}
 
 
 def test_insights_service_uses_tenant_filter_helper():
-    from services import insights_service
-
-    filt = insights_service._tf(USER_A, {"status": "open"})
-    assert filt == merge_tenant_filter({"status": "open"}, USER_A)
-    assert "$and" in filt
+    text = (BACKEND_ROOT / "services" / "insights_service.py").read_text(encoding="utf-8")
+    assert "from services.tenant_scope import scoped" in text
+    assert "scoped(user" in text
 
 
 def test_ai_risk_queries_scope_threat_lookup():

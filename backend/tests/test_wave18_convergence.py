@@ -24,9 +24,9 @@ def test_equipment_import_service_exists():
 
 
 def test_equipment_import_service_uses_tenant_filters():
-    text = (BACKEND_ROOT / "services/equipment_import_service.py").read_text(encoding="utf-8")
-    assert "merge_tenant_filter" in text
-    assert "with_tenant_id" in text
+    excel = (BACKEND_ROOT / "services/equipment_import_excel.py").read_text(encoding="utf-8")
+    assert "merge_tenant_filter" in excel
+    assert "with_tenant_id" in excel
 
 
 def test_all_equipment_routes_are_green():

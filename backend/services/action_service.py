@@ -742,3 +742,9 @@ async def delete_action(action_id: str, current_user: dict) -> None:
             ) from exc
         raise
 
+    from services.work_item_projection import invalidate_user_projections
+
+    await invalidate_user_projections(
+        current_user.get("id") or "",
+        tenant_id=current_user.get("company_id") or current_user.get("organization_id"),
+    )

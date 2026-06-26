@@ -45,7 +45,7 @@ def test_normalize_recommended_actions_list():
 @pytest.mark.asyncio
 async def test_suggest_action_downtime_requirements_parses_llm_response():
     with patch(
-        "services.failure_modes.action_downtime_suggest.execute_json_prompt",
+        "services.ai_platform.execute_json_prompt",
         new_callable=AsyncMock,
         return_value={
             "parsed": {
@@ -84,7 +84,7 @@ async def test_suggest_action_downtime_requirements_parses_llm_response():
 @pytest.mark.asyncio
 async def test_suggest_action_downtime_includes_fm_id_in_results():
     with patch(
-        "services.failure_modes.action_downtime_suggest.execute_json_prompt",
+        "services.ai_platform.execute_json_prompt",
         new_callable=AsyncMock,
         return_value={
             "parsed": {
@@ -133,7 +133,7 @@ async def test_classify_downtime_batch_rejects_oversized_batch():
 @pytest.mark.asyncio
 async def test_suggest_chunk_json_parse_fallback():
     with patch(
-        "services.failure_modes.action_downtime_suggest.execute_json_prompt",
+        "services.ai_platform.execute_json_prompt",
         new_callable=AsyncMock,
         return_value={"parsed": {}, "content": "not-json"},
     ):

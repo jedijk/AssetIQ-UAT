@@ -79,7 +79,8 @@
   "scripts": {
     "start": "REACT_APP_VERSION=$npm_package_version craco start",
     "build": "REACT_APP_VERSION=$npm_package_version craco build",
-    "test": "craco test"
+    "test": "craco test",
+    "test:ci": "CI=true craco test --watchAll=false --passWithNoTests"
   },
   "browserslist": {
     "kiosk": [

@@ -75,8 +75,18 @@ async def test_generate_tasks_from_strategy_coerces_integer_failure_mode_id():
 
     mock_db = MagicMock()
     mock_db.equipment_type_strategies.find_one = AsyncMock(return_value=strategy)
+    mock_db.equipment_nodes.find_one = AsyncMock(
+        return_value={
+            "id": "eq-bearing",
+            "equipment_type_id": "bearing_radial",
+            "tenant_id": "co-1",
+            "criticality": {"level": "medium"},
+        }
+    )
 
-    with patch("services.maintenance_program_service.db", mock_db):
+    with patch("services.maintenance_program_service.db", mock_db), patch(
+        "services.maintenance_program_helpers.db", mock_db
+    ):
         from services.maintenance_program_service import MaintenanceProgramService
 
         tasks = await MaintenanceProgramService.generate_tasks_from_strategy(

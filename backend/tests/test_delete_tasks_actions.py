@@ -2,13 +2,39 @@
 Test suite for My Tasks deletion functionality.
 Tests both Action deletion (/api/actions/{id}) and Task Instance deletion (/api/task-instances/{id}).
 """
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 import requests
-import os
 
 from conftest import BASE_URL, TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD
 
 pytestmark = pytest.mark.integration
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _reseed_ci_action() -> None:
+    """Restore CI action fixture after a prior delete test in the same session."""
+    if not os.environ.get("MONGO_URL"):
+        return
+    subprocess.run(
+        [sys.executable, str(_BACKEND_ROOT / "scripts" / "ci_integration_bootstrap.py")],
+        cwd=str(_BACKEND_ROOT),
+        env=os.environ.copy(),
+        check=True,
+    )
+
+
+@pytest.fixture(autouse=True)
+def restore_ci_action_before_delete_tests(request):
+    """Delete tests share ci-action-001; re-seed before each delete scenario."""
+    if "delete" in request.node.name.lower():
+        _reseed_ci_action()
+    yield
 
 class TestDeleteActions:
     """Tests for deleting Actions from My Tasks page"""

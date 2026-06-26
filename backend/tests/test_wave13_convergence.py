@@ -13,7 +13,7 @@ def test_ai_routes_is_thin_orchestrator():
 
 
 def test_ai_risk_service_holds_endpoint_logic():
-    path = BACKEND_ROOT / "services" / "ai_risk_service.py"
+    path = BACKEND_ROOT / "services" / "ai_risk_analysis.py"
     text = path.read_text(encoding="utf-8")
     assert "async def analyze_threat_risk" in text
     assert "find_threat" in text

@@ -50,10 +50,11 @@ def _mock_db(strategy=None, equipment=None):
 
 
 def _patch_maintenance_program_db(mock_db):
-    """Patch db on service and extracted WS4 enrichment module."""
+    """Patch db on service, enrichment, and equipment loader modules."""
     return (
         patch("services.maintenance_program_service.db", mock_db),
         patch("services.maintenance_program_enrichment.db", mock_db),
+        patch("services.maintenance_program_helpers.db", mock_db),
     )
 
 
@@ -80,8 +81,8 @@ async def test_enrich_adds_strategy_tasks_to_ephemeral_pm_only_program():
         equipment={"id": equipment_id, "equipment_type_id": "et-1", "criticality": {"level": "medium"}},
     )
 
-    db_patch_service, db_patch_enrichment = _patch_maintenance_program_db(mock_db)
-    with db_patch_service, db_patch_enrichment, patch(
+    db_patch_service, db_patch_enrichment, db_patch_helpers = _patch_maintenance_program_db(mock_db)
+    with db_patch_service, db_patch_enrichment, db_patch_helpers, patch(
         "services.scheduler_helpers.build_task_to_failure_modes",
         return_value={},
     ), patch(
@@ -126,8 +127,8 @@ async def test_enrich_adds_strategy_tasks_when_stored_program_has_none():
         equipment={"id": equipment_id, "equipment_type_id": "et-1", "criticality": "low"},
     )
 
-    db_patch_service, db_patch_enrichment = _patch_maintenance_program_db(mock_db)
-    with db_patch_service, db_patch_enrichment, patch(
+    db_patch_service, db_patch_enrichment, db_patch_helpers = _patch_maintenance_program_db(mock_db)
+    with db_patch_service, db_patch_enrichment, db_patch_helpers, patch(
         "services.scheduler_helpers.build_task_to_failure_modes",
         return_value={},
     ), patch(
@@ -166,9 +167,12 @@ async def test_enrich_dedupes_existing_strategy_template_ids():
         "strategy_tasks": 1,
     }
     mock_db = _mock_db(strategy=MOCK_STRATEGY, equipment=None)
+    mock_db.equipment_nodes.find_one = AsyncMock(
+        return_value={"id": equipment_id, "equipment_type_id": "et-1", "criticality": {"level": "medium"}}
+    )
 
-    db_patch_service, db_patch_enrichment = _patch_maintenance_program_db(mock_db)
-    with db_patch_service, db_patch_enrichment, patch(
+    db_patch_service, db_patch_enrichment, db_patch_helpers = _patch_maintenance_program_db(mock_db)
+    with db_patch_service, db_patch_enrichment, db_patch_helpers, patch(
         "services.scheduler_helpers.build_task_to_failure_modes",
         return_value={},
     ), patch(

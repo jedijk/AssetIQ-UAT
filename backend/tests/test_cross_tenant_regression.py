@@ -112,16 +112,18 @@ async def test_threat_update_dispatches_graph_sync():
     mock_db.threats.update_one = AsyncMock()
     graph_sync = AsyncMock()
 
-    with patch("services.threat_service.db", mock_db), patch(
-        "services.threat_service.assert_threat_installation_scope",
+    with patch("services.threat_crud.db", mock_db), patch(
+        "services.threat_helpers.db", mock_db
+    ), patch(
+        "services.threat_crud.assert_threat_installation_scope",
         AsyncMock(),
-    ), patch("services.threat_service._mirror_threat_observation", AsyncMock()), patch(
-        "services.threat_service._sync_threat_graph",
+    ), patch("services.threat_crud._mirror_threat_observation", AsyncMock()), patch(
+        "services.threat_crud._sync_threat_graph",
         graph_sync,
-    ), patch("services.threat_service.update_all_ranks", AsyncMock()), patch(
-        "services.threat_service.cache.invalidate_stats"
+    ), patch("services.threat_crud.update_all_ranks", AsyncMock()), patch(
+        "services.threat_crud.cache.invalidate_stats"
     ):
-        from services.threat_service import update_threat
+        from services.threat_crud import update_threat
 
         await update_threat(USER_A, "t-1", {"status": "closed"})
 

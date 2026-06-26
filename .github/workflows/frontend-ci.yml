@@ -38,6 +38,9 @@ jobs:
       - name: Banned import checks
         run: bash ../scripts/check_frontend_imports.sh
 
+      - name: Unit tests
+        run: npm run test:ci
+
       - name: Production build
         env:
           CI: "true"

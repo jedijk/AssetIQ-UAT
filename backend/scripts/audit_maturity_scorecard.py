@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -236,6 +237,40 @@ async def _uat_data_scores() -> list[DimensionScore]:
     return scores
 
 
+def _frontend_unit_test_score() -> DimensionScore:
+    """Score from verify_frontend_unit_tests.py (lib coverage + CI execution)."""
+    ok, summary = _run_script("verify_frontend_unit_tests.py")
+    if ok:
+        return DimensionScore(
+            "Frontend unit test coverage",
+            10.0,
+            10.0,
+            summary,
+        )
+
+    lib_match = re.search(r"lib=(\d+)/(\d+)", summary)
+    suites_match = re.search(r"suites=(\d+)", summary)
+    tests_match = re.search(r"tests=(\d+)", summary)
+    lib_ratio = 0.0
+    if lib_match:
+        tested, total = int(lib_match.group(1)), int(lib_match.group(2))
+        lib_ratio = tested / total if total else 0.0
+    suites = int(suites_match.group(1)) if suites_match else 0
+    tests = int(tests_match.group(1)) if tests_match else 0
+
+    lib_pts = min(4.0, (lib_ratio / 0.85) * 4.0) if lib_ratio else 0.0
+    suite_pts = min(3.0, (suites / 30.0) * 3.0)
+    test_pts = min(3.0, (tests / 200.0) * 3.0)
+    score = round(min(9.5, lib_pts + suite_pts + test_pts), 1)
+
+    return DimensionScore(
+        "Frontend unit test coverage",
+        score,
+        10.0,
+        summary,
+    )
+
+
 def _infra_ceiling_scores() -> list[DimensionScore]:
     """Dimensions that cannot reach 9.0 from UAT data fixes alone."""
     return [
@@ -251,12 +286,7 @@ def _infra_ceiling_scores() -> list[DimensionScore]:
             "External audit — not UAT-script addressable",
             not_tested=True,
         ),
-        DimensionScore(
-            "Frontend unit test coverage",
-            2.0, 10.0,
-            "~12 test files / ~578 sources — separate workstream",
-            not_tested=True,
-        ),
+        _frontend_unit_test_score(),
     ]
 
 

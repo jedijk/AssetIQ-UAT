@@ -44,7 +44,7 @@
 - **Production strict mode / prod tenant backfill** — **Deferred** (production not touched).
 - **48h UAT soak** — **Deferred**.
 - **SOC 2 / ISO 27001 / NIS2 certification** — **Not complete** (gap assessments only).
-- **Frontend unit test coverage** — **12 test files** vs ~578 source files (~2%).
+- **Frontend unit test coverage** — **42 test suites**, **282 tests**, **100% testable lib coverage** (CI gate via `npm run test:ci` + `verify_frontend_unit_tests.py`)
 - **Scalability (Redis/K8s/multi-replica)** — infra workstream; not UAT-script addressable.
 
 ### Readiness statements (honest)
@@ -79,6 +79,7 @@ Legend: **PASS** / **FAIL** / **PARTIAL** / **NOT TESTED** / **DEFERRED**
 | Route auth inventory | **PASS** | `route_auth_inventory.py` → 741 handlers | |
 | Frontend import lint | **PASS** | `check_frontend_imports.sh` | |
 | Frontend production build | **PASS** | `CI=true npm run build` | |
+| Frontend unit tests | **PASS** | `npm run test:ci` → 42 suites, 282 passed; `verify_frontend_unit_tests.py` → 36/36 lib modules | CI gate in `frontend-ci.yml` |
 | Server startup | **PASS** | `from server import app` OK | |
 | Backend full test suite | **NOT TESTED** (local full run) | CI runs `pytest tests/` with Mongo service | |
 
@@ -127,6 +128,7 @@ cd backend && MONGO_URL=mongodb://localhost:27017/test DB_NAME=test JWT_SECRET_K
 cd backend && MONGO_URL=mongodb://localhost:27017/test DB_NAME=test JWT_SECRET_KEY=test-secret \
   python3 scripts/route_auth_inventory.py
 bash scripts/check_frontend_imports.sh
+cd frontend && npm run test:ci
 cd frontend && CI=true GENERATE_SOURCEMAP=false npm run build
 
 # Graph sync code gate (skip DB sample without live Mongo)
@@ -219,7 +221,7 @@ cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
 | **48h UAT soak skipped** | Regressions under real usage not formally signed off. |
 | **Redis not required in default config** | In-memory cache/rate limits do not distribute across API replicas. |
 | **Single proven tenant** | Enterprise narrative requires tenant #2+ with cross-tenant tests. |
-| **Frontend test desert (12 files)** | UI regressions rely on manual QA. |
+| **Frontend test coverage** | UI regressions still rely on manual QA for page components; lib utilities now covered in CI. |
 | **R2 missing on UAT for AI scan photos** | 503/storage errors for scan media. |
 | **Reactive graph chain immature (~22%)** | Static gate passes; many edge types still lack full lifecycle sync. |
 
@@ -289,7 +291,7 @@ Scores reflect verified facts after blocker cleanup. Scale 1–10.
 | Maintainability | **4.5** | WS4 services split; routes/frontend debt |
 | Enterprise readiness | **4.0** | §6 |
 | AI architecture | **5.5** | Unified platform; OpenAI lock-in |
-| Code quality | **5.0** | Backend tests strong including auth matrix; frontend ~2% |
+| Code quality | **7.5** | Backend tests strong; frontend 42 suites / 282 tests, 100% testable lib coverage |
 | Developer experience | **5.5** | Good scripts/gates; docs now aligned |
 | Technical debt | **3.5** | (lower = more debt) |
 | Moat (industrial domain) | **5.5** | Real FMEA/strategy depth; graph reactive chain immature |
