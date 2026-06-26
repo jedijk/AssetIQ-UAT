@@ -2,9 +2,9 @@
 
 **Date:** 2026-06-26  
 **Repository:** AssetIQ-Dev  
-**Commit assessed:** `4976c0b0` (`deploy-uat` → `uat/main`)  
+**Commit assessed:** `fe17044f` (`deploy-uat`)  
 **Assessment method:** Code inspection, executable verification scripts, CI gates, UAT Atlas evidence (`assetiq-UAT`, tenant `Tyromer`)  
-**Companion doc:** `ASSETIQ_TECHNICAL_STATUS.md` (operational gate status)
+**Companion docs:** [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md) (operational gates), [`PHASE1_EXECUTION.md`](./PHASE1_EXECUTION.md), [`PLATFORM_1_0_EXECUTION.md`](./PLATFORM_1_0_EXECUTION.md) — remain active until archived after the next live UAT gate run.
 
 **Rule:** Nothing in this document is marked **Implemented** without file, script, or test evidence. Unverified items are marked **NOT VERIFIED**.
 
@@ -450,9 +450,9 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | Field | Value |
 |-------|-------|
 | Author | Platform audit (evidence-based) |
-| Supersedes | Ad-hoc diligence narratives |
-| Next review | After tenant #2 proof or prod cutover decision |
-| Related | `ASSETIQ_TECHNICAL_STATUS.md`, `PLATFORM_1_0_EXECUTION.md`, `SOC2_GAP_ASSESSMENT.md` |
+| Supersedes | Ad-hoc diligence narratives (not yet archived) |
+| Next review | After next live UAT gate run — then archive superseded execution/status docs if gates still pass |
+| Related | `ASSETIQ_TECHNICAL_STATUS.md`, `PHASE1_EXECUTION.md`, `PLATFORM_1_0_EXECUTION.md`, `SOC2_GAP_ASSESSMENT.md` |
 
 ---
 

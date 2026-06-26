@@ -1,10 +1,14 @@
 # Phase 1 — Platform Convergence & Enterprise Readiness (v1.0)
 
+**Current source of truth:** [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md)
+
+> This execution plan stays active until archived after the next live UAT gate run.
+
 **Objective:** Complete convergence from fast-moving startup platform to enterprise-ready Industrial Reliability Intelligence Platform.
 
 **Gate:** Phase 0 complete; no new product modules unless required for convergence.
 
-**Current status:** See [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md) — single source of truth for code gates vs live UAT data gates.
+**Current status:** See [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md) for operational gate commands; see [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md) for product/platform truth.
 
 **No Phase 2 work** until every verification report in Workstream D passes on **live UAT** (exit 0).
 

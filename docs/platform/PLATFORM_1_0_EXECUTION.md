@@ -1,8 +1,12 @@
 # AssetIQ Platform 1.0 — Execution Plan (v1.0)
 
+**Current source of truth:** [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md)
+
+> This execution plan stays active until archived after the next live UAT gate run.
+
 **Objective:** Build a robust, scalable, maintainable foundation so every future module shares one consistent architecture.
 
-**Gate:** Phase 1 **code/platform workstreams** largely complete; **live UAT data convergence** and **production readiness** are not complete. See [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md).
+**Gate:** Phase 1 **code/platform workstreams** largely complete; **live UAT data convergence** and **production readiness** are not complete. See [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md) for gates; see [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md) for product/platform truth.
 
 **No major new product modules** until Platform 1.0 success criteria are verified.
 
@@ -14,7 +18,8 @@
 
 | Area | Status |
 |------|--------|
-| **Authoritative status** | [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md) |
+| **Authoritative status (product/platform truth)** | [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md) |
+| **Operational gate commands** | [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md) |
 | Code verification gates (CI / local) | **Pass** — platform standards, tenant audit, graph sync static, AI entry points |
 | UAT live data gates | **Not verified this cycle** — `phase1_data_integrity_report.py`, `verify_uat_gates.py` require UAT Atlas |
 | Maintenance domain tenant scoping (B1) | **Done** — `maintenance_tenant_scope.py` cluster + `77d97602` |

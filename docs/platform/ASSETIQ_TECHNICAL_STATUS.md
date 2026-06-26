@@ -1,11 +1,15 @@
 # ASSETIQ TECHNICAL STATUS
 
+**Current source of truth:** [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md)
+
+> This document stays active for operational gate commands and exit codes until archived after the next live UAT gate run.
+
 **Version:** 2026-06-26 (UAT live verification)  
 **Repository:** AssetIQ-Dev  
 **Branch / commit assessed:** `deploy-uat` @ `ebe2eb66`  
 **Environment assessed:** Local code gates + **live UAT Atlas** (`assetiq-UAT`, tenant `Tyromer`)
 
-**Purpose:** Single source of truth reconciling the technical due diligence report, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable verification scripts.
+**Purpose:** Operational gate status and reproducible verification commands. Product/platform truth lives in [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md); this file reconciles due diligence, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable scripts.
 
 **Assessment method:** Run or inspect verification scripts listed below. Do not treat narrative “Done” checkboxes in older docs as proof unless backed by a script exit code or test run on the target environment.
 
@@ -316,9 +320,10 @@ Production soak and production rollout are **intentionally skipped**. Recommende
 
 | Document | Status |
 |----------|--------|
-| **`ASSETIQ_TECHNICAL_STATUS.md`** (this file) | **Current** — refresh after UAT gate run |
-| **`PHASE1_EXECUTION.md`** | **Updated** — success criteria vs workstreams aligned; Phase 1 not marked complete |
-| **`PLATFORM_1_0_EXECUTION.md`** | **Updated** — code gates vs live UAT separated; Platform 1.0 not marked complete |
+| **`PLATFORM_TRUTH_AUDIT_2026-06-26.md`** | **Current** — product + platform truth (evidence-based) |
+| **`ASSETIQ_TECHNICAL_STATUS.md`** | **Active** — operational gate commands; archive after next UAT gate run |
+| **`PHASE1_EXECUTION.md`** | **Active** — archive after next UAT gate run |
+| **`PLATFORM_1_0_EXECUTION.md`** | **Active** — archive after next UAT gate run |
 | **`RELIABILITY_GRAPH_ARCHITECTURE.md`** | **Updated** — approved upsert modules reflect WS4 split |
 
 ### Claims that must not appear unless re-verified on live UAT
