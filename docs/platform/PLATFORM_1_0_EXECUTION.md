@@ -22,6 +22,7 @@
 | Canonical data models | **Done (WS3)** — `canonical_models.py`, `CANONICAL_DATA_MODELS.md` |
 | AI gateway | **Done (WS5)** — unified `ai_platform` API; all vision/multimodal paths migrated |
 | Executive read models | **Done (WS6)** — dashboard routes read snapshots; materializers refresh on miss/invalidation |
+| Graph performance benchmarks | **Done (WS7)** — harness, verify gate, optimization report |
 | Large-file modularization | **Done (WS4)** — zero service modules over 800 LOC |
 | R2 on UAT (AI scan photos) | **Open** — ops, not blocking Platform 1.0 code track |
 
@@ -37,7 +38,7 @@ Platform 1.0 is complete when:
 - [x] All major files have been modularized (~800 line target)
 - [x] Every AI feature uses the unified AI platform
 - [x] Executive dashboards use read models
-- [ ] Graph performance benchmarks completed
+- [x] Graph performance benchmarks completed
 - [ ] Engineering standards documented and CI-enforced
 
 ---
@@ -248,9 +249,19 @@ Provider Layer → Prompt Registry → Context Builder → Evidence Builder
 
 **Metrics:** BFS latency · query count · node/edge count · memory · AI traversal latency
 
-**Status:** **Not started**
+**Status:** **Done** — benchmark harness, query instrumentation, verify gate, optimization report
 
-**Deliverables:** Performance benchmark report · optimization report
+**Docs:** [`GRAPH_PERFORMANCE_BENCHMARKS.md`](./GRAPH_PERFORMANCE_BENCHMARKS.md)
+
+| Task | Status |
+|------|--------|
+| Benchmark harness | **Done** — `services/reliability_graph_benchmark.py` |
+| CLI runner | **Done** — `scripts/benchmark_reliability_graph.py` |
+| Query instrumentation | **Done** — context-scoped counter in `reliability_graph_core.py` |
+| Verify gate | **Done** — `scripts/verify_graph_performance_benchmarks.py` |
+| Optimization report | **Done** — documented in `GRAPH_PERFORMANCE_BENCHMARKS.md` |
+
+**Definition of done:** Performance benchmark report · optimization report ✓
 
 ---
 

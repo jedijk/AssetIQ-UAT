@@ -826,6 +826,19 @@ def test_ws6_read_models_registry_exists():
     assert get_read_model("executive_kpi").collection == "executive_kpi_snapshots"
 
 
+def test_ws7_graph_performance_benchmark_exists():
+    """WS7 — graph performance benchmark harness and verify gate."""
+    from services.reliability_graph_benchmark_lib import BENCHMARK_SCALES, benchmark_tenant_id
+
+    assert BENCHMARK_SCALES == (100, 1_000, 10_000, 100_000)
+    assert benchmark_tenant_id(100) == "ws7-bench-100"
+
+    script = BACKEND_ROOT / "scripts" / "verify_graph_performance_benchmarks.py"
+    assert script.is_file()
+    runner = BACKEND_ROOT / "scripts" / "benchmark_reliability_graph.py"
+    assert runner.is_file()
+
+
 def test_openai_imports_are_allowlisted():
     """Phase 4 — direct OpenAI imports must stay in allowlist or grandfathered baseline."""
     import importlib.util

@@ -7,6 +7,7 @@ and AI/RIL context assembly.
 """
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 import uuid
@@ -24,6 +25,31 @@ RELIABILITY_IMPACTS_COLLECTION = "reliability_impacts"
 
 EDGE_STATUS_ACTIVE = "active"
 EDGE_STATUS_RETIRED = "retired"
+
+# Optional WS7 benchmark counter — zero overhead when unset.
+_graph_query_counter: contextvars.ContextVar[Optional[List[str]]] = contextvars.ContextVar(
+    "graph_query_counter", default=None
+)
+
+
+def reset_graph_query_counter() -> contextvars.Token:
+    """Start counting Mongo graph read operations in the current context."""
+    return _graph_query_counter.set([])
+
+
+def restore_graph_query_counter(token: contextvars.Token) -> None:
+    _graph_query_counter.reset(token)
+
+
+def graph_query_count() -> int:
+    counter = _graph_query_counter.get()
+    return len(counter) if counter is not None else 0
+
+
+def _record_graph_query(op: str) -> None:
+    counter = _graph_query_counter.get()
+    if counter is not None:
+        counter.append(op)
 
 
 def _edge_tenant_clause(tenant_id: Optional[str]) -> Dict[str, Any]:
@@ -191,6 +217,7 @@ async def get_edges_for_equipment(
     if not include_retired:
         query["status"] = {"$ne": EDGE_STATUS_RETIRED}
     query = _merge_edge_query(query, tenant_id)
+    _record_graph_query("get_edges_for_equipment")
     return await db[COLLECTION].find(
         query,
         {"_id": 0},
@@ -216,6 +243,7 @@ async def get_edges_for_node(
     if not include_retired:
         query["status"] = {"$ne": EDGE_STATUS_RETIRED}
     query = _merge_edge_query(query, tenant_id)
+    _record_graph_query("get_edges_for_node")
     return await db[COLLECTION].find(query, {"_id": 0}).sort("updated_at", -1).to_list(limit)
 
 
