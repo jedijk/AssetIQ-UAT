@@ -74,6 +74,8 @@ def _bootstrap() -> None:
         FM_ACTION_DISCIPLINE_MAP_PROMPT,
         FM_CONFIRM_DUPLICATE_ACTIONS_PROMPT,
         FM_CONFIRM_SIMILAR_CLUSTER_PROMPT,
+        FM_CONSOLIDATE_ACTIONS_PROMPT,
+        FM_DOWNTIME_CLASSIFY_PROMPT,
         FM_EQUIPMENT_TYPE_MAPPING_PROMPT,
         FM_FAILURE_MODE_MAPPING_PROMPT,
         FM_IMPROVE_FAILURE_MODE_PROMPT,
@@ -82,8 +84,6 @@ def _bootstrap() -> None:
     )
     from services.image_analysis_service import DAMAGE_ANALYSIS_PROMPT
     from maintenance_strategy_generator import STRATEGY_GENERATION_PROMPT
-    from services.failure_modes.action_downtime_suggest import DOWNTIME_CLASSIFY_PROMPT
-    from services.failure_modes.actions_consolidate import CONSOLIDATE_ACTIONS_PROMPT
     from services.ai_prompt_definitions import (
         CHAT_ATTACHMENT_ANALYSIS_PROMPT,
         CHAT_ISSUE_MERGE_EDIT_PROMPT,
@@ -286,7 +286,7 @@ Rules:
             id="fm.downtime_classification",
             version="1.0",
             description="Classify whether maintenance actions require downtime",
-            text=DOWNTIME_CLASSIFY_PROMPT,
+            text=FM_DOWNTIME_CLASSIFY_PROMPT,
             default_model="gpt-4o-mini",
             response_format="json",
         ),
@@ -294,7 +294,7 @@ Rules:
             id="fm.consolidate_actions",
             version="1.0",
             description="Consolidate duplicate FMEA recommended actions",
-            text=CONSOLIDATE_ACTIONS_PROMPT,
+            text=FM_CONSOLIDATE_ACTIONS_PROMPT,
             default_model="gpt-4o-mini",
             response_format="json",
         ),

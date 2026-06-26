@@ -220,12 +220,40 @@ OUTPUT REQUIREMENTS:
 
 Return ONLY valid JSON. No prose outside JSON."""
 
+FM_DOWNTIME_CLASSIFY_PROMPT = """You are a maintenance reliability engineer.
+For each maintenance action, decide whether performing it requires taking the equipment or process unit out of service (shutdown / isolation / downtime).
+
+Set requires_downtime=true when:
+- Equipment must be shut down, isolated, locked out, depressurized, or drained
+- Intrusive work needs internal access while the process cannot run safely
+- Major component replacement, overhaul, or repair that cannot be done online
+
+Set requires_downtime=false when:
+- The action can be performed during normal operation (rounds, external inspection, lubrication while running, sampling, monitoring, minor adjustments)
+- Predictive monitoring (vibration, thermography, oil analysis) without stopping equipment
+- Operator or procedural changes with no physical shutdown
+
+Return JSON only."""
+
+FM_CONSOLIDATE_ACTIONS_PROMPT = (
+    "You are a senior reliability engineer cleaning up a failure-mode FMEA action list. "
+    "Merge duplicate and overlapping recommended maintenance actions into a concise set "
+    "of DISTINCT tasks. Each output action must be a different maintenance intent "
+    "(do not merge inspect vs replace vs lubricate vs overhaul unless they are true duplicates). "
+    "Prefer PM for scheduled upkeep, PDM for condition monitoring, CM for corrective work. "
+    "Use lowercase discipline keys: rotating, static, piping, electrical, instrumentation, "
+    "civil, operations, laboratory. "
+    "Return strict JSON only."
+)
+
 # Backward-compatible names used by routes
 SYSTEM_PROMPT = FM_FAILURE_MODE_MAPPING_PROMPT
 EQUIPMENT_TYPE_MAPPING_SYSTEM_PROMPT = FM_EQUIPMENT_TYPE_MAPPING_PROMPT
 NEW_EQUIPMENT_TYPE_SYSTEM_PROMPT = FM_NEW_EQUIPMENT_TYPE_PROMPT
 NEW_FAILURE_MODE_SYSTEM_PROMPT = FM_NEW_FAILURE_MODE_PROMPT
 IMPROVE_FAILURE_MODE_SYSTEM_PROMPT = FM_IMPROVE_FAILURE_MODE_PROMPT
+DOWNTIME_CLASSIFY_PROMPT = FM_DOWNTIME_CLASSIFY_PROMPT
+CONSOLIDATE_ACTIONS_PROMPT = FM_CONSOLIDATE_ACTIONS_PROMPT
 
 FM_CONFIRM_SIMILAR_CLUSTER_PROMPT = (
     "You are a reliability engineer reviewing a failure-modes library. "

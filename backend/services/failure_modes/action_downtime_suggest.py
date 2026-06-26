@@ -5,28 +5,13 @@ import json
 import logging
 from typing import Any, Dict, List
 
-from services.ai_platform import execute_json_prompt
+from services.ai_fm_prompts import DOWNTIME_CLASSIFY_PROMPT
 
 logger = logging.getLogger(__name__)
 
 # FM-level checks may chunk; bulk review uses one OpenAI call per HTTP request.
 _CLASSIFY_CHUNK_SIZE = 4
 _REVIEW_BATCH_MAX = 8
-
-DOWNTIME_CLASSIFY_PROMPT = """You are a maintenance reliability engineer.
-For each maintenance action, decide whether performing it requires taking the equipment or process unit out of service (shutdown / isolation / downtime).
-
-Set requires_downtime=true when:
-- Equipment must be shut down, isolated, locked out, depressurized, or drained
-- Intrusive work needs internal access while the process cannot run safely
-- Major component replacement, overhaul, or repair that cannot be done online
-
-Set requires_downtime=false when:
-- The action can be performed during normal operation (rounds, external inspection, lubrication while running, sampling, monitoring, minor adjustments)
-- Predictive monitoring (vibration, thermography, oil analysis) without stopping equipment
-- Operator or procedural changes with no physical shutdown
-
-Return JSON only."""
 
 
 def _downtime_prompt() -> str:
@@ -67,6 +52,8 @@ Return JSON: {{"results": [{{"i": 0, "requires_downtime": false, "reasoning": ".
 
     max_tokens = min(1600, max(300, len(actions) * 80 + 120))
     try:
+        from services.ai_platform import execute_json_prompt
+
         result = await execute_json_prompt(
             "fm.downtime_classification",
             user={"id": user_id, "company_id": company_id},

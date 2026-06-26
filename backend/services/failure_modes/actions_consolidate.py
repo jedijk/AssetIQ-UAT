@@ -3,19 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Set, Tuple
 
-from services.ai_platform import execute_json_prompt
+from services.ai_fm_prompts import CONSOLIDATE_ACTIONS_PROMPT
 from services.failure_modes.cache import _invalidate_cache
-
-CONSOLIDATE_ACTIONS_PROMPT = (
-    "You are a senior reliability engineer cleaning up a failure-mode FMEA action list. "
-    "Merge duplicate and overlapping recommended maintenance actions into a concise set "
-    "of DISTINCT tasks. Each output action must be a different maintenance intent "
-    "(do not merge inspect vs replace vs lubricate vs overhaul unless they are true duplicates). "
-    "Prefer PM for scheduled upkeep, PDM for condition monitoring, CM for corrective work. "
-    "Use lowercase discipline keys: rotating, static, piping, electrical, instrumentation, "
-    "civil, operations, laboratory. "
-    "Return strict JSON only."
-)
 
 
 class ActionsConsolidateMixin:
