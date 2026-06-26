@@ -50,10 +50,11 @@ async def generate_ai_recommendations(
     existing_tasks = [t.get("task_title") for t in program.get("tasks", [])]
 
     failure_context = ""
+    observations = []
     if include_failure_history:
         observations = await db.observations.find(
             maintenance_scoped(user, {"equipment_id": equipment_id}),
-            {"title": 1, "description": 1, "failure_mode": 1, "_id": 0},
+            {"id": 1, "title": 1, "description": 1, "failure_mode": 1, "_id": 0},
         ).sort("created_at", -1).limit(20).to_list(20)
         if observations:
             failure_context = "\n\nRecent failure history:\n"
@@ -114,6 +115,29 @@ async def generate_ai_recommendations(
             recommendations = []
 
         ai_tasks = []
+        from services.ai_citation import make_citation
+
+        citations = []
+        for obs in observations[:10]:
+            obs_id = obs.get("id")
+            if obs_id:
+                citations.append(
+                    make_citation(
+                        id=str(obs_id),
+                        type="observation",
+                        label=obs.get("title") or str(obs_id),
+                        url_path=f"/threats/{obs_id}",
+                    )
+                )
+        citations.append(
+            make_citation(
+                id=equipment_id,
+                type="equipment",
+                label=equipment.get("name") or equipment_id,
+                url_path=f"/equipment/{equipment_id}",
+            )
+        )
+
         for rec in recommendations[:max_recommendations]:
             freq_str = rec.get("frequency", "monthly").lower()
             try:
@@ -165,7 +189,7 @@ async def generate_ai_recommendations(
             action="generate_ai_recommendations",
             equipment_id=equipment_id,
             user_id=user_id,
-            details={"recommendations_count": len(ai_tasks)},
+            details={"recommendations_count": len(ai_tasks), "citation_count": len(citations)},
         )
         return ai_tasks
     except Exception as e:

@@ -522,23 +522,44 @@ Return as JSON array with fields: title, description, impact (high/medium/low)
         
         # Ensure max 5 recommendations
         recommendations = recommendations[:5]
-        
-        return {
-            "recommendations": recommendations,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "data_summary": {
+
+        from services.ai_citation import make_citation
+        from services.ai_recommendation_contract import finalize_ai_recommendation_response
+
+        citations = [
+            make_citation(
+                id="fleet-reliability-summary",
+                type="kpi",
+                label="Fleet reliability KPI snapshot",
+                url_path="/insights",
+            )
+        ]
+        evidence = {
+            "deterministic": {
                 "total_actions": total_actions,
                 "success_rate": success_rate,
                 "fmea_coverage": fmea_coverage,
-                "observations_without_actions": obs_without_actions
-            }
+                "observations_without_actions": obs_without_actions,
+            },
         }
+        return finalize_ai_recommendation_response(
+            {
+                "recommendations": recommendations,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "data_summary": evidence["deterministic"],
+            },
+            citations=citations,
+            evidence=evidence,
+        )
         
     except Exception as e:
         logger.error(f"Error generating AI recommendations: {e}")
+        from services.ai_recommendation_contract import finalize_ai_recommendation_response
+
         # Return fallback recommendations
-        return {
-            "recommendations": [
+        return finalize_ai_recommendation_response(
+            {
+                "recommendations": [
                 {
                     "title": "Review Data Quality",
                     "description": "Ensure all assets have complete criticality assessments and FMEA coverage.",
@@ -566,8 +587,10 @@ Return as JSON array with fields: title, description, impact (high/medium/low)
                 }
             ],
             "generated_at": datetime.now(timezone.utc).isoformat(),
-            "error": "AI generation failed, showing default recommendations"
-        }
+            "error": "AI generation failed, showing default recommendations",
+        },
+        citations=[],
+    )
 
 
 async def get_insights_summary(

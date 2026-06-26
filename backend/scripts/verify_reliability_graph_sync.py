@@ -22,6 +22,12 @@ REPO_ROOT = BACKEND_ROOT.parent
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
+# Static checks import service modules that load database.py at import time.
+os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017/graph-sync-gate")
+os.environ.setdefault("DB_NAME", "graph-sync-gate")
+os.environ.setdefault("JWT_SECRET_KEY", "graph-audit-script")
+os.environ.setdefault("ENVIRONMENT", "test")
+
 
 def _static_path_checks() -> list[str]:
     """Return list of static check failures."""

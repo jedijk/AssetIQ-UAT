@@ -48,7 +48,7 @@
 - **Production strict mode / prod tenant backfill** — **Deferred** (production not touched).
 - **48h UAT soak** — **Deferred**.
 - **SOC 2 / ISO 27001 / NIS2 certification** — **Not complete** (gap assessments only).
-- **Frontend unit test coverage** — **42 test suites**, **282 tests**, **100% testable lib coverage** (CI gate via `npm run test:ci` + `verify_frontend_unit_tests.py`)
+- **Frontend unit test coverage** — **43 test suites**, **285 tests** (includes `maintenanceStrategyFilters.test.js`); CI gate via `npm run test:ci` + `verify_frontend_unit_tests.py`
 - **Scalability (Redis/K8s/multi-replica)** — infra workstream; not UAT-script addressable.
 
 ### Readiness statements (honest)
@@ -75,7 +75,7 @@ Legend: **PASS** / **FAIL** / **PARTIAL** / **NOT TESTED** / **DEFERRED**
 | Canonical data models (WS3) | **PASS** | `verify_canonical_models.py` → 13 domains | |
 | Read models registry (WS6) | **PASS** | `verify_read_models_registry.py` → 12 models | |
 | Graph performance gate (WS7) | **PARTIAL** | Harness OK; micro benchmark needs Mongo | |
-| Reliability graph sync (static) | **PASS** | `verify_reliability_graph_sync.py` static section → OK | Requires `MONGO_URL` for import; use `ENVIRONMENT=test` locally to skip DB sample |
+| Reliability graph sync (static) | **PASS** | `verify_reliability_graph_sync.py` static section → OK | Script sets default `MONGO_URL` for imports; use `ENVIRONMENT=test` locally to skip DB sample |
 | Auth matrix tests | **PASS** | `pytest tests/test_auth_matrix.py` → 61 passed | AI/RIL/copilot routes still enforced via `require_permission` + `ai_platform` |
 | Graph sync unit tests | **PASS** | `pytest tests/test_verify_reliability_graph_sync.py` → 4 passed | |
 | Architecture convergence tests | **PASS** | `pytest tests/test_architecture_convergence.py` → 74 passed | |
@@ -83,7 +83,7 @@ Legend: **PASS** / **FAIL** / **PARTIAL** / **NOT TESTED** / **DEFERRED**
 | Route auth inventory | **PASS** | `route_auth_inventory.py` → 741 handlers | |
 | Frontend import lint | **PASS** | `check_frontend_imports.sh` | |
 | Frontend production build | **PASS** | `CI=true npm run build` | |
-| Frontend unit tests | **PASS** | `npm run test:ci` → 42 suites, 282 passed; `verify_frontend_unit_tests.py` → 36/36 lib modules | CI gate in `frontend-ci.yml` |
+| Frontend unit tests | **PASS** | `npm run test:ci` → 43 suites, 285 passed | CI gate in `frontend-ci.yml`; maintenance strategy filter tests added |
 | Server startup | **PASS** | `from server import app` OK | |
 | Backend full test suite | **NOT TESTED** (local full run) | CI runs `pytest tests/` with Mongo service | |
 
@@ -216,7 +216,7 @@ cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
 |------|----------------|
 | **Live UAT data integrity unverified this cycle** | Code gates pass; UAT data may still have bridge/FM/schedule gaps from last documented run. |
 | **Production strict mode / prod tenant backfill not done** | Single-tenant pilot does not prove multi-customer isolation in production. |
-| **JWT default secret if env misconfigured** | `database.py` falls back to insecure default when `JWT_SECRET_KEY` unset. |
+| **JWT default secret if env misconfigured** | **Mitigated (2026-06-26):** `database.py` fails startup for `uat`/`staging`/`production` when `JWT_SECRET_KEY` unset; fallback only for `local`/`development`/`dev`/`test`. Tests: `tests/test_jwt_secret_config.py`. |
 
 ### High
 

@@ -222,7 +222,55 @@ async def analyze_threat_risk(
     except Exception as e:
         logger.warning(f"Failed linking ai_risk_insights onto threat {threat_id}: {e}")
 
-    return result.model_dump()
+    from services.ai_citation import make_citation
+    from services.ai_recommendation_contract import finalize_ai_recommendation_response
+
+    citations = []
+    citations.append(
+        make_citation(
+            id=threat_id,
+            type="observation",
+            label=threat.get("title") or "Observation",
+            url_path=f"/threats/{threat_id}",
+        )
+    )
+    if equipment_id:
+        citations.append(
+            make_citation(
+                id=equipment_id,
+                type="equipment",
+                label=(equipment_data or {}).get("name") or threat.get("asset") or equipment_id,
+                url_path=f"/equipment/{equipment_id}",
+            )
+        )
+    for obs in (equipment_history or {}).get("observations") or []:
+        obs_id = obs.get("id")
+        if obs_id and obs_id != threat_id:
+            citations.append(
+                make_citation(
+                    id=obs_id,
+                    type="observation",
+                    label=obs.get("title") or obs_id,
+                    url_path=f"/threats/{obs_id}",
+                )
+            )
+
+    evidence = {
+        "deterministic": {
+            "threat_risk_score": threat.get("risk_score"),
+            "equipment_history_counts": {
+                "observations": len((equipment_history or {}).get("observations") or []),
+                "actions": len((equipment_history or {}).get("actions") or []),
+                "tasks": len((equipment_history or {}).get("tasks") or []),
+            },
+        },
+        "ai_narrative": result.model_dump(),
+    }
+    return finalize_ai_recommendation_response(
+        result.model_dump(),
+        citations=citations[:20],
+        evidence=evidence,
+    )
 
 
 async def get_risk_insights(

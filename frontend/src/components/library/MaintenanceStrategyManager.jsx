@@ -24,7 +24,6 @@ import {
   CheckCircle2,
   Calendar,
   Activity,
-  Search,
   Edit2,
   Plus,
   X,
@@ -118,6 +117,16 @@ import { useFailureModeNameMap, useMaintenanceTaskTemplateMap } from "../../hook
 import StrategyIntelligenceFlowBar from "../intelligence/StrategyIntelligenceFlowBar";
 import { normalizeScheduleProgramRow } from "../../lib/strategyIntelligenceFlow";
 import ActionDowntimeBadge, { resolveTaskRequiresDowntime } from "../failure-modes/ActionDowntimeBadge";
+import StrategyHeader from "./maintenance-strategy/StrategyHeader";
+import StrategyFilters from "./maintenance-strategy/StrategyFilters";
+import StrategyTaskList from "./maintenance-strategy/StrategyTaskList";
+import StrategyAIRecommendations from "./maintenance-strategy/StrategyAIRecommendations";
+import { useMaintenanceStrategyData } from "../../hooks/useMaintenanceStrategyData";
+import {
+  filterFailureModeStrategies,
+  filterTaskTemplates,
+  isStrategyTaskActive,
+} from "../../lib/maintenanceStrategyFilters";
 
 // ============= Constants =============
 
@@ -1177,15 +1186,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
  * each strategy mints its own FM-strategy id distinct from the library FM id
  * stored inside task.failure_mode_ids.
  */
-const isTaskActive = (task, failureModeStrategies = []) => {
-  if (!task?.id) return true;
-  if (task.is_mandatory === false) return false;
-  const linkedFms = failureModeStrategies.filter((fm) =>
-    (fm?.task_ids || []).includes(task.id),
-  );
-  if (!linkedFms.length) return true;
-  return linkedFms.some((fm) => fm?.enabled !== false);
-};
+const isTaskActive = isStrategyTaskActive;
 
 const formatVersionHistoryChange = (change) => {
   if (typeof change === "string") {
@@ -1310,34 +1311,22 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
   const equipmentTypeName = equipmentType?.name;
   const fmNameMap = useFailureModeNameMap();
 
-  // ============= Queries =============
+  const {
+    strategyQuery,
+    schedulableProgramsQuery,
+    affectedEquipmentQuery,
+    versionHistoryQuery,
+    strategyData,
+    strategy,
+    hasStrategy,
+    libraryFmsById,
+  } = useMaintenanceStrategyData(equipmentTypeId, { affectedEquipmentDialogOpen });
 
-  const { data: strategyData, isLoading: strategyLoading, refetch: refetchStrategy } = useQuery({
-    queryKey: ["maintenance-strategy-v2", equipmentTypeId],
-    queryFn: () => maintenanceStrategyV2API.getStrategy(equipmentTypeId),
-    enabled: !!equipmentTypeId,
-  });
-
-  const { data: libraryFailureModes } = useQuery({
-    queryKey: queryKeys.failureModes.list(),
-    queryFn: () => failureModesAPI.getAll(),
-    enabled: !!equipmentTypeId,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const libraryFmsById = useMemo(() => {
-    const map = {};
-    for (const fm of libraryFailureModes?.failure_modes || []) {
-      if (fm?.id) map[String(fm.id)] = fm;
-    }
-    return map;
-  }, [libraryFailureModes]);
-
-  const strategy = strategyData?.strategy;
-  const hasStrategy =
-    strategyData?.exists === true &&
-    strategyData?.equipment_type_id === equipmentTypeId &&
-    !!strategy;
+  const { isLoading: strategyLoading, refetch: refetchStrategy } = strategyQuery;
+  const schedulableProgramsData = schedulableProgramsQuery.data;
+  const versionHistoryData = versionHistoryQuery.data;
+  const affectedEquipmentData = affectedEquipmentQuery.data;
+  const affectedEquipmentLoading = affectedEquipmentQuery.isLoading;
 
   const flowFailureModeItems = useMemo(
     () =>
@@ -1349,16 +1338,6 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
   );
 
   const flowSelectedFailureModeIds = useMemo(() => [...expandedFMs], [expandedFMs]);
-
-  const { data: schedulableProgramsData } = useQuery({
-    queryKey: ["maintenance-scheduler-programs", equipmentTypeId || "all"],
-    queryFn: () =>
-      maintenanceSchedulerAPI.getPrograms(
-        equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {},
-      ),
-    enabled: !!equipmentTypeId,
-    staleTime: 30_000,
-  });
 
   const scheduleFlowProgramItems = useMemo(
     () =>
@@ -1449,22 +1428,6 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
     return () => window.clearTimeout(timer);
   }, [strategyHighlight, strategyLoading, hasStrategy, strategy, onStrategyHighlightConsumed]);
-
-  // Affected equipment query
-  const { data: affectedEquipmentData, isLoading: affectedEquipmentLoading } = useQuery({
-    queryKey: ["maintenance-strategy-v2-affected-equipment", equipmentTypeId],
-    queryFn: () => maintenanceStrategyV2API.getAffectedEquipment(equipmentTypeId),
-    enabled: !!equipmentTypeId && affectedEquipmentDialogOpen,
-  });
-
-  // Version history query
-  const { data: versionHistoryData } = useQuery({
-    queryKey: ["maintenance-strategy-v2-history", equipmentTypeId],
-    queryFn: () => maintenanceStrategyV2API.getVersionHistory(equipmentTypeId),
-    enabled: !!equipmentTypeId && hasStrategy,
-    retry: false,
-    staleTime: 30_000,
-  });
 
   // ============= Mutations =============
 
@@ -1827,26 +1790,15 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
   // ============= Filtered Data =============
 
-  const filteredFMStrategies = useMemo(() => {
-    const fmStrategies = strategy?.failure_mode_strategies || [];
-    if (!searchQuery) return fmStrategies;
-    const q = searchQuery.toLowerCase();
-    return fmStrategies.filter(
-      (fm) => fm.failure_mode_name?.toLowerCase().includes(q)
-    );
-  }, [strategy, searchQuery]);
+  const filteredFMStrategies = useMemo(
+    () => filterFailureModeStrategies(strategy?.failure_mode_strategies, searchQuery),
+    [strategy, searchQuery],
+  );
 
-  const filteredTasks = useMemo(() => {
-    const tasks = strategy?.task_templates || [];
-    if (!searchQuery) return tasks;
-    const q = searchQuery.toLowerCase();
-    return tasks.filter(
-      (t) =>
-        t.name?.toLowerCase().includes(q) ||
-        t.description?.toLowerCase().includes(q) ||
-        t.task_type?.toLowerCase().includes(q)
-    );
-  }, [strategy, searchQuery]);
+  const filteredTasks = useMemo(
+    () => filterTaskTemplates(strategy?.task_templates, searchQuery),
+    [strategy, searchQuery],
+  );
 
   // ============= Render =============
 
@@ -1936,129 +1888,37 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-3 text-slate-900">
-            <Wrench className="w-7 h-7 text-blue-600" />
-            {equipmentTypeName} <span className="text-slate-400 font-normal">|</span> {t("maintenance.maintenanceStrategy")}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {hasStrategy ? (
-            <>
-              <Button size="sm" variant="outline" onClick={() => refetchStrategy()}>
-                <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                {t("maintenance.refresh")}
-              </Button>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => syncStrategyMutation.mutate()}
-                      disabled={syncStrategyMutation.isPending}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                    >
-                      {syncStrategyMutation.isPending ? (
-                        <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                      )}
-                      {t("maintenance.syncLibrary")}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-xs">
-                      Sync with library to add new failure modes and tasks. 
-                      <strong> Existing configurations will be preserved.</strong>
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                    <Trash2 className="w-3.5 h-3.5 mr-1" />
-                    {t("maintenance.deleteStrategyBtn")}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-                      <AlertTriangle className="w-5 h-5" />
-                      Delete Maintenance Strategy?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                      <div className="space-y-3">
-                        <p>
-                          This will permanently delete the maintenance strategy for <strong>{equipmentTypeName}</strong>, 
-                          including all {strategy?.failure_mode_strategies?.length || 0} failure mode configurations 
-                          and {strategy?.task_templates?.length || 0} task templates.
-                        </p>
-                        
-                        {(strategy?.affected_equipment_count || 0) > 0 && (
-                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                            <div className="flex items-start gap-2">
-                              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                              <div>
-                                <p className="font-medium text-amber-800">
-                                  This will impact {strategy?.affected_equipment_count} equipment items
-                                </p>
-                                <p className="text-sm text-amber-700 mt-1">
-                                  All equipment in the hierarchy using this equipment type will lose their maintenance strategy 
-                                  and scheduled tasks will no longer be generated.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        <p className="text-red-600 font-medium">
-                          This action cannot be undone.
-                        </p>
-                      </div>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => deleteStrategyMutation.mutate()}
-                      className="bg-red-600 hover:bg-red-700"
-                      disabled={deleteStrategyMutation.isPending}
-                    >
-                      {deleteStrategyMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4 mr-2" />
-                      )}
-                      Delete Strategy
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
-          ) : (
-            <Button size="sm" onClick={handleCreateStrategy} disabled={createStrategyMutation.isPending}>
-              {createStrategyMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4 mr-2" />
-              )}
-              Generate Strategy
-            </Button>
-          )}
-        </div>
-      </div>
+      <StrategyHeader
+        equipmentTypeName={equipmentTypeName}
+        maintenanceStrategyLabel={t("maintenance.maintenanceStrategy")}
+        hasStrategy={hasStrategy}
+        strategy={strategy}
+        t={t}
+        onRefresh={() => refetchStrategy()}
+        onSyncLibrary={() => syncStrategyMutation.mutate()}
+        syncPending={syncStrategyMutation.isPending}
+        onDeleteStrategy={() => deleteStrategyMutation.mutate()}
+        deletePending={deleteStrategyMutation.isPending}
+        onCreateStrategy={handleCreateStrategy}
+        createPending={createStrategyMutation.isPending}
+      />
 
       {/* Strategy Overview */}
-      <StrategyOverviewCard 
-        strategy={strategyData} 
-        onToggleStrategy={handleToggleStrategy}
-        isUpdating={updateStrategyMutation.isPending || strategyDisableImpactLoading}
-        onShowAffectedEquipment={() => setAffectedEquipmentDialogOpen(true)}
-        t={t}
-      />
+      {hasStrategy ? (
+        <StrategyOverviewCard
+          strategy={strategyData}
+          onToggleStrategy={handleToggleStrategy}
+          isUpdating={updateStrategyMutation.isPending || strategyDisableImpactLoading}
+          onShowAffectedEquipment={() => setAffectedEquipmentDialogOpen(true)}
+          t={t}
+        />
+      ) : (
+        <StrategyAIRecommendations
+          t={t}
+          onGenerate={handleCreateStrategy}
+          isPending={createStrategyMutation.isPending}
+        />
+      )}
 
       {/* Tabs (only show if strategy exists) */}
       {hasStrategy && (
@@ -2078,53 +1938,31 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
             </TabsTrigger>
           </TabsList>
 
-          {/* Search */}
-          <div className="relative mt-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              placeholder={t("maintenance.search")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9"
-            />
-          </div>
+          <StrategyFilters
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder={t("maintenance.search")}
+          />
 
           {/* Failure Modes Tab */}
           <TabsContent value="overview" className="mt-4">
-            <div className="space-y-2">
-              {filteredFMStrategies.length === 0 ? (
-                <Card className="p-8 text-center">
-                  <AlertTriangle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">
-                    {searchQuery ? "No failure modes match your search" : "No failure modes defined"}
-                  </p>
-                </Card>
-              ) : (
-                filteredFMStrategies.map((fm) => (
-                  <FailureModeStrategyRow
-                    key={fm.failure_mode_id}
-                    fmStrategy={fm}
-                    isExpanded={expandedFMs.has(fm.failure_mode_id)}
-                    onToggle={() => handleToggleFM(fm.failure_mode_id)}
-                    onUpdate={(updates) => handleUpdateFMStrategy(fm.failure_mode_id, updates)}
-                    onUpdateTask={handleUpdateTaskWithConfirm}
-                    onEditTask={handleEditTask}
-                    taskTemplates={strategy?.task_templates}
-                    onViewInFMEA={handleViewInFMEA}
-                    onSyncNewVersion={() => syncFmMutation.mutate(fm.failure_mode_id)}
-                    isSyncingFm={syncingFmId === fm.failure_mode_id && syncFmMutation.isPending}
-                    highlightedTask={
-                      strategyHighlight &&
-                      (!strategyHighlight.failureModeId ||
-                        strategyHighlight.failureModeId === fm.failure_mode_id)
-                        ? { taskName: strategyHighlight.taskName }
-                        : null
-                    }
-                    libraryFmsById={libraryFmsById}
-                  />
-                ))
-              )}
-            </div>
+            <StrategyTaskList
+              filteredFMStrategies={filteredFMStrategies}
+              searchQuery={searchQuery}
+              expandedFMs={expandedFMs}
+              onToggleFM={handleToggleFM}
+              onUpdateFMStrategy={handleUpdateFMStrategy}
+              onUpdateTask={handleUpdateTaskWithConfirm}
+              onEditTask={handleEditTask}
+              taskTemplates={strategy?.task_templates}
+              onViewInFMEA={handleViewInFMEA}
+              onSyncNewVersion={(fmId) => syncFmMutation.mutate(fmId)}
+              syncingFmId={syncingFmId}
+              syncFmPending={syncFmMutation.isPending}
+              strategyHighlight={strategyHighlight}
+              libraryFmsById={libraryFmsById}
+              FailureModeStrategyRow={FailureModeStrategyRow}
+            />
           </TabsContent>
 
           {/* Frequency Matrix Tab */}

@@ -185,7 +185,55 @@ Respond with a JSON object:
             # Always expose the candidate's full action list so the UI can render a preview.
             recommendation["target_actions_list"] = target_actions_list
 
-            return recommendation
+            from services.ai_citation import attach_citations_to_response, make_citation
+
+            citations = []
+            task_id = task.get("id") or task.get("task_id")
+            if task_id:
+                citations.append(
+                    make_citation(
+                        id=str(task_id),
+                        type="pm_import_task",
+                        label=(task_description or task_id)[:120],
+                        url_path=f"/pm-import/tasks/{task_id}",
+                    )
+                )
+            for fm in similar_failure_modes[:5]:
+                fm_id = fm.get("id")
+                if fm_id:
+                    citations.append(
+                        make_citation(
+                            id=str(fm_id),
+                            type="failure_mode",
+                            label=fm.get("failure_mode") or str(fm_id),
+                            url_path=f"/failure-modes/{fm_id}",
+                        )
+                    )
+            if equipment_match and equipment_match.get("matched") and equipment_match.get("equipment_id"):
+                eq_id = str(equipment_match["equipment_id"])
+                citations.append(
+                    make_citation(
+                        id=eq_id,
+                        type="equipment",
+                        label=equipment_match.get("equipment_name") or eq_id,
+                        url_path=f"/equipment/{eq_id}",
+                    )
+                )
+
+            out = attach_citations_to_response(
+                recommendation,
+                citations,
+                evidence={
+                    "deterministic": {
+                        "equipment_match": equipment_match,
+                        "similar_failure_mode_count": len(similar_failure_modes),
+                    }
+                },
+            )
+            out["evidence_not_available"] = not bool(citations)
+            if citations:
+                out.setdefault("source_refs", [c["id"] for c in citations[:5]])
+            return out
             
         except Exception as e:
             logger.error(f"AI recommendation error: {e}")

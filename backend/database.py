@@ -218,27 +218,31 @@ async def safe_db_query(query_func, fallback_value=None, timeout: float = 5.0):
 
 # JWT Config
 #
-# Backwards-compatible behavior:
-# - If JWT_SECRET_KEY is missing, we fall back to an insecure default (same risk as before),
-#   but we log loudly so misconfig is obvious.
-# - If you want fail-fast behavior in production, set REQUIRE_JWT_SECRET_KEY=true.
+# - local/development/test: insecure fallback allowed when JWT_SECRET_KEY is unset.
+# - uat/staging/production (and any other env): startup fails if JWT_SECRET_KEY is missing.
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
-_IS_DEV_ENV = ENVIRONMENT in ("development", "dev", "local", "test", "testing")
-# Fail fast in non-dev unless explicitly relaxed (REQUIRE_JWT_SECRET_KEY=false).
+_JWT_FALLBACK_ENVIRONMENTS = frozenset({"development", "dev", "local", "test", "testing"})
+_IS_JWT_FALLBACK_ENV = ENVIRONMENT in _JWT_FALLBACK_ENVIRONMENTS
+# Explicit opt-in to require secret even in local dev; non-fallback envs always require it.
 REQUIRE_JWT_SECRET_KEY = os.environ.get(
     "REQUIRE_JWT_SECRET_KEY",
-    "false" if _IS_DEV_ENV else "true",
+    "false" if _IS_JWT_FALLBACK_ENV else "true",
 ).lower() == "true"
+_JWT_SECRET_REQUIRED = (not _IS_JWT_FALLBACK_ENV) or REQUIRE_JWT_SECRET_KEY
 
 JWT_SECRET = os.environ.get("JWT_SECRET_KEY")
 if not JWT_SECRET:
-    if REQUIRE_JWT_SECRET_KEY and ENVIRONMENT not in ("development", "dev", "local", "test", "testing"):
-        raise ValueError("JWT_SECRET_KEY environment variable is required (REQUIRE_JWT_SECRET_KEY=true)")
+    if _JWT_SECRET_REQUIRED:
+        raise ValueError(
+            f"JWT_SECRET_KEY is required when ENVIRONMENT={ENVIRONMENT!r}. "
+            "Set a long random secret (32+ chars) before starting the server."
+        )
 
     JWT_SECRET = "default_secret_key"
     logger.warning(
-        "JWT_SECRET_KEY not set; using insecure default secret. "
-        "Set JWT_SECRET_KEY (recommended) or set REQUIRE_JWT_SECRET_KEY=true to fail fast."
+        "JWT_SECRET_KEY not set; using insecure default secret for ENVIRONMENT=%s. "
+        "Set JWT_SECRET_KEY before deploying to uat/staging/production.",
+        ENVIRONMENT,
     )
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = int(os.environ.get("JWT_EXPIRATION_HOURS", "24"))

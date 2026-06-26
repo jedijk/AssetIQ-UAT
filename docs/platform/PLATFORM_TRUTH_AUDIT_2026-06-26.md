@@ -97,7 +97,7 @@ Source: `backend/architecture/domain_registry.py` + code search.
 | Form | `form_templates` / `form_submissions` | forms | — | **I** |
 | Spare part | `spare_parts` | spare_parts | — | **I** |
 | Graph edge | `reliability_edges` | reliability_graph | Ad-hoc joins in services | **P** |
-| AI recommendation | Prompt output + citations | ai_platform | Some endpoints return unstructured JSON | **P** |
+| AI recommendation | Prompt output + citations | ai_platform | Contract enforced on analyze-risk, insights, PM import; doc: `AI_RECOMMENDATION_CONTRACT.md` | **P** — chat FM suggestions not yet versioned |
 | Executive KPI | `executive_kpi_snapshots` | analytics | Live compute vs snapshot | **I** (materialized) |
 
 **Highest-impact duplicate:** Observations exist as **`threats` + `observations`** with `threat_observation_bridge.py` mirroring. This splits lifecycle, graph sync, and reporting.
@@ -239,7 +239,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 |---------|--------|----------|
 | Rate limiting | **P** | AI cost guard; spam protection |
 | CSRF | **P** | `apiConfig.js` CSRF helpers |
-| Secret management | **P** | Env-based; JWT fallback risk if unset |
+| Secret management | **P** | Env-based; JWT fail-fast on uat/staging/production (2026-06-26) |
 | Upload validation | **Open** | SOC2 gap assessment |
 | Fail-closed auth | **I** | Permission deps on sensitive routes |
 | Pen testing | **N** | Listed as pre-prod requirement |
@@ -323,10 +323,10 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | # | Problem | Evidence | Business impact | Tech impact | Effort | Dependencies | Outcome |
 |---|---------|----------|-----------------|-------------|--------|--------------|---------|
 | 1 | Single tenant proven | Tyromer only; phase2 report | Blocks enterprise sales | Isolation bugs latent | 2–4 wk | Test tenant data | Second tenant + pen test |
-| 2 | Observation/threat dual model | `threat_observation_bridge.py` | Reporting fragmentation | Graph/sync duplication | 4–6 wk | Migration script | One observation canonical API |
+| 2 | Observation/threat dual model | Phase **1+2 landed** (`update_work_signal`, backfill/verify scripts); plan: `OBSERVATION_THREAT_CONVERGENCE_PLAN.md` | Reporting fragmentation | Graph/sync duplication | 4–6 wk | UAT backfill `--execute` + verify exit 0 | One observation canonical API |
 | 3 | Production cutover blocked | Status doc §5 deferred | No prod revenue at scale | Data integrity risk | 4–8 wk | Ops, Atlas prod | Prod backfill + strict mode |
 | 4 | Graph reactive chain incomplete | ~22% maturity note | Weak "knowledge graph" claim | Traceability gaps | 6–10 wk | Graph plan doc | All lifecycle edges synced |
-| 5 | JWT secret fallback | `database.py` risk in status doc | Account takeover if misconfig | Security incident | 1 d | Deploy config | REQUIRE_JWT_SECRET_KEY enforced |
+| 5 | JWT secret fallback | **Mitigated 2026-06-26** — startup fails for uat/staging/production without `JWT_SECRET_KEY` | Account takeover if misconfig (local dev only) | Security incident | Done (code) | Deploy config on Railway | `tests/test_jwt_secret_config.py` |
 
 ### P1 — High
 
@@ -437,7 +437,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 
 | Month | Focus | Deliverables |
 |-------|-------|--------------|
-| **1** | Truth & safety | Second tenant; cross-tenant tests; JWT/secret hardening; re-run UAT gates weekly; observation/threat RFC + migration spike |
+| **1** | Truth & safety | Second tenant; cross-tenant tests; JWT hardening **landed**; re-run UAT gates weekly; observation/threat plan **published** (`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`) |
 | **2** | Graph & AI trust | Complete top 5 graph sync handlers; enforce citations on all AI user endpoints; Redis on UAT; start 48h soak |
 | **3** | Enterprise path | OIDC with pilot #2; external worker POC; pen test; prod cutover runbook (no prod execute unless approved); frontend modularization of top 3 god pages |
 
