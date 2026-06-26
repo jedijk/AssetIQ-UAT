@@ -98,16 +98,18 @@ async def link_threat_to_equipment(user: dict, threat_id: str, equipment_node_id
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
 
-    await db.threats.update_one(
-        merge_tenant_filter({"id": threat_id}, user),
-        {"$set": update_data},
+    from services.work_signal_lifecycle import update_work_signal
+
+    await update_work_signal(
+        threat_id,
+        user=user,
+        set_fields=update_data,
+        graph_label="threat_link_equipment",
     )
 
     await update_all_ranks(user["id"], user=user)
 
     updated_threat = await _find_threat_scoped(user, threat_id)
-    await _mirror_threat_observation(user, updated_threat)
-    await _sync_threat_graph(user, updated_threat, label="threat_link_equipment")
 
     return {
         "message": f"Threat linked to {node['name']}",
@@ -192,16 +194,18 @@ async def link_threat_to_failure_mode(user: dict, threat_id: str, failure_mode_i
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
 
-    await db.threats.update_one(
-        merge_tenant_filter({"id": threat_id}, user),
-        {"$set": update_data},
+    from services.work_signal_lifecycle import update_work_signal
+
+    await update_work_signal(
+        threat_id,
+        user=user,
+        set_fields=update_data,
+        graph_label="threat_link_failure_mode",
     )
 
     await update_all_ranks(user["id"], user=user)
 
     updated_threat = await _find_threat_scoped(user, threat_id)
-    await _mirror_threat_observation(user, updated_threat)
-    await _sync_threat_graph(user, updated_threat, label="threat_link_failure_mode")
 
     return {
         "message": f"Threat linked to failure mode: {matched_fm['failure_mode']}",
@@ -266,18 +270,19 @@ async def improve_threat_description(
         if not improved:
             raise HTTPException(status_code=500, detail="AI returned empty response")
 
-        await db.threats.update_one(
-            merge_tenant_filter({"id": threat_id}, user),
-            {"$set": {
+        from services.work_signal_lifecycle import update_work_signal
+
+        await update_work_signal(
+            threat_id,
+            user=user,
+            set_fields={
                 "user_context": improved,
                 "description": improved,
                 "ai_improved_at": datetime.now(timezone.utc).isoformat(),
-            }},
+            },
+            graph_label="threat_improve_description",
         )
         updated = await _find_threat_scoped(user, threat_id)
-        if updated:
-            await _mirror_threat_observation(user, updated)
-            await _sync_threat_graph(user, updated, label="threat_improve_description")
 
         return {
             "success": True,

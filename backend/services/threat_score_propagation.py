@@ -185,23 +185,26 @@ async def recalculate_threat_scores_for_failure_mode(
             criticality_score, new_fmea_score, risk_settings
         )
 
-        await db.threats.update_one(
-            {"id": threat["id"]},
-            {
-                "$set": {
-                    "risk_score": final_risk_score,
-                    "fmea_score": new_fmea_score,
-                    "criticality_score": criticality_score,
-                    "base_risk_score": new_fmea_score,
-                    "risk_level": risk_level,
-                    "risk_settings_used": {
-                        "criticality_weight": risk_settings["criticality_weight"],
-                        "fmea_weight": risk_settings["fmea_weight"],
-                        "installation_id": installation_id,
-                    },
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }
+        from services.work_signal_lifecycle import update_work_signal
+
+        await update_work_signal(
+            threat["id"],
+            user=user,
+            set_fields={
+                "risk_score": final_risk_score,
+                "fmea_score": new_fmea_score,
+                "criticality_score": criticality_score,
+                "base_risk_score": new_fmea_score,
+                "risk_level": risk_level,
+                "risk_settings_used": {
+                    "criticality_weight": risk_settings["criticality_weight"],
+                    "fmea_weight": risk_settings["fmea_weight"],
+                    "installation_id": installation_id,
+                },
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             },
+            graph_label="threat_fmea_propagation",
+            sync_graph=False,
         )
         updated_count += 1
         users_updated.add(threat.get("created_by"))
@@ -246,20 +249,23 @@ async def recalculate_all_for_installation(
             criticality_score, fmea_score, risk_settings
         )
 
-        await db.threats.update_one(
-            {"id": threat["id"]},
-            {
-                "$set": {
-                    "risk_score": final_risk_score,
-                    "risk_level": risk_level,
-                    "risk_settings_used": {
-                        "criticality_weight": risk_settings["criticality_weight"],
-                        "fmea_weight": risk_settings["fmea_weight"],
-                        "installation_id": installation_id,
-                    },
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }
+        from services.work_signal_lifecycle import update_work_signal
+
+        await update_work_signal(
+            threat["id"],
+            user=user,
+            set_fields={
+                "risk_score": final_risk_score,
+                "risk_level": risk_level,
+                "risk_settings_used": {
+                    "criticality_weight": risk_settings["criticality_weight"],
+                    "fmea_weight": risk_settings["fmea_weight"],
+                    "installation_id": installation_id,
+                },
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             },
+            graph_label="installation_risk_recalc",
+            sync_graph=False,
         )
         threats_updated += 1
         users_updated.add(threat.get("created_by"))

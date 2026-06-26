@@ -17,7 +17,13 @@ router = APIRouter(tags=["Definitions"])
 _settings_write = require_permission("settings:write")
 
 
-async def propagate_definitions_to_threats(equipment_id: str, user_id: str, definitions: dict):
+async def propagate_definitions_to_threats(
+    equipment_id: str,
+    user_id: str,
+    definitions: dict,
+    *,
+    user: Optional[dict] = None,
+):
     """
     When FMEA definitions are updated, recalculate risk scores for threats
     linked to this equipment and its children.
@@ -78,13 +84,17 @@ async def propagate_definitions_to_threats(equipment_id: str, user_id: str, defi
             # Calculate new RPN
             rpn = severity * occurrence * detection
             
-            # Update threat with recalculated values
-            await db.threats.update_one(
-                {"id": threat["id"]},
-                {"$set": {
+            from services.work_signal_lifecycle import update_work_signal
+
+            await update_work_signal(
+                threat["id"],
+                user=user,
+                set_fields={
                     "rpn": rpn,
-                    "definitions_updated_at": datetime.now(timezone.utc).isoformat()
-                }}
+                    "definitions_updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                graph_label="definitions_propagation",
+                sync_graph=False,
             )
             updated_count += 1
         
@@ -383,14 +393,15 @@ async def create_or_update_definitions(
     
     # Propagate definitions changes to affected threats
     updated_threats = await propagate_definitions_to_threats(
-        data.equipment_id, 
+        data.equipment_id,
         current_user["id"],
         {
             "severity": severity_list,
             "occurrence": occurrence_list,
             "detection": detection_list,
             "criticality": criticality_list
-        }
+        },
+        user=current_user,
     )
     
     return {
@@ -440,9 +451,10 @@ async def update_definitions(
     
     # Propagate definitions changes to affected threats
     updated_threats = await propagate_definitions_to_threats(
-        equipment_id, 
+        equipment_id,
         current_user["id"],
-        updated
+        updated,
+        user=current_user,
     )
     
     return {

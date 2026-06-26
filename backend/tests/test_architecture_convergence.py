@@ -671,6 +671,28 @@ def test_threat_insert_one_only_in_allowlist():
     )
 
 
+def test_threat_update_one_only_in_allowlist():
+    """Phase 1+2 — direct threats.update_one must stay in THREAT_UPDATE_ALLOWLIST."""
+    from services.work_signal_lifecycle import THREAT_UPDATE_ALLOWLIST
+
+    pattern = re.compile(r"\bdb\.threats\.update_one\b")
+    violations: list[str] = []
+    scan_dirs = (SERVICES_DIR, ROUTES_DIR)
+    for scan_dir in scan_dirs:
+        for path in scan_dir.rglob("*.py"):
+            if path.name == "__init__.py":
+                continue
+            rel = path.relative_to(BACKEND_ROOT).as_posix()
+            text = path.read_text(encoding="utf-8")
+            if pattern.search(text) and rel not in THREAT_UPDATE_ALLOWLIST:
+                violations.append(rel)
+
+    assert not violations, (
+        "db.threats.update_one outside THREAT_UPDATE_ALLOWLIST — use update_work_signal: "
+        + ", ".join(sorted(violations))
+    )
+
+
 def test_phase4_ai_convergence_modules_exist():
     from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
     from services.ai_evidence_pack import build_evidence_pack

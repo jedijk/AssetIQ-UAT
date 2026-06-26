@@ -116,10 +116,15 @@ async def update_all_ranks(user_id: str, user: Optional[dict] = None):
     threats = await db.threats.find(query, {"_id": 0}).sort("risk_score", -1).to_list(1000)
 
     total = len(threats)
+    from services.work_signal_lifecycle import update_work_signal
+
     for idx, threat in enumerate(threats):
-        await db.threats.update_one(
-            {"id": threat["id"]},
-            {"$set": {"rank": idx + 1, "total_threats": total}}
+        await update_work_signal(
+            threat["id"],
+            user=user,
+            set_fields={"rank": idx + 1, "total_threats": total},
+            graph_label="threat_rank_update",
+            sync_graph=False,
         )
 
 
@@ -212,7 +217,15 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
         if criticality_data:
             update_data["equipment_criticality_data"] = criticality_data
 
-        await db.threats.update_one({"id": threat["id"]}, {"$set": update_data})
+        from services.work_signal_lifecycle import update_work_signal
+
+        await update_work_signal(
+            threat["id"],
+            user=user,
+            set_fields=update_data,
+            graph_label="threat_score_recalc",
+            sync_graph=False,
+        )
         updated_count += 1
 
     # Propagate updated risk scores to linked actions and investigations

@@ -290,7 +290,16 @@ async def core_chat_process(user_id: str, content: str, session_id: str,
             if image_base64:
                 att = {"type": "image", "data": image_thumbnail,
                        "description": content, "created_at": datetime.now(timezone.utc).isoformat()}
-                await db.threats.update_one({"id": threat_id}, {"$set": ctx, "$push": {"attachments": att}})
+                from services.work_signal_lifecycle import update_work_signal
+
+                await update_work_signal(
+                    threat_id,
+                    user=tenant_user,
+                    set_fields=ctx,
+                    push_fields={"attachments": att},
+                    graph_label="chat_context_image",
+                    sync_graph=False,
+                )
 
                 # AI image analysis — analyze photo and update threat with findings
                 threat_doc = await db.threats.find_one(
@@ -333,7 +342,13 @@ async def core_chat_process(user_id: str, content: str, session_id: str,
                             new_desc = ai_analysis_text
                         analysis_update["description"] = new_desc
                     
-                    await db.threats.update_one({"id": threat_id}, {"$set": analysis_update})
+                    await update_work_signal(
+                        threat_id,
+                        user=tenant_user,
+                        set_fields=analysis_update,
+                        graph_label="chat_image_analysis",
+                        sync_graph=False,
+                    )
 
                     # Create actions from AI recommendations
                     ai_actions = analysis.get("recommended_actions", [])
@@ -386,12 +401,26 @@ async def core_chat_process(user_id: str, content: str, session_id: str,
                         created_action_ids.append(aid)
 
                     if created_action_ids:
-                        await db.threats.update_one(
-                            {"id": threat_id},
-                            {"$push": {"auto_created_action_ids": {"$each": created_action_ids}}}
+                        threat_row = await db.threats.find_one(
+                            scoped(tenant_user, {"id": threat_id}) if tenant_user else {"id": threat_id},
+                            {"_id": 0, "auto_created_action_ids": 1},
+                        )
+                        prior = (threat_row or {}).get("auto_created_action_ids") or []
+                        await update_work_signal(
+                            threat_id,
+                            user=tenant_user,
+                            set_fields={"auto_created_action_ids": prior + created_action_ids},
+                            graph_label="chat_image_actions",
+                            sync_graph=False,
                         )
             else:
-                await db.threats.update_one({"id": threat_id}, {"$set": ctx})
+                await update_work_signal(
+                    threat_id,
+                    user=tenant_user,
+                    set_fields=ctx,
+                    graph_label="chat_context_text",
+                    sync_graph=False,
+                )
 
         # Build reply and determine next state
         if is_skip:

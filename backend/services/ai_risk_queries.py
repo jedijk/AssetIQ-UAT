@@ -37,7 +37,15 @@ async def upsert_ai_doc(
 
 
 async def update_threat(user: dict, threat_id: str, fields: Dict[str, Any]) -> None:
-    await db.threats.update_one(scoped(user, {"id": threat_id}), {"$set": fields})
+    from services.work_signal_lifecycle import update_work_signal
+
+    await update_work_signal(
+        threat_id,
+        user=user,
+        set_fields=fields,
+        graph_label="ai_risk_threat_update",
+        sync_graph=False,
+    )
 
 
 def find_threats(user: dict, query: Dict[str, Any], projection: dict, **cursor_kwargs):

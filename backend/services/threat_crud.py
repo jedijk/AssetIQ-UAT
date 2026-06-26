@@ -197,26 +197,24 @@ async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[st
             if equipment_node:
                 update_data["linked_equipment_id"] = equipment_node["id"]
 
-            await db.threats.update_one(
-                merge_tenant_filter({"id": threat_id}, user),
-                {"$set": update_data},
+            from services.work_signal_lifecycle import update_work_signal
+
+            await update_work_signal(
+                threat_id,
+                user=user,
+                set_fields=update_data,
+                graph_label="threat_auto_sync",
             )
 
-            threat["risk_score"] = new_risk_score
-            threat["fmea_score"] = fmea_score
-            threat["criticality_score"] = new_criticality_score
-            threat["risk_level"] = risk_level
-            threat["equipment_criticality"] = criticality_level
-            if criticality_data:
-                threat["equipment_criticality_data"] = criticality_data
-            if equipment_node:
-                threat["linked_equipment_id"] = equipment_node["id"]
-
-            logger.info(f"Auto-synced threat {threat_id}: risk={new_risk_score}, crit={new_criticality_score}, fmea={fmea_score}")
-
+            threat.update(update_data)
+            logger.info(
+                "Auto-synced threat %s: risk=%s, crit=%s, fmea=%s",
+                threat_id,
+                new_risk_score,
+                new_criticality_score,
+                fmea_score,
+            )
             await propagate_risk_to_linked_entities([threat_id], [threat], user=user)
-            await _mirror_threat_observation(user, threat)
-            await _sync_threat_graph(user, threat, label="threat_auto_sync")
 
         if isinstance(threat.get("risk_score"), float):
             threat["risk_score"] = int(threat["risk_score"])
@@ -291,9 +289,13 @@ async def update_threat(user: dict, threat_id: str, update_data: dict) -> dict:
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         with_tenant_id(update_data, user)
-        await db.threats.update_one(
-            merge_tenant_filter({"id": threat_id}, user),
-            {"$set": update_data},
+        from services.work_signal_lifecycle import update_work_signal
+
+        await update_work_signal(
+            threat_id,
+            user=user,
+            set_fields=update_data,
+            graph_label="threat_update",
         )
 
         if "status" in update_data:
@@ -310,8 +312,6 @@ async def update_threat(user: dict, threat_id: str, update_data: dict) -> dict:
         raise HTTPException(status_code=404, detail="Threat not found")
     if isinstance(updated.get("risk_score"), float):
         updated["risk_score"] = int(updated["risk_score"])
-    await _mirror_threat_observation(user, updated)
-    await _sync_threat_graph(user, updated, label="threat_update")
     if update_data:
         from services.dashboard_read_model_hooks import notify_dashboard_data_changed
 
@@ -460,7 +460,15 @@ async def recalculate_all_threat_scores(user: dict):
         if criticality_data:
             update_fields["equipment_criticality_data"] = criticality_data
 
-        await db.threats.update_one({"id": threat["id"]}, {"$set": update_fields})
+        from services.work_signal_lifecycle import update_work_signal
+
+        await update_work_signal(
+            threat["id"],
+            user=user,
+            set_fields=update_fields,
+            graph_label="threat_recalculate",
+            sync_graph=False,
+        )
         updated_count += 1
 
     logger.info(f"Updated {updated_count} threats, linked {linked_count} to equipment")

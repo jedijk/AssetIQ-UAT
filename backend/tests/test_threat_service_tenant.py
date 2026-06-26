@@ -32,21 +32,29 @@ async def test_find_threat_scoped_uses_merge_tenant_filter():
 async def test_update_threat_scoped_update_filter():
     mock_db = MagicMock()
     mock_db.threats = MagicMock()
+    mock_db.observations = MagicMock()
+    threat_open = {"id": "t-1", "status": "open", "likelihood": "Possible", "detectability": "Moderate"}
+    threat_closed = {"id": "t-1", "status": "closed", "risk_score": 30}
     mock_db.threats.find_one = AsyncMock(
-        side_effect=[
-            {"id": "t-1", "status": "open", "likelihood": "Possible", "detectability": "Moderate"},
-            {"id": "t-1", "status": "closed", "risk_score": 30},
-        ]
+        side_effect=[threat_open, threat_open, threat_closed, threat_closed]
     )
+    mock_db.observations.find_one = AsyncMock(return_value={"id": "t-1", "description": "Test"})
     mock_db.threats.update_one = AsyncMock()
+    mock_db.observations.update_one = AsyncMock()
+    graph_sync = AsyncMock()
 
     with patch("services.threat_crud.db", mock_db), patch(
         "services.threat_helpers.db", mock_db
-    ), patch("services.threat_crud.assert_threat_installation_scope", AsyncMock()), patch(
-        "services.threat_crud._mirror_threat_observation", AsyncMock()
+    ), patch("services.work_signal_lifecycle.db", mock_db), patch(
+        "services.threat_crud.assert_threat_installation_scope", AsyncMock()
     ), patch(
         "services.threat_crud.update_all_ranks", AsyncMock()
-    ), patch("services.threat_crud.cache.invalidate_stats"):
+    ), patch(
+        "services.reliability_graph.dispatch_graph_sync",
+        graph_sync,
+    ), patch("services.threat_crud.cache.invalidate_stats"), patch(
+        "services.dashboard_read_model_hooks.notify_dashboard_data_changed", AsyncMock()
+    ):
         result = await update_threat(USER, "t-1", {"status": "closed"})
 
     assert result["status"] == "closed"

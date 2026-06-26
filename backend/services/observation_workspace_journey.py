@@ -385,9 +385,16 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
 
         async def _sync_observation_status():
             try:
-                await db.threats.update_one(
-                    {"id": observation_id},
-                    {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}},
+                from services.work_signal_lifecycle import update_work_signal
+
+                await update_work_signal(
+                    observation_id,
+                    set_fields={
+                        "status": new_status,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                    graph_label="workspace_status_sync",
+                    sync_graph=False,
                 )
             except Exception:
                 pass

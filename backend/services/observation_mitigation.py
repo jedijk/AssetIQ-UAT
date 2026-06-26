@@ -75,16 +75,18 @@ async def maybe_auto_mitigate_observation(
         return None
 
     now = datetime.now(timezone.utc).isoformat()
-    await db.threats.update_one(
-        scoped_job({"id": observation_id}),
-        {
-            "$set": {
-                "status": "Mitigated",
-                "updated_at": now,
-                "mitigated_at": now,
-                "auto_mitigated": True,
-            }
+    from services.work_signal_lifecycle import update_work_signal
+
+    await update_work_signal(
+        observation_id,
+        user={"id": user_id} if user_id else None,
+        set_fields={
+            "status": "Mitigated",
+            "updated_at": now,
+            "mitigated_at": now,
+            "auto_mitigated": True,
         },
+        graph_label="observation_auto_mitigate",
     )
 
     if user_id:

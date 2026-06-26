@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from database import db
-from services.tenant_schema import with_tenant_id
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from services.threat_observation_bridge import threat_to_observation_doc
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,11 @@ LIFECYCLE_STAGES = (
 # Modules allowed to insert into ``threats`` directly (enforced in architecture tests).
 THREAT_INSERT_ALLOWLIST = frozenset({
     "services/work_signal_lifecycle.py",
-    "services/chat_routes_service.py",  # transitional — calls create_work_signal
+})
+
+# Modules allowed to update ``threats`` directly (enforced in architecture tests).
+THREAT_UPDATE_ALLOWLIST = frozenset({
+    "services/work_signal_lifecycle.py",
 })
 
 
@@ -174,3 +178,138 @@ async def create_work_signal(
         "observation": observation,
         "threat_projection": threat_projection,
     }
+
+
+def observation_doc_from_threat(threat: Dict[str, Any], *, user: Optional[dict] = None) -> Dict[str, Any]:
+    """Build a same-id canonical observation document from a threat record."""
+    signal_id = threat.get("id")
+    if not signal_id:
+        raise ValueError("threat id required")
+    doc = threat_to_observation_doc(threat, user=user)
+    doc["id"] = signal_id
+    doc.pop("legacy_threat_id", None)
+    if doc.get("source") == "threat_mirror":
+        doc["source"] = threat.get("source") or "convergence_backfill"
+    return doc
+
+
+async def ensure_observation_for_signal(
+    signal_id: str,
+    *,
+    user: Optional[dict] = None,
+) -> Optional[Dict[str, Any]]:
+    """Return canonical observation for ``signal_id``, creating from threat if missing."""
+    filt = merge_tenant_filter({"id": signal_id}, user)
+    existing = await db.observations.find_one(filt, {"_id": 0})
+    if existing:
+        return existing
+
+    legacy = await db.observations.find_one(
+        merge_tenant_filter({"legacy_threat_id": signal_id}, user),
+        {"_id": 0},
+    )
+    if legacy:
+        threat = await db.threats.find_one(filt, {"_id": 0})
+        base = {**legacy, **(threat or {}), "id": signal_id}
+        doc = observation_doc_from_threat(base, user=user)
+        await db.observations.update_one(
+            merge_tenant_filter({"id": signal_id}, user),
+            {"$set": {k: v for k, v in doc.items() if k != "_id"}},
+            upsert=True,
+        )
+        if legacy.get("id") != signal_id:
+            await db.observations.delete_one(
+                merge_tenant_filter({"id": legacy["id"]}, user),
+            )
+        return doc
+
+    threat = await db.threats.find_one(filt, {"_id": 0})
+    if not threat:
+        return None
+
+    doc = observation_doc_from_threat(threat, user=user)
+    await db.observations.insert_one(doc)
+    return doc
+
+
+async def update_work_signal(
+    signal_id: str,
+    *,
+    user: Optional[dict] = None,
+    set_fields: Optional[Dict[str, Any]] = None,
+    push_fields: Optional[Dict[str, Any]] = None,
+    graph_label: str = "work_signal_update",
+    sync_graph: bool = True,
+) -> Optional[Dict[str, Any]]:
+    """
+    Canonical update: merge into observation, sync threat projection, optional graph.
+
+    ``set_fields`` / ``push_fields`` use legacy threat field names where applicable.
+    """
+    if not signal_id:
+        return None
+    if not set_fields and not push_fields:
+        return await db.threats.find_one(
+            merge_tenant_filter({"id": signal_id}, user),
+            {"_id": 0},
+        )
+
+    threat_filt = merge_tenant_filter({"id": signal_id}, user)
+    threat = await db.threats.find_one(threat_filt, {"_id": 0})
+    observation = await ensure_observation_for_signal(signal_id, user=user)
+    if not observation and not threat:
+        return None
+
+    now = datetime.now(timezone.utc).isoformat()
+    merged_threat = {**(threat or observation or {}), **(set_fields or {}), "id": signal_id}
+    merged_obs = observation_doc_from_threat(merged_threat, user=user)
+    for key, val in merged_threat.items():
+        if key not in ("_id", "legacy_threat_id"):
+            merged_obs[key] = val
+    merged_obs["id"] = signal_id
+    merged_obs.pop("legacy_threat_id", None)
+    merged_obs["updated_at"] = now
+    with_tenant_id(merged_obs, user)
+
+    obs_ops: Dict[str, Any] = {"$set": {k: v for k, v in merged_obs.items() if k != "_id"}}
+    if push_fields:
+        for pk, pv in push_fields.items():
+            obs_key = "media_urls" if pk == "attachments" else pk
+            obs_ops.setdefault("$push", {})[obs_key] = pv
+
+    await db.observations.update_one(
+        merge_tenant_filter({"id": signal_id}, user),
+        obs_ops,
+        upsert=True,
+    )
+
+    threat_proj = observation_to_threat_projection(
+        merged_obs,
+        user=user,
+        extra=merged_threat,
+    )
+    threat_proj["id"] = signal_id
+    threat_proj["projection_of"] = "observation"
+    threat_proj["updated_at"] = now
+    threat_set = {k: v for k, v in threat_proj.items() if k not in ("_id",)}
+    with_tenant_id(threat_set, user)
+
+    threat_ops: Dict[str, Any] = {"$set": threat_set}
+    if push_fields:
+        for pk, pv in push_fields.items():
+            threat_ops.setdefault("$push", {})[pk] = pv
+
+    if threat:
+        await db.threats.update_one(threat_filt, threat_ops)
+    else:
+        await db.threats.insert_one(threat_proj)
+
+    if sync_graph:
+        await _sync_work_signal_graph(
+            signal_id,
+            merged_obs,
+            graph_label,
+            tenant_id=merged_obs.get("tenant_id"),
+        )
+
+    return await db.threats.find_one(threat_filt, {"_id": 0})

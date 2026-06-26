@@ -210,9 +210,14 @@ async def create_observation(
             auto_created.append({"id": aid, "title": desc[:100], "type": ra.get("action_type", "CM")})
 
     if auto_created:
-        await db.threats.update_one(
-            {"id": threat_id},
-            {"$set": {"auto_created_action_ids": [a["id"] for a in auto_created]}},
+        from services.work_signal_lifecycle import update_work_signal
+
+        await update_work_signal(
+            threat_id,
+            user=tenant_user,
+            set_fields={"auto_created_action_ids": [a["id"] for a in auto_created]},
+            graph_label="chat_auto_actions",
+            sync_graph=False,
         )
 
     asyncio.create_task(update_all_ranks(user_id, user=tenant_user))
