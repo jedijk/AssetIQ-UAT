@@ -25,7 +25,9 @@ async def test_cancel_open_scheduled_for_v2_task_uses_v2_and_legacy_ids():
         ]
     )
 
-    with patch("services.maintenance_scheduler_sync.db", mock_db):
+    with patch("services.maintenance_scheduler_shared.db", mock_db), patch(
+        "services.maintenance_scheduler_v2_sync.db", mock_db
+    ):
         cancelled = await _cancel_open_scheduled_for_v2_task(
             "eq-1",
             "v2-task-1",
@@ -46,7 +48,7 @@ async def test_refresh_schedule_enable_schedules_target_program():
     program_row = {"id": "v2-task-1", "v2_task_id": "v2-task-1", "equipment_id": "eq-1"}
 
     with patch(
-        "services.maintenance_scheduler_sync.should_sync_legacy_maintenance_programs",
+        "services.maintenance_scheduler_v2_sync.should_sync_legacy_maintenance_programs",
         return_value=False,
     ), patch(
         "services.scheduler_program_source.load_schedulable_programs",
@@ -78,10 +80,13 @@ async def test_refresh_schedule_disable_cancels_without_legacy_sync():
     )
 
     with patch(
-        "services.maintenance_scheduler_sync.db",
+        "services.maintenance_scheduler_shared.db",
         mock_db,
     ), patch(
-        "services.maintenance_scheduler_sync.should_sync_legacy_maintenance_programs",
+        "services.maintenance_scheduler_v2_sync.db",
+        mock_db,
+    ), patch(
+        "services.maintenance_scheduler_v2_sync.should_sync_legacy_maintenance_programs",
         return_value=False,
     ):
         result = await refresh_schedule_after_v2_task_active_toggle(

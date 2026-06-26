@@ -20,9 +20,9 @@
 | Reliability graph sync (UAT) | **Pass** — `verify_reliability_graph_sync.py` |
 | Graph ownership / dedup | **Done (WS2)** — `reliability_graph_ownership.py`, architecture doc |
 | Canonical data models | **Done (WS3)** — `canonical_models.py`, `CANONICAL_DATA_MODELS.md` |
-| AI gateway | **Partial** — `ai_gateway.py` in use; not full Platform 1.0 AI stack |
+| AI gateway | **Partial** — `ai_gateway.py` + WS5 `ai_platform.py` started |
 | Executive read models | **Partial** — some materializers exist; dashboards still mix operational reads |
-| Large-file modularization | **In progress** — Waves 4–8 splits started |
+| Large-file modularization | **Done (WS4)** — zero service modules over 800 LOC |
 | R2 on UAT (AI scan photos) | **Open** — ops, not blocking Platform 1.0 code track |
 
 ---
@@ -34,7 +34,7 @@ Platform 1.0 is complete when:
 - [ ] Every backend service is tenant safe
 - [ ] Every domain has one canonical data model
 - [ ] The reliability graph has one owner per relationship
-- [ ] All major files have been modularized (~800 line target)
+- [x] All major files have been modularized (~800 line target)
 - [ ] Every AI feature uses the unified AI platform
 - [ ] Executive dashboards use read models
 - [ ] Graph performance benchmarks completed
@@ -123,18 +123,70 @@ cd backend && python3 scripts/verify_canonical_models.py
 
 **Objective:** Maintainability without functional or UI changes.
 
-**Status:** **In progress** — maintenance strategy, PM import, forms, causal engine, observation workspace splits started (Waves 4–8).
+**Status:** **Done** — all `backend/services/**/*.py` modules are at or below 800 LOC (architecture gate enforced).
 
 **Rules:** No functional changes · no UI redesign · identical behaviour
 
 **Deliverables:** Files under ~800 lines · improved module separation
 
 ```bash
-# Find large backend services
 find backend/services -name '*.py' -exec wc -l {} + | sort -n | tail -20
-# Find large frontend components
-find frontend/src -name '*.js' -o -name '*.jsx' | xargs wc -l 2>/dev/null | sort -n | tail -20
+cd backend && python3 -m pytest tests/test_architecture_convergence.py::test_service_modules_respect_loc_limit_or_allowlist -q
 ```
+
+**WS4 splits (this batch):**
+
+| Module | Extracted from | Purpose |
+|--------|----------------|---------|
+| `task_service_helpers.py` | `task_service.py` | Serializers + date math |
+| `task_service_scheduling.py` | `task_service.py` | Plan instance generation |
+| `chat_routes_state.py` | `chat_routes_service.py` | Conversation state + FM loader |
+| `chat_routes_media.py` | `chat_routes_service.py` | Image compression |
+| `chat_routes_observation.py` | `chat_routes_service.py` | Work-signal creation from chat |
+| `maintenance_program_helpers.py` | `maintenance_program_service.py` | Equipment lookup + criticality |
+| `maintenance_program_session_import.py` | `maintenance_program_service.py` | PM Import session → program tasks |
+| `maintenance_program_enrichment.py` | `maintenance_program_service.py` | Strategy merge + criticality context |
+| `form_service_thresholds.py` | `form_service.py` | Threshold evaluation + breach observations |
+| `form_service_serializers.py` | `form_service.py` | Template/submission serialization |
+| `form_service_analytics.py` | `form_service.py` | Form analytics aggregation |
+| `form_service_submissions_list.py` | `form_service.py` | Lightweight submission list query |
+| `chat_routes_confirm.py` | `chat_routes_service.py` | Issue-confirm helpers |
+| `chat_routes_finalize.py` | `chat_routes_service.py` | Post-state-machine persistence |
+| `maintenance_strategy_v2_sync.py` | `maintenance_strategy_v2_service.py` | Library sync + schedule refresh |
+| `form_service_reliability.py` | `form_service.py` | Graph/score loop after submit |
+| `form_service_submissions_query.py` | `form_service.py` | Filtered submission list query |
+| `chat_routes_processor.py` | `chat_routes_service.py` | Core chat state machine |
+| `production_logs_templates.py` | `production_logs_service.py` | Template CRUD + batch ingest |
+| `form_service_submit.py` | `form_service.py` | Submit validation + persistence |
+| `form_service_submission_detail.py` | `form_service.py` | Attachment-safe submission fetch |
+| `production_logs_ingest.py` | `production_logs_service.py` | Upload/preview/ingest jobs |
+| `maintenance_program_scheduler_sync.py` | `maintenance_program_service.py` | PM-import → scheduler sync |
+| `maintenance_program_task_crud.py` | `maintenance_program_service.py` | Task add/update/delete |
+| `maintenance_program_regeneration.py` | `maintenance_program_service.py` | Strategy-based program regeneration |
+| `form_service_templates.py` | `form_service.py` | Template CRUD, fields, documents |
+| `maintenance_strategy_v2_instances.py` | `maintenance_strategy_v2_service.py` | Per-equipment task generation and customization |
+| `maintenance_strategy_v2_fm_strategy.py` | `maintenance_strategy_v2_service.py` | Failure-mode strategy endpoints |
+| `decision_engine_evaluators.py` | `decision_engine.py` | Rule evaluators |
+| `decision_engine_suggestions.py` | `decision_engine.py` | Suggestion workflow |
+| `ai_risk_dashboard.py` | `ai_risk_service.py` | Dashboard intent + injection guard |
+| `ai_risk_analysis.py` | `ai_risk_service.py` | Threat risk, causes, diagrams |
+| `task_service_templates.py` | `task_service.py` | Template CRUD |
+| `task_service_plans.py` | `task_service.py` | Plan CRUD |
+| `threat_helpers.py` / `threat_crud.py` / `threat_links.py` | `threat_service.py` | Threat domain split |
+| `work_item_filters.py` / `work_item_serializers.py` | `work_item_query.py` | Work item query split |
+| `maintenance_program_routes_*.py` (4 modules) | `maintenance_program_routes_service.py` | Program route sections |
+| `intelligence_map_helpers.py` / `intelligence_map_stats.py` | `intelligence_map_routes_service.py` | Map stats split |
+| `investigation_*.py` (4 modules) | `investigation_service.py` | Investigation domain |
+| `executive_dashboard_*.py` (3 modules) | `executive_dashboard_service.py` | Dashboard read models |
+| `failure_modes_*.py` (4 modules) | `failure_modes_routes_service.py` | FM routes split |
+| `observation_workspace_*.py` (3 modules) | `observation_workspace_service.py` | Workspace split |
+| `equipment_import_*.py` (3 modules) | `equipment_import_service.py` | Import formats |
+| `process_import_*.py` (2 modules) | `process_import_service.py` | Vision + constants |
+| `maintenance_scheduler_*.py` (5 modules) | `maintenance_scheduler_sync.py` | Scheduler sync split |
+| `reliability_graph_*.py` (3 modules) | `reliability_graph.py` | Graph ownership split |
+| `production_dashboard_*.py` (3 modules) | `production_dashboard_service.py` | Production dashboard |
+| `ril_*.py` (5 modules) | `ril_service.py` | RIL domain sections |
+| `pm_import/pm_import_*.py` (3 modules) | `pm_import/ai_review.py` | PM import AI review |
 
 ---
 
@@ -149,11 +201,14 @@ Provider Layer → Prompt Registry → Context Builder → Evidence Builder
 
 | Task | Status |
 |------|--------|
-| Centralize prompts | **Open** |
-| Standardize context/evidence building | **Open** |
-| Provider abstraction | **Partial** — `ai_gateway.py` |
-| Prompt versioning | **Open** |
-| Token efficiency / AI logging | **Partial** |
+| Centralize prompts | **Started** — `ai_prompt_registry.py` (3 bootstrap prompts) |
+| Standardize context/evidence building | **Started** — `ai_context_builder.py` + `ai_evidence_pack.py` |
+| Provider abstraction | **Done** — `ai_gateway.py` |
+| Unified execution entry point | **Started** — `ai_platform.py` |
+| Prompt versioning | **Open** — registry versions only (no DB yet) |
+| Token efficiency / AI logging | **Partial** — `ai_cost_guard` |
+
+**Docs:** [`AI_PLATFORM.md`](./AI_PLATFORM.md)
 
 **Definition of done:** Every AI feature uses the same platform entry points
 

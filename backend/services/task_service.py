@@ -17,30 +17,27 @@ import logging
 
 from services.tenant_scope import scoped, scoped_job
 from services.tenant_schema import BACKFILL_TENANT_ID, with_tenant_id
+from services.task_service_helpers import (
+    calculate_next_due,
+    serialize_instance,
+)
+from services import task_service_scheduling
+from services.task_service_plans import (
+    create_plan as _create_plan,
+    delete_plan as _delete_plan,
+    get_plan_by_id as _get_plan_by_id,
+    get_plans as _get_plans,
+    update_plan as _update_plan,
+)
+from services.task_service_templates import (
+    create_template as _create_template,
+    delete_template as _delete_template,
+    get_template_by_id as _get_template_by_id,
+    get_templates as _get_templates,
+    update_template as _update_template,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def _safe_isoformat(value):
-    """Safely convert datetime to ISO format string with UTC timezone suffix.
-    
-    MongoDB returns naive datetimes (without timezone info), but our frontend
-    needs the UTC suffix to correctly interpret times.
-    """
-    if value is None:
-        return None
-    if isinstance(value, str):
-        # If already a string, ensure it has UTC suffix
-        if value and not value.endswith('Z') and '+' not in value and '-' not in value[-6:]:
-            return value + '+00:00'
-        return value
-    if hasattr(value, 'isoformat'):
-        iso_str = value.isoformat()
-        # Ensure UTC suffix is present (MongoDB returns naive datetimes)
-        if not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
-            iso_str += '+00:00'
-        return iso_str
-    return str(value)
 
 
 class TaskService:
@@ -68,48 +65,19 @@ class TaskService:
         self.efms = db["equipment_failure_modes"]
     
     # ==================== TASK TEMPLATES ====================
-    
+
     async def create_template(
         self, data: Dict[str, Any], created_by: str, user: Optional[dict] = None
     ) -> Dict[str, Any]:
-        """Create a new task template."""
-        import uuid
-        now = datetime.now(timezone.utc)
-        
-        # Determine if ad-hoc
-        is_adhoc = data.get("is_adhoc", False)
-        
-        doc = {
-            "id": str(uuid.uuid4()),  # Add explicit id field for index
-            "name": data["name"],
-            "description": data.get("description"),
-            "discipline": data["discipline"],
-            "mitigation_strategy": data["mitigation_strategy"],
-            "equipment_type_ids": data.get("equipment_type_ids", []),
-            "failure_mode_ids": data.get("failure_mode_ids", []),
-            "frequency_type": "adhoc" if is_adhoc else data.get("frequency_type", "time_based"),
-            "default_interval": 0 if is_adhoc else data.get("default_interval", 30),
-            "default_unit": None if is_adhoc else data.get("default_unit", "days"),
-            "estimated_duration_minutes": data.get("estimated_duration_minutes"),
-            "procedure_steps": data.get("procedure_steps", []),
-            "safety_requirements": data.get("safety_requirements", []),
-            "tools_required": data.get("tools_required", []),
-            "spare_parts": data.get("spare_parts", []),
-            "form_template_id": data.get("form_template_id"),
-            "tags": data.get("tags", []),
-            "is_adhoc": is_adhoc,
-            "is_active": True,
-            "usage_count": 0,  # Track how many plans use this template
-            "created_by": created_by,
-            "created_at": now,
-            "updated_at": now,
-        }
-        
-        result = await self.templates.insert_one(with_tenant_id(doc, self._stamp_user(user)))
-        doc["_id"] = result.inserted_id
-        
-        return self._serialize_template(doc)
-    
+        return await _create_template(
+            templates=self.templates,
+            data=data,
+            created_by=created_by,
+            scope=self._scope,
+            stamp_user=self._stamp_user,
+            user=user,
+        )
+
     async def get_templates(
         self,
         discipline: Optional[str] = None,
@@ -121,251 +89,67 @@ class TaskService:
         limit: int = 100,
         user: Optional[dict] = None,
     ) -> Dict[str, Any]:
-        """Get task templates with filters."""
-        
-        query = {}
-        
-        if active_only:
-            query["is_active"] = True
-        
-        if discipline:
-            query["discipline"] = discipline
-        
-        if mitigation_strategy:
-            query["mitigation_strategy"] = mitigation_strategy
-        
-        if equipment_type_id:
-            query["equipment_type_ids"] = equipment_type_id
-        
-        if search:
-            from utils.mongo_regex import or_search_fields
+        return await _get_templates(
+            templates=self.templates,
+            scope=self._scope,
+            discipline=discipline,
+            mitigation_strategy=mitigation_strategy,
+            equipment_type_id=equipment_type_id,
+            search=search,
+            active_only=active_only,
+            skip=skip,
+            limit=limit,
+            user=user,
+        )
 
-            search_clause = or_search_fields(search, "name", "description", "tags")
-            if search_clause:
-                query.update(search_clause)
-        
-        scoped_query = self._scope(user, query)
-        cursor = self.templates.find(scoped_query).sort("name", 1).skip(skip).limit(limit)
-        
-        templates = []
-        async for doc in cursor:
-            templates.append(self._serialize_template(doc))
-        
-        total = await self.templates.count_documents(scoped_query)
-        
-        return {"total": total, "templates": templates}
-    
     async def get_template_by_id(
         self, template_id: str, user: Optional[dict] = None
     ) -> Optional[Dict[str, Any]]:
-        """Get a specific template by id (string UUID) or _id (ObjectId)."""
-        doc = await self.templates.find_one(self._scope(user, {"id": template_id}))
-        if doc:
-            return self._serialize_template(doc)
-        if ObjectId.is_valid(template_id):
-            doc = await self.templates.find_one(self._scope(user, {"_id": ObjectId(template_id)}))
-            if doc:
-                return self._serialize_template(doc)
-        
-        return None
-    
+        return await _get_template_by_id(
+            templates=self.templates,
+            scope=self._scope,
+            template_id=template_id,
+            user=user,
+        )
+
     async def update_template(
         self, template_id: str, data: Dict[str, Any], user: Optional[dict] = None
     ) -> Optional[Dict[str, Any]]:
-        """Update a task template."""
-        update = {"updated_at": datetime.now(timezone.utc)}
-        
-        allowed_fields = [
-            "name", "description", "discipline", "mitigation_strategy",
-            "equipment_type_ids", "failure_mode_ids", "frequency_type",
-            "default_interval", "default_unit", "estimated_duration_minutes",
-            "procedure_steps", "safety_requirements", "tools_required",
-            "spare_parts", "form_template_id", "tags", "is_active", "is_adhoc"
-        ]
-        
-        for field in allowed_fields:
-            if field in data and data[field] is not None:
-                update[field] = data[field]
-        
-        result = await self.templates.find_one_and_update(
-            self._scope(user, {"id": template_id}),
-            {"$set": update},
-            return_document=True
+        return await _update_template(
+            templates=self.templates,
+            scope=self._scope,
+            template_id=template_id,
+            data=data,
+            user=user,
         )
-        if not result and ObjectId.is_valid(template_id):
-            result = await self.templates.find_one_and_update(
-                self._scope(user, {"_id": ObjectId(template_id)}),
-                {"$set": update},
-                return_document=True
-            )
-        
-        if result:
-            return self._serialize_template(result)
-        return None
-    
+
     async def delete_template(self, template_id: str, user: Optional[dict] = None) -> bool:
-        """Delete a task template (soft delete by deactivating)."""
-        plans_count = await self.plans.count_documents(self._scope(user, {
-            "task_template_id": template_id,
-            "is_active": True
-        }))
-        
-        if plans_count > 0:
-            raise ValueError(f"Cannot delete template: {plans_count} active plans use it")
-        
-        result = await self.templates.update_one(
-            self._scope(user, {"id": template_id}),
-            {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
+        return await _delete_template(
+            templates=self.templates,
+            plans=self.plans,
+            scope=self._scope,
+            template_id=template_id,
+            user=user,
         )
-        if result.modified_count > 0:
-            return True
-        if ObjectId.is_valid(template_id):
-            result = await self.templates.update_one(
-                self._scope(user, {"_id": ObjectId(template_id)}),
-                {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
-            )
-            return result.modified_count > 0
-        
-        return False
-    
+
     # ==================== TASK PLANS ====================
-    
+
     async def create_plan(
         self, data: Dict[str, Any], created_by: str, user: Optional[dict] = None
     ) -> Dict[str, Any]:
-        """Create a task plan for specific equipment."""
-        now = datetime.now(timezone.utc)
-        
-        equipment = await self.equipment.find_one(self._scope(user, {"id": data["equipment_id"]}))
-        if not equipment:
-            raise ValueError("Equipment not found")
-        
-        template = await self.get_template_by_id(data["task_template_id"], user=user)
-        if not template:
-            raise ValueError("Task template not found")
-        
-        # === EQUIPMENT TYPE VALIDATION FOR SYSTEM AND BELOW ===
-        # Levels that require equipment type matching
-        system_and_below_levels = [
-            "section_system", "system",  # Level 3
-            "equipment_unit", "equipment",  # Level 4
-            "subunit",  # Level 5
-            "maintainable_item"  # Level 6
-        ]
-        
-        equipment_level = equipment.get("level", "").lower()
-        
-        if equipment_level in system_and_below_levels:
-            # Get the equipment type
-            equipment_type_id = equipment.get("equipment_type_id")
-            
-            # Get the template's applicable equipment types
-            template_equipment_types = template.get("equipment_type_ids", [])
-            
-            # If template has specific equipment types defined, validate match
-            if template_equipment_types and len(template_equipment_types) > 0:
-                if not equipment_type_id:
-                    raise ValueError(
-                        f"Equipment '{equipment.get('name')}' at level '{equipment_level}' "
-                        f"has no equipment type defined. Cannot create plan with this template."
-                    )
-                
-                if equipment_type_id not in template_equipment_types:
-                    raise ValueError(
-                        f"Equipment type '{equipment_type_id}' does not match template's "
-                        f"applicable types: {', '.join(template_equipment_types)}. "
-                        f"Plan creation is only allowed for matching equipment types at "
-                        f"system level and below."
-                    )
-        
-        # Check if template is ad-hoc
-        is_adhoc_template = template.get("is_adhoc", False)
-        
-        # Get form_template_id from template if not provided in plan data
-        form_template_id = data.get("form_template_id") or template.get("form_template_id")
-        
-        # Lookup form template name
-        form_template_name = None
-        if form_template_id:
-            # Try finding by 'id' field first (string ID)
-            form_template = await self.db.form_templates.find_one(self._scope(user, {"id": form_template_id}))
-            if not form_template:
-                try:
-                    form_template = await self.db.form_templates.find_one(
-                        self._scope(user, {"_id": ObjectId(form_template_id)})
-                    )
-                except Exception:
-                    pass
-            if form_template:
-                form_template_name = form_template.get("name")
-        
-        # Get frequency settings (use template defaults if not overridden)
-        frequency_type = data.get("frequency_type") or template["frequency_type"]
-        
-        # For ad-hoc templates, only use interval if explicitly provided by user
-        # For regular templates, fall back to template defaults
-        if is_adhoc_template:
-            interval_value = data.get("interval_value")  # None if not provided
-            interval_unit = data.get("interval_unit") if data.get("interval_value") else None
-        else:
-            interval_value = data.get("interval_value") or template.get("default_interval")
-            interval_unit = data.get("interval_unit") or template.get("default_unit")
-        
-        # Calculate next due date (or None for ad-hoc without interval)
-        effective_from = data.get("effective_from") or now
-        next_due = None
-        if interval_value and interval_unit:
-            next_due = self._calculate_next_due(effective_from, interval_value, interval_unit)
-        elif is_adhoc_template:
-            # For ad-hoc templates, next_due can be None (execute manually)
-            next_due = None
-        else:
-            # Default to 30 days if somehow no interval is set
-            next_due = self._calculate_next_due(effective_from, 30, "days")
-        
-        doc = {
-            "id": str(uuid.uuid4()),  # Add explicit id field for index
-            "equipment_id": data["equipment_id"],
-            "equipment_name": equipment.get("name"),
-            "task_template_id": data["task_template_id"],
-            "task_template_name": template["name"],
-            "form_template_id": form_template_id,
-            "form_template_name": form_template_name,
-            "efm_id": data.get("efm_id"),
-            "frequency_type": frequency_type,
-            "interval_value": interval_value,
-            "interval_unit": interval_unit,
-            "trigger_condition": data.get("trigger_condition"),
-            "assigned_team": data.get("assigned_team"),
-            "assigned_user_id": data.get("assigned_user_id"),
-            "effective_from": effective_from,
-            "effective_until": data.get("effective_until"),
-            "last_executed_at": None,
-            "next_due_date": next_due,
-            "execution_count": 0,
-            "notes": data.get("notes"),
-            "is_active": True,
-            "is_adhoc": is_adhoc_template,
-            "created_by": created_by,
-            "created_at": now,
-            "updated_at": now,
-        }
-        
-        result = await self.plans.insert_one(with_tenant_id(doc, self._stamp_user(user)))
-        doc["_id"] = result.inserted_id
-        
-        update_result = await self.templates.update_one(
-            self._scope(user, {"id": data["task_template_id"]}),
-            {"$inc": {"usage_count": 1}}
+        return await _create_plan(
+            db=self.db,
+            templates=self.templates,
+            plans=self.plans,
+            equipment=self.equipment,
+            data=data,
+            created_by=created_by,
+            scope=self._scope,
+            stamp_user=self._stamp_user,
+            get_template_by_id=self.get_template_by_id,
+            user=user,
         )
-        if update_result.modified_count == 0 and ObjectId.is_valid(data["task_template_id"]):
-            await self.templates.update_one(
-                self._scope(user, {"_id": ObjectId(data["task_template_id"])}),
-                {"$inc": {"usage_count": 1}}
-            )
-        
-        return self._serialize_plan(doc)
-    
+
     async def get_plans(
         self,
         equipment_id: Optional[str] = None,
@@ -376,120 +160,47 @@ class TaskService:
         limit: int = 100,
         user: Optional[dict] = None,
     ) -> Dict[str, Any]:
-        """Get task plans with filters."""
-        
-        query = {}
-        
-        if active_only:
-            query["is_active"] = True
-        
-        if equipment_id:
-            query["equipment_id"] = equipment_id
-        
-        if template_id:
-            query["task_template_id"] = template_id
-        
-        if due_before:
-            query["next_due_date"] = {"$lte": due_before}
-        
-        scoped_query = self._scope(user, query)
-        cursor = self.plans.find(scoped_query).sort("next_due_date", 1).skip(skip).limit(limit)
-        
-        plans = []
-        async for doc in cursor:
-            plans.append(self._serialize_plan(doc))
-        
-        total = await self.plans.count_documents(scoped_query)
-        
-        return {"total": total, "plans": plans}
-    
+        return await _get_plans(
+            plans=self.plans,
+            scope=self._scope,
+            equipment_id=equipment_id,
+            template_id=template_id,
+            active_only=active_only,
+            due_before=due_before,
+            skip=skip,
+            limit=limit,
+            user=user,
+        )
+
     async def get_plan_by_id(
         self, plan_id: str, user: Optional[dict] = None
     ) -> Optional[Dict[str, Any]]:
-        """Get a specific plan by id (string UUID) or _id (ObjectId)."""
-        doc = await self.plans.find_one(self._scope(user, {"id": plan_id}))
-        if doc:
-            return self._serialize_plan(doc)
-        if ObjectId.is_valid(plan_id):
-            doc = await self.plans.find_one(self._scope(user, {"_id": ObjectId(plan_id)}))
-            if doc:
-                return self._serialize_plan(doc)
-        
-        return None
-    
+        return await _get_plan_by_id(
+            plans=self.plans,
+            scope=self._scope,
+            plan_id=plan_id,
+            user=user,
+        )
+
     async def update_plan(
         self, plan_id: str, data: Dict[str, Any], user: Optional[dict] = None
     ) -> Optional[Dict[str, Any]]:
-        """Update a task plan."""
-        existing = await self.plans.find_one(self._scope(user, {"id": plan_id}))
-        query_field = "id" if existing else "_id"
-        query_value = plan_id if existing else (ObjectId(plan_id) if ObjectId.is_valid(plan_id) else None)
-        
-        if not existing and query_value:
-            existing = await self.plans.find_one(self._scope(user, {"_id": query_value}))
-        
-        if not existing:
-            return None
-        
-        update = {"updated_at": datetime.now(timezone.utc)}
-        
-        allowed_fields = [
-            "frequency_type", "interval_value", "interval_unit",
-            "trigger_condition", "assigned_team", "assigned_user_id",
-            "effective_from", "effective_until", "notes", "is_active"
-        ]
-        
-        for field in allowed_fields:
-            if field in data and data[field] is not None:
-                update[field] = data[field]
-        
-        # Recalculate next due if frequency changed
-        if any(f in data for f in ["interval_value", "interval_unit"]):
-            interval_value = data.get("interval_value") or existing["interval_value"]
-            interval_unit = data.get("interval_unit") or existing["interval_unit"]
-            base_date = existing.get("last_executed_at") or existing.get("effective_from") or datetime.now(timezone.utc)
-            update["next_due_date"] = self._calculate_next_due(base_date, interval_value, interval_unit)
-        
-        result = await self.plans.find_one_and_update(
-            self._scope(user, {query_field: query_value}),
-            {"$set": update},
-            return_document=True
+        return await _update_plan(
+            plans=self.plans,
+            scope=self._scope,
+            plan_id=plan_id,
+            data=data,
+            user=user,
         )
-        
-        if result:
-            return self._serialize_plan(result)
-        return None
-    
+
     async def delete_plan(self, plan_id: str, user: Optional[dict] = None) -> bool:
-        """Deactivate a task plan."""
-        plan = await self.plans.find_one(self._scope(user, {"id": plan_id}))
-        query_field = "id" if plan else "_id"
-        query_value = plan_id if plan else (ObjectId(plan_id) if ObjectId.is_valid(plan_id) else None)
-        
-        if not plan and query_value:
-            plan = await self.plans.find_one(self._scope(user, {"_id": query_value}))
-        
-        if not plan:
-            return False
-        
-        result = await self.plans.update_one(
-            self._scope(user, {query_field: query_value}),
-            {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
+        return await _delete_plan(
+            templates=self.templates,
+            plans=self.plans,
+            scope=self._scope,
+            plan_id=plan_id,
+            user=user,
         )
-        
-        if result.modified_count > 0 and plan.get("task_template_id"):
-            template_id = plan["task_template_id"]
-            update_result = await self.templates.update_one(
-                self._scope(user, {"id": template_id}),
-                {"$inc": {"usage_count": -1}}
-            )
-            if update_result.modified_count == 0 and ObjectId.is_valid(template_id):
-                await self.templates.update_one(
-                    self._scope(user, {"_id": ObjectId(template_id)}),
-                    {"$inc": {"usage_count": -1}}
-                )
-        
-        return result.modified_count > 0
     
     # ==================== TASK INSTANCES ====================
     
@@ -538,7 +249,7 @@ class TaskService:
         result = await self.instances.insert_one(with_tenant_id(doc, self._stamp_user(user)))
         doc["_id"] = result.inserted_id
         
-        return self._serialize_instance(doc)
+        return serialize_instance(doc)
     
     async def create_adhoc_instance(
         self, data: Dict[str, Any], created_by: str, user: Optional[dict] = None
@@ -624,7 +335,7 @@ class TaskService:
         result = await self.instances.insert_one(with_tenant_id(doc, self._stamp_user(user)))
         doc["_id"] = result.inserted_id
         
-        return self._serialize_instance(doc)
+        return serialize_instance(doc)
     
     async def get_instances(
         self,
@@ -694,7 +405,7 @@ class TaskService:
             cursor = self.instances.find(scoped_query, projection).sort("scheduled_date", 1).skip(skip).limit(limit)
             instances = []
             async for doc in cursor:
-                instances.append(self._serialize_instance(doc))
+                instances.append(serialize_instance(doc))
             return instances
         
         count_task = self.instances.count_documents(scoped_query)
@@ -711,7 +422,7 @@ class TaskService:
 
         doc = await resolve_task_instance(instance_id)
         if doc:
-            return self._serialize_instance(doc)
+            return serialize_instance(doc)
         return None
     
     async def update_instance(
@@ -743,7 +454,7 @@ class TaskService:
         )
         
         if result:
-            return self._serialize_instance(result)
+            return serialize_instance(result)
         return None
     
     async def start_task(
@@ -768,7 +479,7 @@ class TaskService:
         )
 
         if result:
-            return self._serialize_instance(result)
+            return serialize_instance(result)
         return None
     
     async def complete_task(
@@ -884,7 +595,7 @@ class TaskService:
                     pass
                 
                 if plan:
-                    next_due = self._calculate_next_due(
+                    next_due = calculate_next_due(
                         now,
                         plan["interval_value"],
                         plan["interval_unit"]
@@ -916,7 +627,7 @@ class TaskService:
 
             await sync_reliability_graph_on_complete(self.db, instance, result, now)
 
-            serialized = self._serialize_instance(result)
+            serialized = serialize_instance(result)
             if created_submission_id:
                 serialized["form_submission_id"] = created_submission_id
             if label_print_config:
@@ -947,193 +658,24 @@ class TaskService:
         user: Optional[dict] = None,
     ) -> List[Dict[str, Any]]:
         """Generate task instances for a plan within the horizon and date range."""
-        
-        plan = await self.get_plan_by_id(plan_id, user=user)
-        if not plan or not plan["is_active"]:
-            return []
-        
-        # Skip ad-hoc plans - they don't have recurring schedules
-        if plan.get("is_adhoc"):
-            return []
-        
-        # Ensure the plan has the required scheduling fields
-        if not plan.get("next_due_date") or not plan.get("interval_value") or not plan.get("interval_unit"):
-            return []
-        
-        now = datetime.now(timezone.utc)
-        horizon_end = now + timedelta(days=horizon_days)
-        
-        # Parse plan's effective_from and effective_until dates
-        effective_from = plan.get("effective_from")
-        if effective_from:
-            if isinstance(effective_from, str):
-                effective_from = datetime.fromisoformat(effective_from.replace('Z', '+00:00'))
-            if effective_from.tzinfo is None:
-                effective_from = effective_from.replace(tzinfo=timezone.utc)
-        else:
-            effective_from = now
-        
-        effective_until = plan.get("effective_until")
-        if effective_until:
-            if isinstance(effective_until, str):
-                effective_until = datetime.fromisoformat(effective_until.replace('Z', '+00:00'))
-            if effective_until.tzinfo is None:
-                effective_until = effective_until.replace(tzinfo=timezone.utc)
-        
-        # The generation window is bounded by both the horizon AND the plan's effective_until
-        generation_end = horizon_end
-        if effective_until and effective_until < generation_end:
-            generation_end = effective_until
-        
-        # Start date must be at least effective_from, or now if that's later
-        generation_start = max(now, effective_from)
-        
-        # If the plan's date range is entirely in the past, don't generate anything
-        if effective_until and effective_until < now:
-            return []
-        
-        # Get existing instances to avoid duplicates
-        existing = await self.instances.find(self._scope(user, {
-            "task_plan_id": plan_id,
-            "scheduled_date": {"$gte": generation_start, "$lte": generation_end},
-            "status": {"$in": ["planned", "scheduled"]}
-        })).to_list(100)
-        
-        existing_dates = set()
-        for inst in existing:
-            sd = inst["scheduled_date"]
-            if isinstance(sd, str):
-                sd = datetime.fromisoformat(sd.replace('Z', '+00:00'))
-            if sd.tzinfo is None:
-                sd = sd.replace(tzinfo=timezone.utc)
-            existing_dates.add(sd.date())
-        
-        # Generate instances
-        generated = []
-        current_date = plan["next_due_date"]
-        
-        # Parse if string and ensure timezone
-        if isinstance(current_date, str):
-            current_date = datetime.fromisoformat(current_date.replace('Z', '+00:00'))
-        if current_date.tzinfo is None:
-            current_date = current_date.replace(tzinfo=timezone.utc)
-        
-        # If the next_due_date is before effective_from, calculate forward to effective_from
-        while current_date < effective_from:
-            current_date = self._calculate_next_due(
-                current_date,
-                plan["interval_value"],
-                plan["interval_unit"]
-            )
-        
-        # Generate instances within the valid date range
-        while current_date <= generation_end:
-            # Only create if within the effective date range and not already existing
-            if current_date.date() not in existing_dates and current_date >= generation_start:
-                if not effective_until or current_date <= effective_until:
-                    instance = await self.create_instance({
-                        "task_plan_id": plan_id,
-                        "scheduled_date": current_date,
-                        "due_date": current_date + timedelta(days=1),  # 1 day grace period
-                        "priority": "medium",
-                    }, created_by, user=user)
-                    generated.append(instance)
-            
-            # Calculate next occurrence
-            current_date = self._calculate_next_due(
-                current_date,
-                plan["interval_value"],
-                plan["interval_unit"]
-            )
-        
-        return generated
-    
+        return await task_service_scheduling.generate_instances_for_plan(
+            self, plan_id, horizon_days, created_by, user=user
+        )
+
     async def generate_all_due_instances(
         self,
         horizon_days: int = 30,
-        created_by: str = "system"
+        created_by: str = "system",
     ) -> Dict[str, Any]:
         """Generate instances for all active plans within their effective date ranges."""
-        
-        now = datetime.now(timezone.utc)
-        horizon_end = now + timedelta(days=horizon_days)
-        
-        # Get all active plans - we'll filter dates in Python since dates might be stored as strings
-        all_active_plans = await self.plans.find(self._scope(None, {
-            "is_active": True
-        })).to_list(1000)
-        
-        # Filter plans based on next_due_date and effective_until
-        plans = []
-        for plan in all_active_plans:
-            next_due = plan.get("next_due_date")
-            effective_until = plan.get("effective_until")
-            
-            # Parse next_due_date if it's a string
-            if isinstance(next_due, str):
-                try:
-                    next_due = datetime.fromisoformat(next_due.replace("Z", "+00:00"))
-                except (ValueError, TypeError):
-                    continue  # Skip if can't parse
-            
-            if next_due is None:
-                continue
-            
-            # Make timezone aware if needed
-            if next_due.tzinfo is None:
-                next_due = next_due.replace(tzinfo=timezone.utc)
-            
-            # Check if next_due is within horizon
-            if next_due > horizon_end:
-                continue
-            
-            # Parse and check effective_until
-            if effective_until is not None:
-                if isinstance(effective_until, str):
-                    try:
-                        effective_until = datetime.fromisoformat(effective_until.replace("Z", "+00:00"))
-                    except (ValueError, TypeError):
-                        effective_until = None
-                
-                if effective_until and effective_until.tzinfo is None:
-                    effective_until = effective_until.replace(tzinfo=timezone.utc)
-                
-                if effective_until and effective_until < now:
-                    continue  # Plan has expired
-            
-            plans.append(plan)
-        
-        total_generated = 0
-        plans_processed = 0
-        
-        for plan in plans:
-            plan_id = plan.get("id") or str(plan["_id"])
-            instances = await self.generate_instances_for_plan(
-                plan_id, horizon_days, created_by, user=None
-            )
-            total_generated += len(instances)
-            plans_processed += 1
-        
-        return {
-            "plans_processed": plans_processed,
-            "instances_generated": total_generated,
-            "horizon_days": horizon_days
-        }
-    
+        return await task_service_scheduling.generate_all_due_instances(
+            self, horizon_days, created_by
+        )
+
     async def mark_overdue_tasks(self) -> int:
         """Mark tasks past due date as overdue."""
-        now = datetime.now(timezone.utc)
-        
-        result = await self.instances.update_many(
-            scoped_job({
-                "status": {"$in": ["planned", "scheduled"]},
-                "due_date": {"$lt": now}
-            }),
-            {"$set": {"status": "overdue", "updated_at": now}}
-        )
-        
-        return result.modified_count
-    
+        return await task_service_scheduling.mark_overdue_tasks(self)
+
     # ==================== DASHBOARD / STATS ====================
     
     async def get_task_stats(
@@ -1208,129 +750,6 @@ class TaskService:
             })
         
         return events
-    
-    # ==================== HELPERS ====================
-    
-    def _calculate_next_due(
-        self,
-        base_date: datetime,
-        interval_value: Any,
-        interval_unit: str
-    ) -> datetime:
-        """Calculate next due date based on interval."""
-        
-        if isinstance(base_date, str):
-            base_date = datetime.fromisoformat(base_date.replace('Z', '+00:00'))
-        try:
-            iv = int(interval_value) if interval_value is not None else 1
-        except (TypeError, ValueError):
-            iv = 1
-        unit = (interval_unit or "days").lower() if isinstance(interval_unit, str) else "days"
-        
-        if unit == "hours":
-            return base_date + timedelta(hours=iv)
-        elif unit == "days":
-            return base_date + timedelta(days=iv)
-        elif unit == "weeks":
-            return base_date + timedelta(weeks=iv)
-        elif unit == "months":
-            # Approximate months as 30 days
-            return base_date + timedelta(days=iv * 30)
-        elif unit == "years":
-            return base_date + timedelta(days=iv * 365)
-        else:
-            return base_date + timedelta(days=iv)
-    
-    def _serialize_template(self, doc: Dict) -> Dict[str, Any]:
-        """Serialize template document."""
-        return {
-            "id": doc.get("id") or str(doc["_id"]),
-            "name": doc["name"],
-            "description": doc.get("description"),
-            "discipline": doc["discipline"],
-            "mitigation_strategy": doc["mitigation_strategy"],
-            "equipment_type_ids": doc.get("equipment_type_ids", []),
-            "failure_mode_ids": doc.get("failure_mode_ids", []),
-            "frequency_type": doc.get("frequency_type", "time_based"),
-            "default_interval": doc.get("default_interval", 30),
-            "default_unit": doc.get("default_unit", "days"),
-            "estimated_duration_minutes": doc.get("estimated_duration_minutes"),
-            "procedure_steps": doc.get("procedure_steps", []),
-            "safety_requirements": doc.get("safety_requirements", []),
-            "tools_required": doc.get("tools_required", []),
-            "spare_parts": doc.get("spare_parts", []),
-            "form_template_id": doc.get("form_template_id"),
-            "tags": doc.get("tags", []),
-            "is_adhoc": doc.get("is_adhoc", False),
-            "is_active": doc.get("is_active", True),
-            "usage_count": doc.get("usage_count", 0),
-            "created_at": _safe_isoformat(doc.get("created_at")),
-            "updated_at": _safe_isoformat(doc.get("updated_at")),
-        }
-    
-    def _serialize_plan(self, doc: Dict) -> Dict[str, Any]:
-        """Serialize plan document."""
-        return {
-            "id": doc.get("id") or str(doc["_id"]),
-            "equipment_id": doc["equipment_id"],
-            "equipment_name": doc.get("equipment_name"),
-            "task_template_id": doc["task_template_id"],
-            "task_template_name": doc.get("task_template_name"),
-            "form_template_id": doc.get("form_template_id"),
-            "form_template_name": doc.get("form_template_name"),
-            "efm_id": doc.get("efm_id"),
-            "frequency_type": doc["frequency_type"],
-            "interval_value": doc.get("interval_value"),
-            "interval_unit": doc.get("interval_unit"),
-            "trigger_condition": doc.get("trigger_condition"),
-            "assigned_team": doc.get("assigned_team"),
-            "assigned_user_id": doc.get("assigned_user_id"),
-            "effective_from": _safe_isoformat(doc.get("effective_from")),
-            "effective_until": _safe_isoformat(doc.get("effective_until")),
-            "last_executed_at": _safe_isoformat(doc.get("last_executed_at")),
-            "next_due_date": _safe_isoformat(doc.get("next_due_date")),
-            "execution_count": doc.get("execution_count", 0),
-            "notes": doc.get("notes"),
-            "is_active": doc.get("is_active", True),
-            "is_adhoc": doc.get("is_adhoc", False),
-            "created_at": _safe_isoformat(doc.get("created_at")),
-            "updated_at": _safe_isoformat(doc.get("updated_at")),
-        }
-    
-    def _serialize_instance(self, doc: Dict) -> Dict[str, Any]:
-        """Serialize instance document."""
-        # Handle task_plan_id which might be ObjectId or string
-        task_plan_id = doc.get("task_plan_id")
-        if task_plan_id and hasattr(task_plan_id, '__str__'):
-            task_plan_id = str(task_plan_id)
-        
-        return {
-            "id": str(doc["_id"]),
-            "task_plan_id": task_plan_id,
-            "task_template_id": doc.get("task_template_id"),
-            "task_template_name": doc.get("task_template_name"),
-            "equipment_id": doc.get("equipment_id"),  # Optional - adhoc tasks may not have equipment
-            "equipment_name": doc.get("equipment_name"),
-            "efm_id": doc.get("efm_id"),
-            "scheduled_date": _safe_isoformat(doc.get("scheduled_date")),
-            "due_date": _safe_isoformat(doc.get("due_date")),
-            "status": doc.get("status", "pending"),  # Default to pending if not set
-            "priority": doc.get("priority", "medium"),
-            "assigned_team": doc.get("assigned_team"),
-            "assigned_user_id": doc.get("assigned_user_id"),
-            "discipline": doc.get("discipline"),
-            "estimated_duration_minutes": doc.get("estimated_duration_minutes"),
-            "started_at": _safe_isoformat(doc.get("started_at")),
-            "completed_at": _safe_isoformat(doc.get("completed_at")),
-            "actual_duration_minutes": doc.get("actual_duration_minutes"),
-            "completion_notes": doc.get("completion_notes"),
-            "issues_found": doc.get("issues_found", []),
-            "follow_up_required": doc.get("follow_up_required", False),
-            "follow_up_notes": doc.get("follow_up_notes"),
-            "notes": doc.get("notes"),
-            "created_at": _safe_isoformat(doc.get("created_at")),
-            "updated_at": _safe_isoformat(doc.get("updated_at")),
-        }
 
 
 from services.task_service_completion import (  # noqa: E402

@@ -15,590 +15,42 @@ from bson import ObjectId
 
 from database import db
 from services.db_monitoring import timed_find
-from services.tenant_schema import merge_tenant_filter
-from services.work_signal_projection import project_list_item
-from services.work_execution_config import (
-    should_include_unbridged_work_items,
-    work_items_source_mode,
-)
 from services.scheduler_job import get_task_generation_config
-from utils.mongo_regex import case_insensitive_contains
-from services.task_instance_bridge import (
-    STATUS_MAP,
-    _build_default_assignees,
-    _build_program_discipline_map,
-    _resolve_discipline,
+from services.tenant_schema import merge_tenant_filter
+from services.work_execution_config import work_items_source_mode
+from services.work_item_filters import (
+    MAX_ACTION_ITEMS,
+    MAX_TASK_INSTANCES,
+    _resolve_linked_signal_id,
+    should_exclude_pm_import_from_my_tasks,
 )
+from services.work_item_serializers import (
+    _merge_work_items_prefer_instances,
+    safe_isoformat,
+    serialize_action_as_task,
+    serialize_task,
+    work_item_sort_key,
+)
+from services.work_item_unbridged import _maybe_fetch_unbridged
+from services.work_signal_projection import project_list_item
+from utils.mongo_regex import case_insensitive_contains
 
 logger = logging.getLogger(__name__)
 
-# How far ahead to include unbridged maintenance in My Tasks.
-MAINTENANCE_HORIZON_DAYS = 14
-MAX_UNBRIDGED_ITEMS = 50
-# Fleet-scale caps for merged work-item lists.
-MAX_TASK_INSTANCES = 100
-MAX_ACTION_ITEMS = 100
-
-
-def _resolve_linked_signal_id(task: dict) -> Optional[str]:
-    """Resolve linked observation/threat id from a task instance document."""
-    for key in ("observation_id", "threat_id", "source_observation_id"):
-        if task.get(key):
-            return str(task[key])
-    if task.get("created_from_observation") and task.get("source_id"):
-        return str(task["source_id"])
-    return None
-
-
-def _parse_due_date(value: Optional[str]) -> Optional[datetime]:
-    if not value:
-        return None
-    try:
-        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (TypeError, ValueError):
-        return None
-
-
-def _safe_iso(value: Any) -> Optional[str]:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-    if isinstance(value, datetime):
-        return value.isoformat()
-    return str(value)
-
-
-def _is_pm_import_scheduled_task(scheduled_task: dict) -> bool:
-    if scheduled_task.get("pm_import_task_id"):
-        return True
-    return (scheduled_task.get("task_source") or "").lower() == "customer_imported"
-
-
-def _is_pm_import_task_instance(task: dict) -> bool:
-    if (task.get("source_type") or "").lower() == "customer_imported":
-        return True
-    form_data = task.get("form_data") or {}
-    if form_data.get("pm_import_task_id"):
-        return True
-    for key in ("v2_task_id", "maintenance_program_id", "task_plan_id"):
-        value = task.get(key) or ""
-        if isinstance(value, str) and value.startswith("pm-import:"):
-            return True
-    return False
-
-
-def should_exclude_pm_import_from_my_tasks(
-    *,
-    scheduled_task: Optional[dict] = None,
-    task_instance: Optional[dict] = None,
-) -> bool:
-    """PM Import belongs on Maintenance Schedule — never show in My Tasks."""
-    if scheduled_task is not None:
-        return _is_pm_import_scheduled_task(scheduled_task)
-    if task_instance is not None:
-        return _is_pm_import_task_instance(task_instance)
-    return False
-
-
-def _is_program_scheduled_task(scheduled_task: dict) -> bool:
-    """Strategy/program PM rows should only appear after the bridge cron creates instances."""
-    if _is_pm_import_scheduled_task(scheduled_task):
-        return True
-    source = (scheduled_task.get("task_source") or "strategy_generated").lower()
-    return source in ("strategy_generated", "customer_imported", "manual")
-
-
-def should_exclude_unbridged_scheduled_task_from_my_tasks(scheduled_task: dict) -> bool:
-    """Unbridged scheduled_tasks are planning artifacts until task_instances exist."""
-    return _is_program_scheduled_task(scheduled_task)
-
-
-def should_exclude_pm_import_overdue_from_my_tasks(
-    *,
-    scheduled_task: Optional[dict] = None,
-    task_instance: Optional[dict] = None,
-    now: Optional[datetime] = None,
-) -> bool:
-    """Deprecated alias — PM import is excluded from My Tasks entirely."""
-    return should_exclude_pm_import_from_my_tasks(
-        scheduled_task=scheduled_task,
-        task_instance=task_instance,
-    )
-
-
-def serialize_scheduled_task_as_work_item(
-    scheduled_task: dict,
-    *,
-    canonical_discipline: Optional[str] = None,
-    assigned_user_id: Optional[str] = None,
-    assignee: Optional[str] = None,
-) -> dict:
-    """Shape a scheduled_task into the My Tasks list item format."""
-    sched_id = scheduled_task.get("id") or ""
-    due_dt = _parse_due_date(scheduled_task.get("due_date"))
-    raw_status = scheduled_task.get("status", "scheduled")
-    mapped_status = STATUS_MAP.get(raw_status, "pending")
-    if due_dt and due_dt < datetime.now(timezone.utc) and mapped_status == "pending":
-        mapped_status = "overdue"
-
-    return {
-        "id": f"sched:{sched_id}",
-        "scheduled_task_id": sched_id,
-        "title": scheduled_task.get("task_name") or "Maintenance task",
-        "description": scheduled_task.get("task_description") or "",
-        "status": mapped_status,
-        "priority": scheduled_task.get("priority") or "medium",
-        "due_date": _safe_iso(due_dt),
-        "scheduled_date": _safe_iso(due_dt),
-        "equipment_id": scheduled_task.get("equipment_id"),
-        "equipment_name": scheduled_task.get("equipment_name") or "",
-        "asset": scheduled_task.get("equipment_name") or "",
-        "equipment_tag": scheduled_task.get("equipment_tag"),
-        "mitigation_strategy": canonical_discipline or scheduled_task.get("discipline") or "maintenance",
-        "type": canonical_discipline or scheduled_task.get("discipline") or "maintenance",
-        "discipline": canonical_discipline or scheduled_task.get("discipline") or "",
-        "is_recurring": False,
-        "frequency": "",
-        "source": "maintenance",
-        "source_type": "scheduled_task",
-        "assigned_user_id": assigned_user_id,
-        "assigned_team": "",
-        "assignee": assignee or "",
-        "last_completed": None,
-        "form_fields": [],
-        "form_template_name": "",
-        "form_documents": [],
-        "template": {},
-        "estimated_duration_minutes": scheduled_task.get("estimated_duration_minutes"),
-        "can_quick_complete": True,
-        "action_type": None,
-        "risk_score": None,
-        "rpn": None,
-        "maintenance_program_id": scheduled_task.get("maintenance_program_id"),
-        "v2_task_id": scheduled_task.get("v2_task_id"),
-        "is_unbridged_maintenance": True,
-    }
-
-
-def _user_can_see_item(
-    assigned_user_id: Optional[str],
-    user_id: str,
-) -> bool:
-    """Match My Tasks visibility: assigned to user or unassigned."""
-    if not assigned_user_id:
-        return True
-    return assigned_user_id == user_id
-
-
-def _build_scheduled_task_query(
-    *,
-    filter_name: str,
-    now: datetime,
-    today_start: datetime,
-    today_end: datetime,
-    equipment_id: Optional[str],
-) -> Optional[dict]:
-    """Return a Mongo query for scheduled_tasks, or None when filter excludes maintenance."""
-    if filter_name in ("recurring", "adhoc"):
-        return None
-
-    horizon_end = (now + timedelta(days=MAINTENANCE_HORIZON_DAYS)).date().isoformat()
-    today_iso = today_start.date().isoformat()
-
-    query: dict = {
-        "status": {"$nin": ["completed", "cancelled"]},
-    }
-
-    if filter_name == "overdue":
-        query["due_date"] = {"$lt": today_iso}
-    elif filter_name == "today":
-        query["due_date"] = {"$gte": today_iso, "$lt": today_end.date().isoformat()}
-    else:
-        # open / all / default
-        query["due_date"] = {"$lte": horizon_end}
-
-    if equipment_id:
-        query["equipment_id"] = equipment_id
-
-    return query
-
-
-async def _maybe_fetch_unbridged(
-    user_id: str,
-    *,
-    filter_name: str = "open",
-    equipment_id: Optional[str] = None,
-    discipline: Optional[str] = None,
-    now: Optional[datetime] = None,
-    user: Optional[dict] = None,
-) -> List[dict]:
-    if not await should_include_unbridged_work_items():
-        return []
-    # When the weekly Task Generation cron is OFF, no unbridged maintenance
-    # rows should leak into My Tasks either.
-    try:
-        gen_cfg = await get_task_generation_config()
-        if not gen_cfg.get("enabled", True):
-            return []
-    except Exception as exc:
-        logger.warning("task_generation config lookup skipped: %s", exc)
-    return await fetch_unbridged_maintenance_work_items(
-        user_id,
-        filter_name=filter_name,
-        equipment_id=equipment_id,
-        discipline=discipline,
-        now=now,
-        user=user,
-    )
-
-
-async def fetch_unbridged_maintenance_work_items(
-    user_id: str,
-    *,
-    filter_name: str = "open",
-    equipment_id: Optional[str] = None,
-    discipline: Optional[str] = None,
-    now: Optional[datetime] = None,
-    user: Optional[dict] = None,
-) -> List[dict]:
-    """Load open scheduled_tasks not yet mirrored in task_instances."""
-    now = now or datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
-
-    query = _build_scheduled_task_query(
-        filter_name=filter_name,
-        now=now,
-        today_start=today_start,
-        today_end=today_end,
-        equipment_id=equipment_id,
-    )
-    if query is None:
-        return []
-
-    query = merge_tenant_filter(query, user)
-
-    cursor = await timed_find(db.scheduled_tasks, query, {"_id": 0})
-    candidate_tasks = await cursor.sort("due_date", 1).to_list(MAX_UNBRIDGED_ITEMS * 2)
-
-    if not candidate_tasks:
-        return []
-
-    candidate_ids = [t.get("id") for t in candidate_tasks if t.get("id")]
-    existing_set: set = set()
-    existing_fingerprints: set = set()
-    if candidate_ids:
-        existing_cursor = await timed_find(
-            db.task_instances,
-            merge_tenant_filter(
-                {"scheduled_task_id": {"$in": candidate_ids}},
-                user,
-            ),
-            {
-                "_id": 0,
-                "scheduled_task_id": 1,
-                "equipment_id": 1,
-                "due_date": 1,
-                "scheduled_date": 1,
-                "v2_task_id": 1,
-                "maintenance_program_id": 1,
-                "task_plan_id": 1,
-            },
-        )
-        existing = await existing_cursor.to_list(len(candidate_ids))
-        for row in existing:
-            if row.get("scheduled_task_id"):
-                existing_set.add(row["scheduled_task_id"])
-            existing_fingerprints.add(
-                _work_item_dedupe_key(
-                    {
-                        "scheduled_task_id": row.get("scheduled_task_id"),
-                        "equipment_id": row.get("equipment_id"),
-                        "v2_task_id": row.get("v2_task_id"),
-                        "maintenance_program_id": row.get("maintenance_program_id")
-                        or row.get("task_plan_id"),
-                        "due_date": _safe_iso(row.get("due_date")) or row.get("due_date"),
-                        "scheduled_date": row.get("scheduled_date"),
-                    }
-                )
-            )
-
-    eq_ids = list({t.get("equipment_id") for t in candidate_tasks if t.get("equipment_id")})
-    if eq_ids:
-        overlap_cursor = await timed_find(
-            db.task_instances,
-            merge_tenant_filter(
-                {
-                    "equipment_id": {"$in": eq_ids},
-                    "status": {"$nin": ["completed", "cancelled"]},
-                },
-                user,
-            ),
-            {
-                "_id": 0,
-                "scheduled_task_id": 1,
-                "equipment_id": 1,
-                "due_date": 1,
-                "scheduled_date": 1,
-                "v2_task_id": 1,
-                "maintenance_program_id": 1,
-                "task_plan_id": 1,
-            },
-        )
-        for row in await overlap_cursor.to_list(MAX_UNBRIDGED_ITEMS * 4):
-            existing_fingerprints.add(
-                _work_item_dedupe_key(
-                    {
-                        "scheduled_task_id": row.get("scheduled_task_id"),
-                        "equipment_id": row.get("equipment_id"),
-                        "v2_task_id": row.get("v2_task_id"),
-                        "maintenance_program_id": row.get("maintenance_program_id")
-                        or row.get("task_plan_id"),
-                        "due_date": _safe_iso(row.get("due_date")) or row.get("due_date"),
-                        "scheduled_date": row.get("scheduled_date"),
-                    }
-                )
-            )
-
-    default_assignees = await _build_default_assignees()
-    discipline_cache: Dict[str, str] = {}
-    program_ids = [
-        st.get("maintenance_program_id")
-        for st in candidate_tasks
-        if st.get("maintenance_program_id")
-    ]
-    program_disciplines = await _build_program_discipline_map(program_ids)
-
-    items: List[dict] = []
-    discipline_lo = discipline.lower() if discipline else None
-
-    for st in candidate_tasks:
-        sched_id = st.get("id")
-        if not sched_id or sched_id in existing_set:
-            continue
-
-        if should_exclude_unbridged_scheduled_task_from_my_tasks(st):
-            continue
-
-        fp = _work_item_dedupe_key(
-            {
-                "scheduled_task_id": sched_id,
-                "equipment_id": st.get("equipment_id"),
-                "v2_task_id": st.get("v2_task_id"),
-                "maintenance_program_id": st.get("maintenance_program_id"),
-                "program_task_id": st.get("program_task_id"),
-                "due_date": st.get("due_date"),
-            }
-        )
-        if fp in existing_fingerprints and fp != (None, None, None, None):
-            continue
-
-        program_disc = program_disciplines.get(st.get("maintenance_program_id"))
-        raw_discipline = program_disc or st.get("discipline")
-        canonical_discipline = await _resolve_discipline(raw_discipline, discipline_cache)
-
-        if discipline_lo:
-            disc = (canonical_discipline or raw_discipline or "").lower()
-            if discipline_lo not in disc:
-                continue
-
-        assignee_meta = default_assignees.get(canonical_discipline or "") or {}
-        assigned_user_id = assignee_meta.get("user_id")
-        if not _user_can_see_item(assigned_user_id, user_id):
-            continue
-
-        items.append(
-            serialize_scheduled_task_as_work_item(
-                st,
-                canonical_discipline=canonical_discipline,
-                assigned_user_id=assigned_user_id,
-                assignee=assignee_meta.get("user_name"),
-            )
-        )
-        existing_fingerprints.add(fp)
-        if len(items) >= MAX_UNBRIDGED_ITEMS:
-            break
-
-    return items
-
-
-def safe_isoformat(value: Any) -> Optional[str]:
-    """Safely convert a datetime or string to ISO format string."""
-    return _safe_iso(value)
-
-
-def serialize_task(task: dict) -> dict:
-    """Serialize a task instance for API response."""
-    if not task:
-        return None
-
-    title = task.get("title") or task.get("task_template_name") or "Untitled Task"
-
-    return {
-        "id": str(task.get("_id", "")),
-        "title": title,
-        "description": task.get("description", ""),
-        "status": task.get("status", "scheduled"),
-        "priority": task.get("priority", "medium"),
-        "due_date": safe_isoformat(task.get("due_date")),
-        "scheduled_date": safe_isoformat(task.get("scheduled_date")),
-        "equipment_id": str(task.get("equipment_id", "")) if task.get("equipment_id") else None,
-        "equipment_name": task.get("equipment_name", ""),
-        "asset": task.get("equipment_name", ""),
-        "mitigation_strategy": task.get("mitigation_strategy") or task.get("discipline", ""),
-        "type": task.get("mitigation_strategy") or task.get("discipline", ""),
-        "discipline": task.get("discipline", ""),
-        "is_recurring": task.get("is_recurring", False),
-        "frequency": task.get("frequency_display", ""),
-        "source": task.get("source", "manual"),
-        "source_type": task.get("source_type", "task"),
-        "assigned_user_id": str(task.get("assigned_user_id", "")) if task.get("assigned_user_id") else None,
-        "assigned_team": task.get("assigned_team", ""),
-        "assignee": task.get("assignee", ""),
-        "last_completed": safe_isoformat(task.get("last_completed")),
-        "form_fields": task.get("form_fields", []),
-        "form_template_name": task.get("form_template_name", ""),
-        "form_documents": task.get("form_documents", []),
-        "template": task.get("template", {}),
-        "estimated_duration_minutes": task.get("estimated_duration_minutes"),
-        "can_quick_complete": not task.get("form_fields") and not task.get("template", {}).get("form_fields"),
-        "action_type": task.get("action_type"),
-        "risk_score": task.get("risk_score"),
-        "rpn": task.get("rpn"),
-        "equipment_tag": task.get("equipment_tag"),
-        "photo_extraction_config": task.get("photo_extraction_config"),
-        "scheduled_task_id": task.get("scheduled_task_id"),
-        "maintenance_program_id": task.get("maintenance_program_id"),
-        "v2_task_id": task.get("v2_task_id"),
-        "is_unbridged_maintenance": False,
-        "work_signal": task.get("work_signal"),
-    }
-
-
-def serialize_action_as_task(action: dict) -> dict:
-    """Serialize a central action as a task item for the My Tasks list."""
-    if not action:
-        return None
-
-    due_date = action.get("due_date")
-    if due_date and isinstance(due_date, str):
-        try:
-            due_date = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
-        except (ValueError, TypeError):
-            due_date = None
-
-    status_map = {
-        "open": "planned",
-        "in_progress": "in_progress",
-        "completed": "completed",
-    }
-
-    return {
-        "id": action.get("id", ""),
-        "title": action.get("title", "Untitled Action"),
-        "description": action.get("description", ""),
-        "status": status_map.get(action.get("status", "open"), "planned"),
-        "priority": action.get("priority", "medium"),
-        "due_date": due_date.isoformat() if due_date else None,
-        "scheduled_date": None,
-        "equipment_id": None,
-        "equipment_name": action.get("source_name", ""),
-        "asset": action.get("source_name", ""),
-        "mitigation_strategy": action.get("action_type", "corrective"),
-        "type": action.get("action_type", "corrective"),
-        "discipline": action.get("discipline", ""),
-        "is_recurring": False,
-        "frequency": "",
-        "source": action.get("source_type", "observation"),
-        "source_type": "action",
-        "source_id": action.get("source_id", ""),
-        "assigned_user_id": None,
-        "assigned_team": "",
-        "assignee": action.get("assignee", ""),
-        "last_completed": None,
-        "form_fields": [],
-        "form_documents": action.get("form_documents", []),
-        "template": {},
-        "estimated_duration_minutes": None,
-        "can_quick_complete": True,
-        "action_type": action.get("action_type"),
-        "comments": action.get("comments", ""),
-        "risk_score": action.get("threat_risk_score") or action.get("risk_score"),
-        "rpn": action.get("threat_rpn") or action.get("rpn"),
-        "equipment_tag": action.get("equipment_tag"),
-        "is_unbridged_maintenance": False,
-    }
-
-
-def _work_item_dedupe_key(item: dict) -> tuple:
-    """Fingerprint for deduping task_instances vs unbridged scheduled_tasks."""
-    sched_id = item.get("scheduled_task_id")
-    equipment_id = item.get("equipment_id")
-    due = item.get("due_date") or item.get("scheduled_date")
-    program_ref = (
-        item.get("v2_task_id")
-        or item.get("program_task_id")
-        or item.get("maintenance_program_id")
-        or item.get("task_plan_id")
-    )
-    return (sched_id, equipment_id, program_ref, due)
-
-
-def _merge_work_items_prefer_instances(
-    instance_items: List[dict],
-    unbridged_items: List[dict],
-) -> List[dict]:
-    """Merge lists; task_instance rows win over unbridged duplicates."""
-    merged = list(instance_items)
-    seen_sched_ids = {
-        t.get("scheduled_task_id") for t in instance_items if t.get("scheduled_task_id")
-    }
-    seen_fingerprints = {_work_item_dedupe_key(t) for t in instance_items}
-
-    for item in unbridged_items:
-        sched_id = item.get("scheduled_task_id")
-        if sched_id and sched_id in seen_sched_ids:
-            continue
-        fp = _work_item_dedupe_key(item)
-        if fp in seen_fingerprints and fp != (None, None, None, None):
-            continue
-        merged.append(item)
-        if sched_id:
-            seen_sched_ids.add(sched_id)
-        seen_fingerprints.add(fp)
-    return merged
-
-
-def work_item_sort_key(item: dict, now: datetime) -> tuple:
-    """Sort combined work items: risk → status → priority → due date."""
-    risk_score = item.get("risk_score") or 0
-    risk_val = -risk_score
-    rpn = item.get("rpn") or 0
-    rpn_val = -rpn
-
-    status_order = {"overdue": 0, "in_progress": 1, "planned": 2, "scheduled": 2, "pending": 2}
-    status_val = status_order.get(item.get("status", "planned"), 2)
-
-    priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    priority_val = priority_order.get(item.get("priority", "medium"), 2)
-
-    due_date = item.get("due_date")
-    if due_date:
-        try:
-            due_dt = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
-            if due_dt < now:
-                status_val = 0
-            due_val = due_dt.timestamp()
-        except (ValueError, TypeError):
-            due_val = float("inf")
-    else:
-        due_val = float("inf")
-
-    return (risk_val, rpn_val, status_val, priority_val, due_val)
+# Re-exports for routes and tests
+from services.work_item_filters import (  # noqa: E402
+    MAINTENANCE_HORIZON_DAYS,
+    MAX_UNBRIDGED_ITEMS,
+    _build_scheduled_task_query,
+    _user_can_see_item,
+    should_exclude_pm_import_overdue_from_my_tasks,
+    should_exclude_unbridged_scheduled_task_from_my_tasks,
+)
+from services.work_item_serializers import (  # noqa: E402
+    _work_item_dedupe_key,
+    serialize_scheduled_task_as_work_item,
+)
+from services.work_item_unbridged import fetch_unbridged_maintenance_work_items  # noqa: E402
 
 
 async def fetch_work_items(
@@ -676,12 +128,6 @@ async def fetch_work_items(
     if status:
         query["status"] = status
 
-    # Gate maintenance-program task_instances behind the Task Generation cron.
-    # When the weekly cron is disabled in Settings → Task Generation, no
-    # maintenance-sourced tasks should appear as "live" on My Tasks. Ad-hoc,
-    # observation-driven, recurring (task_plan) and manual instances are not
-    # affected — only ``source == "maintenance"`` (built by the bridge from
-    # scheduled_tasks) is hidden.
     try:
         gen_cfg = await get_task_generation_config()
         if not gen_cfg.get("enabled", True):
@@ -691,10 +137,6 @@ async def fetch_work_items(
                 query["source"] = block
             elif isinstance(existing_source, dict):
                 existing_source["$ne"] = "maintenance"
-            else:
-                # If a caller is already filtering by a specific source,
-                # respect it — they have explicit intent.
-                pass
     except Exception as exc:
         logger.warning("task_generation config lookup skipped: %s", exc)
 
@@ -708,7 +150,6 @@ async def fetch_work_items(
     ]).limit(MAX_TASK_INSTANCES)
     raw_tasks = await tasks_cursor.to_list(length=MAX_TASK_INSTANCES)
 
-    # Start unbridged maintenance fetch in parallel when hybrid mode allows it.
     maintenance_task = None
     include_unbridged = (
         work_items_source_mode() != "v2_instances"
@@ -741,7 +182,6 @@ async def fetch_work_items(
             else:
                 plan_ids_oid.add(task_plan_id)
 
-    # Batch independent Mongo lookups after raw_tasks (equipment_nodes + task_plans in parallel).
     async def _load_equipment_nodes() -> Dict[Any, Any]:
         equip_map: Dict[Any, Any] = {}
         if not equipment_ids:
@@ -988,7 +428,6 @@ async def fetch_work_items(
             else:
                 threat_source_ids.add(sid)
 
-        # Batch threat/investigation lookups where safe (investigations first, then threats + equipment).
         inv_threat_map: Dict[str, str] = {}
         if investigation_source_ids:
             inv_cursor = await timed_find(

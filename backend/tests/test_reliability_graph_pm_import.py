@@ -11,7 +11,7 @@ from services.reliability_graph import (
 @pytest.mark.asyncio
 async def test_sync_edge_for_pm_import_task_calls_upsert_edge():
     mock_upsert = AsyncMock()
-    with patch("services.reliability_graph.upsert_edge", mock_upsert):
+    with patch("services.reliability_graph_strategy.upsert_edge", mock_upsert):
         await sync_edge_for_pm_import_task(
             task_id="task-123",
             failure_mode_id="fm-456",
@@ -33,7 +33,7 @@ async def test_sync_edge_for_pm_import_task_calls_upsert_edge():
 @pytest.mark.asyncio
 async def test_sync_edge_for_pm_import_task_passes_optional_fields():
     mock_upsert = AsyncMock()
-    with patch("services.reliability_graph.upsert_edge", mock_upsert):
+    with patch("services.reliability_graph_strategy.upsert_edge", mock_upsert):
         await sync_edge_for_pm_import_task(
             task_id="task-789",
             failure_mode_id="fm-abc",
@@ -58,8 +58,8 @@ async def test_sync_edge_for_pm_import_task_passes_optional_fields():
 @pytest.mark.asyncio
 async def test_sync_pm_import_program_task_links_creates_imported_as_and_applied_to():
     mock_upsert = AsyncMock()
-    with patch("services.reliability_graph.upsert_edge", mock_upsert), patch(
-        "services.reliability_graph.sync_edge_for_pm_import_task", AsyncMock()
+    with patch("services.reliability_graph_strategy.upsert_edge", mock_upsert), patch(
+        "services.reliability_graph_strategy.sync_edge_for_pm_import_task", AsyncMock()
     ) as mock_applied:
         count = await sync_pm_import_program_task_links(
             pm_import_task_id="sess-1:task-1",

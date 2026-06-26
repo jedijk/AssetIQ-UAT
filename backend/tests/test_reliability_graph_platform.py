@@ -24,7 +24,7 @@ async def test_upsert_edge_includes_tenant_and_status():
     mock_coll.update_one = AsyncMock()
     mock_db.__getitem__ = MagicMock(return_value=mock_coll)
 
-    with patch("services.reliability_graph.db", mock_db):
+    with patch("services.reliability_graph_core.db", mock_db):
         await upsert_edge(
             source_type="equipment",
             source_id="eq-1",
@@ -50,7 +50,7 @@ async def test_retire_edges_for_entity():
     mock_coll.update_many = AsyncMock(return_value=mock_result)
     mock_db.__getitem__ = MagicMock(return_value=mock_coll)
 
-    with patch("services.reliability_graph.db", mock_db):
+    with patch("services.reliability_graph_core.db", mock_db):
         count = await retire_edges_for_entity(
             source_type="program_task",
             source_id="pt-old",
@@ -81,9 +81,9 @@ async def test_sync_apply_strategy_contains_task_and_has_failure_mode():
     mock_upsert = AsyncMock()
     mock_retire = AsyncMock(return_value=0)
 
-    with patch("services.reliability_graph.db", mock_db), patch(
-        "services.reliability_graph.upsert_edge", mock_upsert
-    ), patch("services.reliability_graph.retire_stale_program_task_edges", mock_retire):
+    with patch("services.reliability_graph_strategy.db", mock_db), patch(
+        "services.reliability_graph_strategy.upsert_edge", mock_upsert
+    ), patch("services.reliability_graph_strategy.retire_stale_program_task_edges", mock_retire):
         result = await sync_edges_for_apply_strategy(
             equipment_type_id="et-1",
             equipment_ids=["eq-1"],
@@ -126,12 +126,12 @@ async def test_sync_apply_strategy_links_pm_import_tasks():
     mock_retire = AsyncMock(return_value=0)
     mock_pm_links = AsyncMock(return_value=2)
 
-    with patch("services.reliability_graph.db", mock_db), patch(
-        "services.reliability_graph.upsert_edge", mock_upsert
+    with patch("services.reliability_graph_strategy.db", mock_db), patch(
+        "services.reliability_graph_strategy.upsert_edge", mock_upsert
     ), patch(
-        "services.reliability_graph.retire_stale_program_task_edges", mock_retire
+        "services.reliability_graph_strategy.retire_stale_program_task_edges", mock_retire
     ), patch(
-        "services.reliability_graph.sync_pm_import_program_task_links", mock_pm_links
+        "services.reliability_graph_strategy.sync_pm_import_program_task_links", mock_pm_links
     ):
         await sync_edges_for_apply_strategy(
             equipment_type_id="et-1",
@@ -148,7 +148,7 @@ async def test_sync_apply_strategy_links_pm_import_tasks():
 @pytest.mark.asyncio
 async def test_sync_observation_edges_all_relations():
     mock_upsert = AsyncMock()
-    with patch("services.reliability_graph.upsert_edge", mock_upsert):
+    with patch("services.reliability_graph_entities.upsert_edge", mock_upsert):
         await sync_observation_edges(
             observation_id="obs-1",
             equipment_id="eq-1",
@@ -166,8 +166,8 @@ async def test_sync_observation_edges_all_relations():
 @pytest.mark.asyncio
 async def test_sync_threat_and_investigation_chain():
     mock_upsert = AsyncMock()
-    with patch("services.reliability_graph.upsert_edge", mock_upsert), patch(
-        "services.reliability_graph.sync_observation_edges", AsyncMock()
+    with patch("services.reliability_graph_entities.upsert_edge", mock_upsert), patch(
+        "services.reliability_graph_entities.sync_observation_edges", AsyncMock()
     ):
         await sync_threat_edges(
             threat_id="th-1",
@@ -192,8 +192,8 @@ async def test_sync_action_and_outcome_edges():
     mock_db.__getitem__ = MagicMock(return_value=mock_coll)
     mock_upsert = AsyncMock()
 
-    with patch("services.reliability_graph.db", mock_db), patch(
-        "services.reliability_graph.upsert_edge", mock_upsert
+    with patch("services.reliability_graph_entities.db", mock_db), patch(
+        "services.reliability_graph_entities.upsert_edge", mock_upsert
     ):
         await sync_action_edges(
             action_id="act-1",

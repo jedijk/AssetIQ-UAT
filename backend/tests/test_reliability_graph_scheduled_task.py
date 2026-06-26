@@ -50,7 +50,7 @@ async def test_sync_edges_for_scheduled_task_completed_legacy_program_id():
         "strategy_id": "str-1",
         "strategy_version": "3",
     }
-    with patch("services.reliability_graph.upsert_edge", mock_upsert):
+    with patch("services.reliability_graph_strategy.upsert_edge", mock_upsert):
         result = await sync_edges_for_scheduled_task(
             task,
             event="completed",
@@ -76,7 +76,7 @@ async def test_sync_edges_for_scheduled_task_cancelled_v2_source():
         "program_source": "v2",
         "task_name": "Lubricate bearing",
     }
-    with patch("services.reliability_graph.upsert_edge", mock_upsert):
+    with patch("services.reliability_graph_strategy.upsert_edge", mock_upsert):
         result = await sync_edges_for_scheduled_task(task, event="cancelled")
 
     assert result["edges_upserted"] == 3
@@ -98,7 +98,7 @@ async def test_sync_edges_for_scheduled_task_created_event():
         "v2_task_id": "pt-3",
         "task_name": "Check filter",
     }
-    with patch("services.reliability_graph.upsert_edge", mock_upsert):
+    with patch("services.reliability_graph_strategy.upsert_edge", mock_upsert):
         result = await sync_edges_for_scheduled_task(task, event="created")
 
     assert result["edges_upserted"] == 2
@@ -121,8 +121,8 @@ async def test_sync_edges_for_scheduled_task_links_pm_import_task():
         "failure_mode_id": "fm-9",
         "task_name": "Imported lube",
     }
-    with patch("services.reliability_graph.upsert_edge", mock_upsert), patch(
-        "services.reliability_graph.sync_pm_import_program_task_links", mock_pm_links
+    with patch("services.reliability_graph_strategy.upsert_edge", mock_upsert), patch(
+        "services.reliability_graph_strategy.sync_pm_import_program_task_links", mock_pm_links
     ):
         result = await sync_edges_for_scheduled_task(task, event="created")
 

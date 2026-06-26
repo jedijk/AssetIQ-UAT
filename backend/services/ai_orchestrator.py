@@ -13,16 +13,11 @@ from services.ai_citation import attach_citations_to_response, format_citations_
 from services.ai_evidence_pack import build_evidence_pack
 from services.ai_gateway import chat as ai_gateway_chat, user_context
 
+from services.ai_prompt_registry import render_prompt
+
 logger = logging.getLogger(__name__)
 
-_GROUNDED_SYSTEM_PROMPT = """You are an AssetIQ reliability AI assistant.
-
-Rules:
-- Answer using ONLY the provided evidence and tool results.
-- Cite sources inline as [cite:<id>] when referencing specific entities, KPIs, or graph edges.
-- End with a "Sources" section listing cited IDs.
-- Be concise, actionable, and focused on reliability and maintenance.
-- Use markdown formatting when helpful."""
+_GROUNDED_SYSTEM_PROMPT = render_prompt("reliability.grounded_assistant")
 
 
 async def run_grounded_recommendation(

@@ -42,9 +42,9 @@ def test_maintenance_scheduler_service_has_read_endpoints():
 
 
 def test_chat_threat_graph_dispatch_includes_tenant():
-    chat_text = (BACKEND_ROOT / "services" / "chat_routes_service.py").read_text(encoding="utf-8")
-    start = chat_text.index("async def _create_observation")
-    end = chat_text.index("# Auto-create actions")
+    chat_text = (BACKEND_ROOT / "services" / "chat_routes_observation.py").read_text(encoding="utf-8")
+    start = chat_text.index("async def create_observation")
+    end = chat_text.index("auto_created = []")
     block = chat_text[start:end]
     assert "create_work_signal" in block
 

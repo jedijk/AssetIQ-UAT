@@ -49,6 +49,14 @@ def _mock_db(strategy=None, equipment=None):
     return mock_db
 
 
+def _patch_maintenance_program_db(mock_db):
+    """Patch db on service and extracted WS4 enrichment module."""
+    return (
+        patch("services.maintenance_program_service.db", mock_db),
+        patch("services.maintenance_program_enrichment.db", mock_db),
+    )
+
+
 @pytest.mark.asyncio
 async def test_enrich_adds_strategy_tasks_to_ephemeral_pm_only_program():
     equipment_id = "eq-1"
@@ -72,7 +80,8 @@ async def test_enrich_adds_strategy_tasks_to_ephemeral_pm_only_program():
         equipment={"id": equipment_id, "equipment_type_id": "et-1", "criticality": {"level": "medium"}},
     )
 
-    with patch("services.maintenance_program_service.db", mock_db), patch(
+    db_patch_service, db_patch_enrichment = _patch_maintenance_program_db(mock_db)
+    with db_patch_service, db_patch_enrichment, patch(
         "services.scheduler_helpers.build_task_to_failure_modes",
         return_value={},
     ), patch(
@@ -117,7 +126,8 @@ async def test_enrich_adds_strategy_tasks_when_stored_program_has_none():
         equipment={"id": equipment_id, "equipment_type_id": "et-1", "criticality": "low"},
     )
 
-    with patch("services.maintenance_program_service.db", mock_db), patch(
+    db_patch_service, db_patch_enrichment = _patch_maintenance_program_db(mock_db)
+    with db_patch_service, db_patch_enrichment, patch(
         "services.scheduler_helpers.build_task_to_failure_modes",
         return_value={},
     ), patch(
@@ -157,7 +167,8 @@ async def test_enrich_dedupes_existing_strategy_template_ids():
     }
     mock_db = _mock_db(strategy=MOCK_STRATEGY, equipment=None)
 
-    with patch("services.maintenance_program_service.db", mock_db), patch(
+    db_patch_service, db_patch_enrichment = _patch_maintenance_program_db(mock_db)
+    with db_patch_service, db_patch_enrichment, patch(
         "services.scheduler_helpers.build_task_to_failure_modes",
         return_value={},
     ), patch(
