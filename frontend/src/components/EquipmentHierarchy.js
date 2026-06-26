@@ -423,14 +423,14 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
 
   const uploadMutation = useMutation({
     mutationFn: (file) => equipmentHierarchyAPI.uploadEquipmentFile(node.id, file),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.equipment.files(node.id) }); toast.success("File uploaded"); },
-    onError: (e) => toast.error(e.response?.data?.detail || "Upload failed"),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.equipment.files(node.id) }); toast.success(t("equipment.fileUploaded")); },
+    onError: (e) => toast.error(e.response?.data?.detail || t("equipment.uploadFailed")),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (fileId) => equipmentHierarchyAPI.deleteEquipmentFile(fileId),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.equipment.files(node.id) }); toast.success("Deleted"); },
-    onError: () => toast.error("Delete failed"),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.equipment.files(node.id) }); toast.success(t("equipment.fileDeleted")); },
+    onError: () => toast.error(t("equipment.deleteFailed")),
   });
 
   const handleDownload = async (fileId, filename) => {
@@ -452,7 +452,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
       a.click();
       a.remove();
       window.setTimeout(() => window.URL.revokeObjectURL(url), 5_000);
-    } catch { toast.error("Download failed"); }
+    } catch { toast.error(t("equipment.downloadFailed")); }
   };
 
   const handleView = (file) => {
@@ -494,36 +494,36 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
         <div className="space-y-3">
           {node.tag && (
             <div>
-              <label className="text-xs text-slate-500 block mb-1">Tag</label>
+              <label className="text-xs text-slate-500 block mb-1">{t("equipment.tag")}</label>
               <span className="text-sm font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{node.tag}</span>
             </div>
           )}
 
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Equipment Type</label>
+            <label className="text-xs text-slate-500 block mb-1">{t("hierarchy.equipmentType")}</label>
             {getEquipmentTypeName() ? (
               <Badge variant="outline" className="bg-slate-50">{getEquipmentTypeName()}</Badge>
             ) : (
-              <span className="text-sm text-slate-400 italic">Not assigned</span>
+              <span className="text-sm text-slate-400 italic">{t("hierarchy.notAssigned")}</span>
             )}
           </div>
 
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Discipline</label>
+            <label className="text-xs text-slate-500 block mb-1">{t("hierarchy.discipline")}</label>
             {getDisciplineDisplay() ? (
               <Badge className={getDisciplineDisplay().color}>{getDisciplineDisplay().label}</Badge>
             ) : (
-              <span className="text-sm text-slate-400 italic">Not assigned</span>
+              <span className="text-sm text-slate-400 italic">{t("hierarchy.notAssigned")}</span>
             )}
           </div>
 
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Criticality</label>
+            <label className="text-xs text-slate-500 block mb-1">{t("hierarchy.criticality")}</label>
             {(() => {
               const critDetails = getCriticalityDetails();
               if (!critDetails) {
                 return (
-                  <span className="text-sm text-slate-400 italic">No criticality assigned</span>
+                  <span className="text-sm text-slate-400 italic">{t("equipment.noCriticality")}</span>
                 );
               }
               return (
@@ -552,7 +552,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
                   {critDetails.riskScore != null && (
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
                       <span className="text-xs font-semibold text-slate-700">
-                        {t?.("equipment.criticalityScore") || "Criticality Score"}
+                        {t("equipment.criticalityScore")}
                       </span>
                       <div className="text-right">
                         <span className="text-sm font-bold text-slate-800">
@@ -583,7 +583,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
               <div className="flex items-center gap-1.5 mb-2">
                 <Package className="w-3.5 h-3.5 text-amber-600" />
                 <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                  {t?.("equipment.spareParts") || "Spare Parts"}
+                  {t("equipment.spareParts")}
                 </span>
               </div>
               <EquipmentSparePartsPanel
@@ -598,19 +598,19 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <Paperclip className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Files</span>
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{t("equipment.filesLabel")}</span>
                 {files.length > 0 && (
                   <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{files.length}</span>
                 )}
               </div>
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending} data-testid="upload-file-detail-btn">
-                <Upload className="w-3.5 h-3.5 mr-1" />{uploadMutation.isPending ? "..." : "Upload"}
+                <Upload className="w-3.5 h-3.5 mr-1" />{uploadMutation.isPending ? t("common.uploading") : t("equipment.uploadFile")}
               </Button>
               <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { uploadMutation.mutate(f); e.target.value = ""; } }} />
             </div>
 
             {files.length === 0 ? (
-              <p className="text-[11px] text-slate-400 text-center py-3">No files attached</p>
+              <p className="text-[11px] text-slate-400 text-center py-3">{t("equipment.noFilesAttached")}</p>
             ) : (
               <div className="space-y-1">
                 {files.map((f) => {
@@ -630,14 +630,14 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
                       </div>
                       <div className="flex items-center gap-0.5">
                         {canView && (
-                          <button onClick={() => handleView(f)} className="p-1.5 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors" title="View" data-testid={`view-file-${f.id}`}>
+                          <button onClick={() => handleView(f)} className="p-1.5 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors" title={t("common.view")} data-testid={`view-file-${f.id}`}>
                             <Eye className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <button onClick={() => handleDownload(f.id, f.filename)} className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title="Download" data-testid={`dl-file-${f.id}`}>
+                        <button onClick={() => handleDownload(f.id, f.filename)} className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title={t("common.download")} data-testid={`dl-file-${f.id}`}>
                           <Download className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => deleteMutation.mutate(f.id)} className="p-1.5 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors" title="Delete" data-testid={`rm-file-${f.id}`}>
+                        <button onClick={() => deleteMutation.mutate(f.id)} className="p-1.5 rounded-md hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors" title={t("common.delete")} data-testid={`rm-file-${f.id}`}>
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -653,7 +653,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
         <div className="px-4 sm:px-6 py-3 border-t border-slate-200 flex-shrink-0">
           <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => { onClose(); onEditEquipment?.(node.id); }} data-testid="edit-equipment-btn">
             <Settings className="w-4 h-4 mr-2" />
-            {t ? t("hierarchy.editInManager") : "Edit in Equipment Manager"}
+            {t("hierarchy.editInManager")}
           </Button>
         </div>
       </DialogContent>

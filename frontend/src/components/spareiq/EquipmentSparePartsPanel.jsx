@@ -111,14 +111,14 @@ export default function EquipmentSparePartsPanel({ equipmentId, equipmentName })
   return (
     <div className="space-y-3" data-testid="equipment-spare-parts">
       {canWrite && (
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-1" />
-            {t("spareiq.create") || "Create"}
+        <div className="grid grid-cols-2 gap-2">
+          <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4 shrink-0" />
+            <span className="truncate">{t("spareiq.create")}</span>
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => setLinkOpen(true)}>
-            <Link2 className="w-4 h-4 mr-1" />
-            {t("spareiq.linkExisting") || "Link existing"}
+          <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => setLinkOpen(true)}>
+            <Link2 className="w-4 h-4 shrink-0" />
+            <span className="truncate">{t("spareiq.linkExisting")}</span>
           </Button>
         </div>
       )}

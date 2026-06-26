@@ -77,7 +77,12 @@
     "equipmentPanelHint": "Spare parts linked to this equipment",
     "noEquipmentParts": "No spare parts linked",
     "linkRemoved": "Link removed",
-    "unlinkFailed": "Failed to remove link"
+    "unlinkFailed": "Failed to remove link",
+    "linkExisting": "Link existing",
+    "linked": "Spare part linked",
+    "linkFailed": "Failed to link spare part",
+    "unlink": "Unlink",
+    "noLinkCandidates": "No spare parts to link"
   },
   "settings": {
     "userManagement": "User Management",
@@ -1645,6 +1650,7 @@
     "impactReputation5Desc": "International coverage, license/permit threat",
     "maintenanceProgram": "Maintenance Program",
     "viewMaintenanceProgram": "View Maintenance Program",
+    "spareParts": "Spare Parts",
     "viewSpareParts": "View Spare Parts",
     "programEquipmentCriticality": "Equipment criticality",
     "programStrategyBand": "Strategy frequency band",

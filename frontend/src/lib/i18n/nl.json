@@ -23,6 +23,24 @@
     "visualManagement": "Visueel Management",
     "spareiq": "SpareIQ"
   },
+  "spareiq": {
+    "create": "Reserveonderdeel aanmaken",
+    "edit": "Reserveonderdeel bewerken",
+    "searchPlaceholder": "Zoek reserveonderdelen...",
+    "mergedExisting": "Bestaand reserveonderdeel bijgewerkt en apparatuur gekoppeld",
+    "created": "Reserveonderdeel aangemaakt",
+    "updated": "Reserveonderdeel bijgewerkt",
+    "saveFailed": "Opslaan mislukt",
+    "equipmentPanelHint": "Reserveonderdelen gekoppeld aan deze apparatuur",
+    "noEquipmentParts": "Geen reserveonderdelen gekoppeld",
+    "linkRemoved": "Koppeling verwijderd",
+    "unlinkFailed": "Koppeling verwijderen mislukt",
+    "linkExisting": "Bestaand koppelen",
+    "linked": "Reserveonderdeel gekoppeld",
+    "linkFailed": "Koppelen mislukt",
+    "unlink": "Ontkoppelen",
+    "noLinkCandidates": "Geen reserveonderdelen om te koppelen"
+  },
   "settings": {
     "userManagement": "Gebruikersbeheer",
     "userManagementDesc": "Beheer gebruikers, rollen en rechten",
@@ -1697,6 +1715,8 @@
     "impactReputation5Desc": "Internationale berichtgeving, dreiging voor licentie of vergunning",
     "maintenanceProgram": "Onderhoudsprogramma",
     "viewMaintenanceProgram": "Onderhoudsprogramma bekijken",
+    "spareParts": "Reserveonderdelen",
+    "viewSpareParts": "Reserveonderdelen bekijken",
     "programEquipmentCriticality": "Apparatuurkriticiteit",
     "programStrategyBand": "Strategie-frequentieband",
     "programStrategyVersion": "Strategieversie",
