@@ -9,8 +9,17 @@ import { sparePartsAPI } from "../lib/apis/spareParts";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import SparePartFormDialog from "../components/spareiq/SparePartFormDialog";
 import SparePartsImportDialog from "../components/spareiq/SparePartsImportDialog";
+
+function formatLinkedEquipmentLine(link) {
+  const tag = link?.equipment_tag || link?.tag;
+  const name = link?.equipment_name || link?.name;
+  const label = tag || name || link?.equipment_id || "—";
+  const position = link?.component_position;
+  return position ? `${label} · ${position}` : label;
+}
 
 export default function SpareIQPage() {
   const { t } = useLanguage();
@@ -52,6 +61,7 @@ export default function SpareIQPage() {
   const categories = categoriesData?.categories || [];
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="p-4 sm:p-6 max-w-7xl mx-auto" data-testid="spareiq-page">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
@@ -122,7 +132,28 @@ export default function SpareIQPage() {
                 <td className="px-4 py-3 hidden sm:table-cell text-slate-700">{part.type_model}</td>
                 <td className="px-4 py-3 hidden md:table-cell text-slate-600">{part.manufacturer || "—"}</td>
                 <td className="px-4 py-3 hidden lg:table-cell text-slate-600">{part.category || "—"}</td>
-                <td className="px-4 py-3 text-right text-slate-700">{part.linked_equipment_count ?? 0}</td>
+                <td className="px-4 py-3 text-right text-slate-700">
+                  {(part.linked_equipment_count ?? 0) > 0 ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default tabular-nums underline decoration-dotted decoration-slate-300 underline-offset-2">
+                          {part.linked_equipment_count}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-xs">
+                        <ul className="space-y-1 text-xs">
+                          {(part.linked_equipment || []).map((link) => (
+                            <li key={link.equipment_id} className="font-mono">
+                              {formatLinkedEquipmentLine(link)}
+                            </li>
+                          ))}
+                        </ul>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <span className="tabular-nums">0</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-right hidden md:table-cell text-slate-700">{part.document_count ?? 0}</td>
               </tr>
             ))}
@@ -139,5 +170,6 @@ export default function SpareIQPage() {
       />
       <SparePartsImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
+    </TooltipProvider>
   );
 }

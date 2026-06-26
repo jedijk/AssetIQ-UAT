@@ -10,6 +10,10 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { Button } from "../components/ui/button";
 import SparePartFormDialog from "../components/spareiq/SparePartFormDialog";
 
+function equipmentLinkLabel(link) {
+  return link?.equipment_tag || link?.tag || link?.equipment_name || link?.equipment_id || "—";
+}
+
 export default function SparePartDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -105,6 +109,20 @@ export default function SparePartDetailPage() {
             <div>
               <h1 className="text-xl font-semibold text-slate-900">{part.description}</h1>
               <p className="text-sm text-slate-600">{part.type_model}{part.manufacturer ? ` · ${part.manufacturer}` : ""}</p>
+              {(part.linked_equipment || []).length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {(part.linked_equipment || []).map((link) => (
+                    <Link
+                      key={link.equipment_id}
+                      to={`/equipment-manager?node=${link.equipment_id}`}
+                      className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-mono text-slate-700 hover:bg-slate-200"
+                      title={link.equipment_name || undefined}
+                    >
+                      {equipmentLinkLabel(link)}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
@@ -188,10 +206,21 @@ export default function SparePartDetailPage() {
             <ul className="divide-y divide-slate-100">
               {(part.linked_equipment || []).map((link) => (
                 <li key={link.equipment_id} className="py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm">
-                  <Link to={`/equipment-manager?node=${link.equipment_id}`} className="font-medium text-blue-700 hover:underline">
-                    {link.equipment_name || link.equipment_id}
+                  <Link to={`/equipment-manager?node=${link.equipment_id}`} className="hover:underline min-w-0">
+                    {link.equipment_tag ? (
+                      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-xs">
+                          {link.equipment_tag}
+                        </span>
+                        {link.equipment_name && (
+                          <span className="font-medium text-blue-700">{link.equipment_name}</span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="font-medium text-blue-700">{link.equipment_name || link.equipment_id}</span>
+                    )}
                   </Link>
-                  <span className="text-slate-500">{link.component_position || link.equipment_type || ""}</span>
+                  <span className="text-slate-500 shrink-0">{link.component_position || link.equipment_type || ""}</span>
                 </li>
               ))}
             </ul>

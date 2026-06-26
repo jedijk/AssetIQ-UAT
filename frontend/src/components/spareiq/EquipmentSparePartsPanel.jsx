@@ -16,7 +16,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import SparePartFormDialog from "./SparePartFormDialog";
+
+function sparePartHoverComment(part, link, t) {
+  const lines = [];
+  if (link?.component_position?.trim()) {
+    lines.push(`${t("spareiq.componentPosition")}: ${link.component_position.trim()}`);
+  }
+  if (part?.notes?.trim()) {
+    lines.push(part.notes.trim());
+  }
+  return lines.length ? lines.join("\n\n") : null;
+}
 
 export default function EquipmentSparePartsPanel({ equipmentId, equipmentName }) {
   const { t } = useLanguage();
@@ -109,6 +121,7 @@ export default function EquipmentSparePartsPanel({ equipmentId, equipmentName })
   };
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="space-y-3" data-testid="equipment-spare-parts">
       {canWrite && (
         <div className="grid grid-cols-2 gap-2">
@@ -132,20 +145,35 @@ export default function EquipmentSparePartsPanel({ equipmentId, equipmentName })
           const link = (part.equipment_links || part.linked_equipment || []).find(
             (l) => l.equipment_id === equipmentId
           );
+          const hoverComment = sparePartHoverComment(part, link, t);
+          const partSummary = (
+            <div className="min-w-0 flex items-center gap-2">
+              <Package className="w-4 h-4 text-amber-600 shrink-0" />
+              <div className="min-w-0">
+                <Link to={`/spareiq/${part.id}`} className="font-medium text-blue-700 hover:underline truncate block">
+                  {part.description}
+                </Link>
+                <span className="text-xs text-slate-500 block truncate">
+                  {part.type_model}
+                  {link?.component_position ? ` · ${link.component_position}` : ""}
+                </span>
+              </div>
+            </div>
+          );
           return (
             <li key={part.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-              <div className="min-w-0 flex items-center gap-2">
-                <Package className="w-4 h-4 text-amber-600 shrink-0" />
-                <div className="min-w-0">
-                  <Link to={`/spareiq/${part.id}`} className="font-medium text-blue-700 hover:underline truncate block">
-                    {part.description}
-                  </Link>
-                  <span className="text-xs text-slate-500">
-                    {part.type_model}
-                    {link?.component_position ? ` · ${link.component_position}` : ""}
-                  </span>
-                </div>
-              </div>
+              {hoverComment ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="min-w-0 flex-1 cursor-default">{partSummary}</div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs whitespace-pre-wrap text-xs">
+                    {hoverComment}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <div className="min-w-0 flex-1">{partSummary}</div>
+              )}
               {canWrite && (
                 <div className="flex items-center shrink-0">
                   <Button
@@ -232,5 +260,6 @@ export default function EquipmentSparePartsPanel({ equipmentId, equipmentName })
         </DialogContent>
       </Dialog>
     </div>
+    </TooltipProvider>
   );
 }

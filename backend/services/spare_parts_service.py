@@ -93,7 +93,38 @@ def _build_list_query(
     return merge_tenant_filter(base_query, user)
 
 
-async def _enrich_list_item(user: dict, doc: dict) -> Optional[dict]:
+async def _load_equipment_map(user: dict, equipment_ids: List[str]) -> Dict[str, dict]:
+    unique_ids = [eid for eid in dict.fromkeys(equipment_ids) if eid]
+    if not unique_ids:
+        return {}
+    nodes = await db.equipment_nodes.find(
+        merge_tenant_filter({"id": {"$in": unique_ids}}, user),
+        {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type_id": 1, "equipment_type": 1},
+    ).to_list(len(unique_ids))
+    return {n["id"]: n for n in nodes}
+
+
+def _build_linked_equipment_preview(links: List[dict], equipment_map: Dict[str, dict]) -> List[dict]:
+    preview = []
+    for link in links or []:
+        equipment_id = link.get("equipment_id")
+        if not equipment_id:
+            continue
+        eq = equipment_map.get(equipment_id, {})
+        preview.append({
+            "equipment_id": equipment_id,
+            "equipment_tag": eq.get("tag"),
+            "equipment_name": eq.get("name"),
+            "component_position": link.get("component_position"),
+        })
+    return preview
+
+
+async def _enrich_list_item(
+    user: dict,
+    doc: dict,
+    equipment_map: Optional[Dict[str, dict]] = None,
+) -> Optional[dict]:
     spare_part_id = doc.get("id")
     if not spare_part_id:
         return None
@@ -102,9 +133,11 @@ async def _enrich_list_item(user: dict, doc: dict) -> Optional[dict]:
         merge_tenant_filter({"spare_part_id": spare_part_id}, user),
     )
     has_url = bool(doc.get("document_url"))
+    linked_equipment = _build_linked_equipment_preview(equipment_links, equipment_map or {})
     return {
         **_serialize_spare_part_doc(doc),
         "linked_equipment_count": len(equipment_links),
+        "linked_equipment": linked_equipment,
         "document_count": file_count + (1 if has_url else 0),
     }
 
@@ -129,9 +162,16 @@ async def list_spare_parts(
     direction = -1 if sort_dir < 0 else 1
     cursor = db.spare_parts.find(query, {"_id": 0}).sort(sort_field, direction)
     items = await cursor.to_list(500)
+    equipment_ids: List[str] = []
+    for doc in items:
+        for link in doc.get("equipment_links") or []:
+            eid = link.get("equipment_id")
+            if eid:
+                equipment_ids.append(eid)
+    equipment_map = await _load_equipment_map(user, equipment_ids)
     enriched = []
     for doc in items:
-        item = await _enrich_list_item(user, doc)
+        item = await _enrich_list_item(user, doc, equipment_map)
         if item:
             enriched.append(item)
     return {"spare_parts": enriched, "total": len(enriched)}
@@ -145,18 +185,13 @@ async def get_spare_part(user: dict, spare_part_id: str) -> dict:
     if not doc:
         raise HTTPException(status_code=404, detail="Spare part not found")
     equipment_ids = [l["equipment_id"] for l in doc.get("equipment_links") or []]
-    equipment_map: Dict[str, dict] = {}
-    if equipment_ids:
-        nodes = await db.equipment_nodes.find(
-            merge_tenant_filter({"id": {"$in": equipment_ids}}, user),
-            {"_id": 0, "id": 1, "name": 1, "equipment_type_id": 1, "equipment_type": 1},
-        ).to_list(len(equipment_ids))
-        equipment_map = {n["id"]: n for n in nodes}
+    equipment_map = await _load_equipment_map(user, equipment_ids)
     linked_equipment = []
     for link in doc.get("equipment_links") or []:
         eq = equipment_map.get(link["equipment_id"], {})
         linked_equipment.append({
             **link,
+            "equipment_tag": eq.get("tag"),
             "equipment_name": eq.get("name"),
             "equipment_type": eq.get("equipment_type") or eq.get("equipment_type_id"),
         })
@@ -207,7 +242,8 @@ async def create_spare_part(user: dict, payload: SparePartCreate) -> dict:
         )
     except Exception:
         pass
-    item = await _enrich_list_item(user, doc)
+    equipment_map = await _load_equipment_map(user, [l["equipment_id"] for l in links])
+    item = await _enrich_list_item(user, doc, equipment_map)
     return item or _serialize_spare_part_doc(doc)
 
 
@@ -250,7 +286,8 @@ async def _merge_into_existing(
     except Exception:
         pass
     updated = {**existing, **updates, "merged": True}
-    item = await _enrich_list_item(user, updated)
+    equipment_map = await _load_equipment_map(user, [l["equipment_id"] for l in merged_links])
+    item = await _enrich_list_item(user, updated, equipment_map)
     return item or _serialize_spare_part_doc(updated)
 
 

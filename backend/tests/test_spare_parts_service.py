@@ -5,7 +5,7 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 
 from services.permissions_defaults import backfill_permissions
 from services.spare_parts_import_service import _map_headers, build_import_template_bytes
-from services.spare_parts_service import _build_list_query, _normalize_key
+from services.spare_parts_service import _build_linked_equipment_preview, _build_list_query, _normalize_key
 
 
 def test_duplicate_key_normalizes_description_and_type_model():
@@ -50,6 +50,24 @@ def test_backfill_permissions_normalizes_spareiq_feature_dict():
     result = backfill_permissions(stored)
     assert result["admin"]["spareiq"]["read"] is True
     assert result["admin"]["spareiq"]["write"] is True
+
+
+def test_build_linked_equipment_preview_prefers_tag():
+    equipment_map = {
+        "eq-1": {"id": "eq-1", "tag": "P-101", "name": "Feed Pump"},
+        "eq-2": {"id": "eq-2", "name": "Compressor"},
+    }
+    preview = _build_linked_equipment_preview(
+        [
+            {"equipment_id": "eq-1", "component_position": "Drive end"},
+            {"equipment_id": "eq-2"},
+        ],
+        equipment_map,
+    )
+    assert preview[0]["equipment_tag"] == "P-101"
+    assert preview[0]["equipment_name"] == "Feed Pump"
+    assert preview[1]["equipment_tag"] is None
+    assert preview[1]["equipment_name"] == "Compressor"
 
 
 def test_build_list_query_combines_search_with_tenant_filter(monkeypatch):
