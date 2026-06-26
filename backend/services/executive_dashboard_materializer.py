@@ -66,3 +66,30 @@ async def store_dashboard_snapshot(
         },
         upsert=True,
     )
+
+
+async def refresh_executive_dashboard(
+    user: dict,
+    period_days: int = 30,
+) -> Dict[str, Any]:
+    """Rebuild executive dashboard snapshot from operational sources."""
+    from services.executive_dashboard_kpis import build_executive_dashboard
+
+    response = await build_executive_dashboard(user, period_days)
+    payload = response.model_dump()
+    await store_dashboard_snapshot(user, period_days, payload)
+    return payload
+
+
+async def get_or_compute_executive_dashboard(
+    user: dict,
+    period_days: int = 30,
+):
+    """Return cached executive dashboard or refresh materialized snapshot."""
+    from services.executive_dashboard_models import ExecutiveDashboardResponse
+
+    cached = await get_cached_dashboard(user, period_days)
+    if cached:
+        return ExecutiveDashboardResponse(**cached)
+    payload = await refresh_executive_dashboard(user, period_days)
+    return ExecutiveDashboardResponse(**payload)

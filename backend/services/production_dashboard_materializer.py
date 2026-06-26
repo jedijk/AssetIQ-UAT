@@ -72,3 +72,61 @@ async def store_production_dashboard_snapshot(
         },
         upsert=True,
     )
+
+
+async def expire_production_dashboard_snapshots(user: dict) -> None:
+    """Force refresh on next request by expiring tenant production snapshots."""
+    tid = tenant_id_from_user(user)
+    if not tid:
+        return
+    await db[COLLECTION].update_many(
+        {"tenant_id": tid},
+        {"$set": {"expires_at": "1970-01-01T00:00:00+00:00"}},
+    )
+
+
+async def refresh_production_dashboard(
+    user: dict,
+    *,
+    date: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    shift: Optional[str] = None,
+) -> Dict[str, Any]:
+    from services.production_dashboard_service import build_production_dashboard
+
+    cache_key = dashboard_cache_key(
+        date=date, from_date=from_date, to_date=to_date, shift=shift,
+    )
+    payload = await build_production_dashboard(
+        user,
+        date=date,
+        from_date=from_date,
+        to_date=to_date,
+        shift=shift,
+    )
+    await store_production_dashboard_snapshot(user, cache_key, payload)
+    return payload
+
+
+async def get_or_compute_production_dashboard(
+    user: dict,
+    *,
+    date: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    shift: Optional[str] = None,
+) -> Dict[str, Any]:
+    cache_key = dashboard_cache_key(
+        date=date, from_date=from_date, to_date=to_date, shift=shift,
+    )
+    cached = await get_cached_production_dashboard(user, cache_key)
+    if cached:
+        return cached
+    return await refresh_production_dashboard(
+        user,
+        date=date,
+        from_date=from_date,
+        to_date=to_date,
+        shift=shift,
+    )

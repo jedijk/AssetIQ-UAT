@@ -7,13 +7,19 @@ from typing import Any, Dict, Optional
 from database import db
 from services.tenant_schema import tenant_id_from_user
 
+
 SNAPSHOT_TTL_SECONDS = 300
 COLLECTION = "ril_dashboard_snapshots"
 
 
 async def refresh_ril_dashboard(user: dict, owner_id: Optional[str] = None) -> Dict[str, Any]:
-    from services.ril_service import RILService
     from services.executive_kpi_materializer import get_or_compute_executive_kpis
+    from services.ril_dashboard_build import (
+        build_ril_data_quality_payload,
+        build_ril_executive_payload,
+        build_ril_intelligence_payload,
+    )
+    from services.ril_service import RILService
 
     oid = owner_id or user.get("owner_id") or user.get("id")
     service = RILService(db)
@@ -23,6 +29,9 @@ async def refresh_ril_dashboard(user: dict, owner_id: Optional[str] = None) -> D
     payload = {
         "stats": stats,
         "reliability_kpis": reliability_kpis,
+        "executive": await build_ril_executive_payload(user, oid, stats, reliability_kpis),
+        "intelligence": await build_ril_intelligence_payload(user, oid),
+        "data_quality": await build_ril_data_quality_payload(user, oid),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 

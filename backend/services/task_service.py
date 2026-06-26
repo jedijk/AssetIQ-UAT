@@ -632,6 +632,11 @@ class TaskService:
                 serialized["form_submission_id"] = created_submission_id
             if label_print_config:
                 serialized["label_print_config"] = label_print_config
+
+            if user:
+                from services.dashboard_read_model_hooks import notify_dashboard_data_changed
+
+                await notify_dashboard_data_changed(user, reason="task_complete")
             return serialized
         return None
 

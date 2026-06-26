@@ -555,5 +555,7 @@ class AnalyticsService:
             "failure_mode_pareto": await self.get_failure_mode_pareto(10),
             "detection_effectiveness": await self.get_detection_effectiveness(),
             "equipment_risk_ranking": await self.get_equipment_risk_ranking(10),
-            "form_summary": await self.get_form_threshold_summary(30)
+            "form_summary": await self.get_form_threshold_summary(30),
+            "under_controlled_risks": await self.get_under_controlled_risks(),
+            "over_maintained_assets": await self.get_over_maintained_assets(),
         }

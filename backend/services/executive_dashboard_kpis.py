@@ -12,10 +12,6 @@ from services.executive_dashboard_exposure import (
     _threat_ids_with_linked_actions,
     compute_exposure_dashboard_section,
 )
-from services.executive_dashboard_materializer import (
-    get_cached_dashboard,
-    store_dashboard_snapshot,
-)
 from services.executive_dashboard_models import (
     ExecutiveDashboardResponse,
     ExposureMetrics,
@@ -27,6 +23,49 @@ from services.executive_dashboard_models import (
 from services.tenant_schema import merge_tenant_filter
 
 logger = logging.getLogger(__name__)
+
+
+async def _fetch_open_action_rows(user: dict, limit: int = 10) -> list:
+    """Open actions for visual board widgets (materialized in executive snapshot)."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    fields = {
+        "_id": 0,
+        "id": 1,
+        "title": 1,
+        "description": 1,
+        "owner": 1,
+        "assigned_to": 1,
+        "owner_name": 1,
+        "due_date": 1,
+        "status": 1,
+        "priority": 1,
+        "equipment_name": 1,
+        "asset_name": 1,
+        "updated_at": 1,
+    }
+    cursor = db.central_actions.find(
+        merge_tenant_filter(
+            {"status": {"$nin": ["completed", "closed", "cancelled", "done"]}},
+            user,
+        ),
+        fields,
+    ).sort([("due_date", 1), ("priority", -1)]).limit(limit)
+    rows = await cursor.to_list(limit)
+    items = []
+    for row in rows:
+        due = row.get("due_date")
+        items.append({
+            "id": row.get("id"),
+            "action": row.get("title") or row.get("description") or "—",
+            "subtitle": row.get("equipment_name") or row.get("asset_name") or "",
+            "owner": row.get("owner_name") or row.get("assigned_to") or row.get("owner") or "—",
+            "due_date": due,
+            "status": row.get("status") or "open",
+            "priority": row.get("priority"),
+            "overdue": bool(due and due < now_iso),
+            "updated_at": row.get("updated_at"),
+        })
+    return items
 
 
 async def count_digital_executions(
@@ -417,6 +456,7 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
         "resolved_exposure": sorted(
             resolved_exposure_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True
         )[:25],
+        "open_actions": await _fetch_open_action_rows(current_user, limit=10),
     }
 
     outcome_summary = None
@@ -446,14 +486,6 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
         report_period=report_period,
         outcome_summary=outcome_summary,
     )
-    try:
-        await store_dashboard_snapshot(
-            current_user,
-            period_days,
-            response.model_dump(),
-        )
-    except Exception as exc:
-        logger.warning("Failed to store executive dashboard snapshot: %s", exc)
     return response
 
 
@@ -461,18 +493,9 @@ async def get_or_compute_executive_dashboard(
     current_user: dict,
     period_days: int = 30,
 ) -> ExecutiveDashboardResponse:
-    """Return cached snapshot or compute and store."""
-    cached = await get_cached_dashboard(current_user, period_days)
-    if cached:
-        return ExecutiveDashboardResponse(**cached)
+    """Return materialized executive dashboard snapshot (refresh on miss)."""
+    from services.executive_dashboard_materializer import (
+        get_or_compute_executive_dashboard as _materialized,
+    )
 
-    response = await build_executive_dashboard(current_user, period_days)
-    try:
-        await store_dashboard_snapshot(
-            current_user,
-            period_days,
-            response.model_dump(),
-        )
-    except Exception as exc:
-        logger.warning("Failed to store executive dashboard snapshot: %s", exc)
-    return response
+    return await _materialized(current_user, period_days)

@@ -461,6 +461,14 @@ INDEX_DEFINITIONS = {
         {"keys": [("tenant_id", 1), ("cache_key", 1)], "unique": True},
         {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
     ],
+    "insights_summary_snapshots": [
+        {"keys": [("tenant_id", 1), ("user_id", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
+    "analytics_dashboard_snapshots": [
+        {"keys": [("tenant_id", 1), ("user_id", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
     "user_preferences": [
         {"keys": [("user_id", 1)]},
         {"keys": [("tenant_id", 1), ("user_id", 1)]},

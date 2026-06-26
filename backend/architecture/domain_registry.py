@@ -214,6 +214,8 @@ DOMAINS: Dict[str, DomainDefinition] = {
             "services/executive_kpi_materializer.py",
             "services/executive_dashboard_materializer.py",
             "services/asset_health_materializer.py",
+            "services/ril_dashboard_materializer.py",
+            "services/production_dashboard_materializer.py",
             "services/analytics_service.py",
         ),
         collections=(
@@ -221,6 +223,7 @@ DOMAINS: Dict[str, DomainDefinition] = {
             "executive_dashboard_snapshots",
             "work_execution_kpi_snapshots",
             "ril_dashboard_snapshots",
+            "production_dashboard_snapshots",
             "asset_health_documents",
             "reliability_snapshots",
         ),
@@ -233,6 +236,8 @@ DOMAINS: Dict[str, DomainDefinition] = {
             "executive_kpi_materializer",
             "executive_dashboard_materializer",
             "work_execution_kpi_materializer",
+            "ril_dashboard_materializer",
+            "production_dashboard_materializer",
         ),
         may_import_domains=frozenset({
             "threats", "observations", "work_execution", "production",

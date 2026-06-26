@@ -102,7 +102,7 @@ API route  →  Domain service  →  Repository (optional)  →  Canonical colle
 
 1. Legacy collections are **read-only** unless an explicit env flag enables dual-write.
 2. New features write only to canonical collections.
-3. Read models (`work_item_projections`, executive snapshots, reliability_snapshots) are derived — never authoritative for mutations.
+3. Read models (`work_item_projections`, executive snapshots, reliability_snapshots) are derived — never authoritative for mutations. See [`EXECUTIVE_READ_MODELS.md`](./EXECUTIVE_READ_MODELS.md) and `architecture/read_models_registry.py`.
 4. Graph edges (`reliability_edges`) are derived from canonical entities — see `RELIABILITY_GRAPH_ARCHITECTURE.md`.
 
 ---
@@ -113,3 +113,14 @@ API route  →  Domain service  →  Repository (optional)  →  Canonical colle
 - [x] Per-domain canonical collection, service, API, legacy notes
 - [x] Verification gate (`verify_canonical_models.py`)
 - [x] Documentation (this file)
+
+---
+
+## WS6 read models
+
+Executive dashboard snapshots and materializers are registered separately from operational domains. Dashboard routes read only from snapshot collections on the request path; materializers aggregate operational data on cache miss or after invalidation.
+
+- **Registry:** `backend/architecture/read_models_registry.py` (12 read models)
+- **Invalidation:** `services/dashboard_read_model_hooks.py`
+- **Verification:** `scripts/verify_read_models_registry.py`
+- **Documentation:** [`EXECUTIVE_READ_MODELS.md`](./EXECUTIVE_READ_MODELS.md)

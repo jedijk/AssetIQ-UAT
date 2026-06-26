@@ -37,24 +37,12 @@ async def get_or_compute_production_dashboard(
     to_date: Optional[str] = None,
     shift: Optional[str] = None,
 ) -> Dict[str, Any]:
-    from services.production_dashboard_materializer import (
-        dashboard_cache_key,
-        get_cached_production_dashboard,
-        store_production_dashboard_snapshot,
-    )
+    from services.production_dashboard_materializer import get_or_compute_production_dashboard as _materialized
 
-    cache_key = dashboard_cache_key(
-        date=date, from_date=from_date, to_date=to_date, shift=shift,
-    )
-    cached = await get_cached_production_dashboard(current_user, cache_key)
-    if cached:
-        return cached
-    payload = await build_production_dashboard(
+    return await _materialized(
         current_user,
         date=date,
         from_date=from_date,
         to_date=to_date,
         shift=shift,
     )
-    await store_production_dashboard_snapshot(current_user, cache_key, payload)
-    return payload

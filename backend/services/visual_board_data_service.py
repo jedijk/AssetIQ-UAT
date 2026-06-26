@@ -21,11 +21,7 @@ from models.visual_board import (
     VisualBoardWidget,
     WidgetType,
 )
-from services.executive_dashboard_service import (
-    TERMINAL_OBSERVATION_STATUSES,
-    get_or_compute_executive_dashboard,
-)
-from services.tenant_schema import merge_tenant_filter
+from services.executive_dashboard_service import get_or_compute_executive_dashboard
 from services.visual_board_service import resolve_token, tenant_display_user
 
 logger = logging.getLogger(__name__)
@@ -63,28 +59,17 @@ async def get_public_layout_from_context(board: dict, version: dict) -> PublicLa
 
 
 async def compute_reliability_status(user: dict) -> StatusIndicatorPayload:
-    obs_filter = merge_tenant_filter(
-        {
-            "status": {"$nin": list(TERMINAL_OBSERVATION_STATUSES)},
-            "$or": [
-                {"risk_level": {"$in": ["critical", "high"]}},
-                {"severity": {"$in": ["critical", "high"]}},
-            ],
-        },
-        user,
+    dashboard = await get_or_compute_executive_dashboard(user, 30)
+    evidence = dashboard.evidence_drill_down or {}
+    active_rows = evidence.get("active_threat_exposure") or []
+    critical_obs = len(active_rows)
+    open_actions = evidence.get("open_actions") or []
+    critical_overdue = sum(
+        1
+        for row in open_actions
+        if row.get("overdue")
+        and str(row.get("priority") or "").lower() in ("critical", "high")
     )
-    critical_obs = await db.threats.count_documents(obs_filter)
-
-    now_iso = datetime.now(timezone.utc).isoformat()
-    action_filter = merge_tenant_filter(
-        {
-            "priority": {"$in": ["critical", "high"]},
-            "status": {"$nin": ["completed", "closed", "cancelled", "done"]},
-            "due_date": {"$lt": now_iso},
-        },
-        user,
-    )
-    critical_overdue = await db.central_actions.count_documents(action_filter)
 
     if critical_obs > 0 and critical_overdue > 0:
         status = ReliabilityStatus.RED
@@ -118,37 +103,18 @@ def _kpi_payload(kpi) -> Dict[str, Any]:
 
 
 async def _observation_list_payload(user: dict, limit: int = 10) -> Dict[str, Any]:
-    cursor = db.threats.find(
-        merge_tenant_filter(
-            {"status": {"$nin": list(TERMINAL_OBSERVATION_STATUSES)}},
-            user,
-        ),
-        {
-            "_id": 0,
-            "id": 1,
-            "title": 1,
-            "equipment_name": 1,
-            "asset": 1,
-            "asset_name": 1,
-            "severity": 1,
-            "risk_level": 1,
-            "status": 1,
-            "risk_score": 1,
-            "exposure_value": 1,
-            "production_exposure": 1,
-        },
-    ).sort("risk_score", -1).limit(limit)
-    rows = await cursor.to_list(limit)
+    dashboard = await get_or_compute_executive_dashboard(user, 30)
+    rows = (dashboard.evidence_drill_down or {}).get("active_threat_exposure") or []
     items = []
-    for row in rows:
+    for row in rows[:limit]:
         items.append(
             {
-                "id": row.get("id"),
-                "asset": row.get("asset_name") or row.get("equipment_name") or "—",
+                "id": row.get("id") or row.get("observation_id"),
+                "asset": row.get("asset_name") or row.get("equipment_name") or row.get("asset") or "—",
                 "risk": row.get("risk_level") or row.get("severity") or row.get("risk_score"),
                 "exposure": row.get("exposure_value") or row.get("production_exposure"),
                 "status": row.get("status"),
-                "title": row.get("title"),
+                "title": row.get("title") or row.get("failure_mode"),
             }
         )
     return {"type": WidgetType.OBSERVATION_LIST.value, "items": items, "total": len(items)}
@@ -160,50 +126,11 @@ async def _action_queue_payload(
     *,
     queue_mode: str = "open",
 ) -> Dict[str, Any]:
-    now_iso = datetime.now(timezone.utc).isoformat()
-    fields = {
-        "_id": 0,
-        "id": 1,
-        "title": 1,
-        "description": 1,
-        "owner": 1,
-        "assigned_to": 1,
-        "owner_name": 1,
-        "due_date": 1,
-        "status": 1,
-        "priority": 1,
-        "equipment_name": 1,
-        "asset_name": 1,
-        "updated_at": 1,
-    }
+    dashboard = await get_or_compute_executive_dashboard(user, 30)
+    rows = (dashboard.evidence_drill_down or {}).get("open_actions") or []
     if queue_mode == "recent":
-        filt = merge_tenant_filter({}, user)
-        cursor = db.central_actions.find(filt, fields).sort("updated_at", -1).limit(limit)
-    else:
-        cursor = db.central_actions.find(
-            merge_tenant_filter(
-                {"status": {"$nin": ["completed", "closed", "cancelled", "done"]}},
-                user,
-            ),
-            fields,
-        ).sort([("due_date", 1), ("priority", -1)]).limit(limit)
-    rows = await cursor.to_list(limit)
-    items = []
-    for row in rows:
-        due = row.get("due_date")
-        overdue = bool(due and due < now_iso)
-        items.append(
-            {
-                "id": row.get("id"),
-                "action": row.get("title") or row.get("description") or "—",
-                "subtitle": row.get("equipment_name") or row.get("asset_name") or "",
-                "owner": row.get("owner_name") or row.get("owner") or row.get("assigned_to") or "—",
-                "due_date": due,
-                "status": row.get("status") or "open",
-                "priority": row.get("priority"),
-                "overdue": overdue,
-            }
-        )
+        rows = sorted(rows, key=lambda r: r.get("updated_at") or "", reverse=True)
+    items = rows[:limit]
     return {"type": WidgetType.ACTION_QUEUE.value, "items": items, "total": len(items)}
 
 
@@ -248,32 +175,6 @@ async def _trend_chart_payload(
             {"date": mid.isoformat(), "value": (previous + current) / 2},
             {"date": today.isoformat(), "value": current},
         ]
-
-    if metric_key == "observation_count":
-        since_dt = datetime.now(timezone.utc) - timedelta(days=days)
-        filt = merge_tenant_filter(
-            {
-                "created_at": {"$gte": since_dt.isoformat()},
-                "status": {"$nin": list(TERMINAL_OBSERVATION_STATUSES)},
-            },
-            user,
-        )
-        pipeline = [
-            {"$match": filt},
-            {
-                "$group": {
-                    "_id": {"$substr": ["$created_at", 0, 10]},
-                    "value": {"$sum": 1},
-                }
-            },
-            {"$sort": {"_id": 1}},
-        ]
-        try:
-            agg = await db.threats.aggregate(pipeline).to_list(days + 1)
-            if agg:
-                points = [{"date": row["_id"], "value": float(row["value"])} for row in agg if row.get("_id")]
-        except Exception:
-            pass
 
     return {
         "type": WidgetType.TREND_CHART.value,

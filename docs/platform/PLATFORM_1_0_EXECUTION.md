@@ -21,7 +21,7 @@
 | Graph ownership / dedup | **Done (WS2)** — `reliability_graph_ownership.py`, architecture doc |
 | Canonical data models | **Done (WS3)** — `canonical_models.py`, `CANONICAL_DATA_MODELS.md` |
 | AI gateway | **Done (WS5)** — unified `ai_platform` API; all vision/multimodal paths migrated |
-| Executive read models | **Partial** — some materializers exist; dashboards still mix operational reads |
+| Executive read models | **Done (WS6)** — dashboard routes read snapshots; materializers refresh on miss/invalidation |
 | Large-file modularization | **Done (WS4)** — zero service modules over 800 LOC |
 | R2 on UAT (AI scan photos) | **Open** — ops, not blocking Platform 1.0 code track |
 
@@ -36,7 +36,7 @@ Platform 1.0 is complete when:
 - [ ] The reliability graph has one owner per relationship
 - [x] All major files have been modularized (~800 line target)
 - [x] Every AI feature uses the unified AI platform
-- [ ] Executive dashboards use read models
+- [x] Executive dashboards use read models
 - [ ] Graph performance benchmarks completed
 - [ ] Engineering standards documented and CI-enforced
 
@@ -222,9 +222,21 @@ Provider Layer → Prompt Registry → Context Builder → Evidence Builder
 
 **Read models needed:** Executive Dashboard · Lifecycle Exposure · PM Compliance · Task Completion · Reliability KPIs · Active Threat Exposure · Critical Equipment · Visual Boards
 
-**Status:** **Open** — operational collections still queried by some dashboard paths
+**Status:** **Done** — registry, materializers, mutation hooks, and route-through reads complete
 
-**Definition of done:** Executive dashboards read only from optimized read models
+**Docs:** [`EXECUTIVE_READ_MODELS.md`](./EXECUTIVE_READ_MODELS.md)
+
+| Task | Status |
+|------|--------|
+| Read model registry | **Done** — `architecture/read_models_registry.py` (12 entries) |
+| Verification gate | **Done** — `scripts/verify_read_models_registry.py` |
+| Executive KPI invalidation wiring | **Done** — `notify_dashboard_data_changed` on threat/task/action mutations |
+| Executive dashboard request-path reads | **Done** — routes + visual boards read snapshots |
+| Insights / analytics route-through | **Done** — `insights_summary_materializer`, `analytics_dashboard_materializer` |
+| RIL executive snapshot-only warm path | **Done** — `ril_dashboard_service` reads materializer only |
+| Dedicated PM compliance read model | **Planned** — embedded in executive dashboard exposure |
+
+**Definition of done:** Executive dashboards read only from optimized read models ✓
 
 ---
 

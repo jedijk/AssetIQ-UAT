@@ -33,8 +33,13 @@ class DomainEventType(str, Enum):
 
     # Read model refresh
     PROJECTION_EXECUTIVE_KPI = "projection.executive_kpi"
+    PROJECTION_EXECUTIVE_DASHBOARD = "projection.executive_dashboard"
     PROJECTION_WORK_EXECUTION_KPI = "projection.work_execution_kpi"
     PROJECTION_ASSET_HEALTH = "projection.asset_health"
+    PROJECTION_RIL_DASHBOARD = "projection.ril_dashboard"
+    PROJECTION_PRODUCTION_DASHBOARD = "projection.production_dashboard"
+    PROJECTION_INSIGHTS_SUMMARY = "projection.insights_summary"
+    PROJECTION_ANALYTICS_DASHBOARD = "projection.analytics_dashboard"
 
 
 GRAPH_EVENT_TYPES = frozenset({
@@ -53,6 +58,11 @@ GRAPH_EVENT_TYPES = frozenset({
 
 PROJECTION_EVENT_TYPES = frozenset({
     DomainEventType.PROJECTION_EXECUTIVE_KPI,
+    DomainEventType.PROJECTION_EXECUTIVE_DASHBOARD,
     DomainEventType.PROJECTION_WORK_EXECUTION_KPI,
     DomainEventType.PROJECTION_ASSET_HEALTH,
+    DomainEventType.PROJECTION_RIL_DASHBOARD,
+    DomainEventType.PROJECTION_PRODUCTION_DASHBOARD,
+    DomainEventType.PROJECTION_INSIGHTS_SUMMARY,
+    DomainEventType.PROJECTION_ANALYTICS_DASHBOARD,
 })

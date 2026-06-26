@@ -40,7 +40,9 @@ async def list_my_tasks(
     status: Optional[str] = None,
     discipline: Optional[str] = None,
 ) -> Dict[str, Any]:
-    tasks = await fetch_work_items(
+    from services.work_item_projection import get_projected_work_items
+
+    projected = await get_projected_work_items(
         user["id"],
         filter_name=filter_name,
         date=date,
@@ -49,7 +51,11 @@ async def list_my_tasks(
         discipline=discipline,
         user=user,
     )
-    return {"tasks": tasks, "count": len(tasks), "filter": filter_name}
+    return {
+        "tasks": projected.get("items") or [],
+        "count": projected.get("count", 0),
+        "filter": filter_name,
+    }
 
 
 def _assigned_user_id_str(task: dict) -> Optional[str]:
@@ -362,7 +368,10 @@ async def complete_action(user: dict, action_id: str, data: Optional[dict] = Non
     response = {"success": True, "message": "Action completed successfully"}
     if completion_notification:
         response["completion_notification"] = completion_notification
-    
+
+    from services.dashboard_read_model_hooks import notify_dashboard_data_changed
+
+    await notify_dashboard_data_changed(user, reason="action_complete")
     return response
 
 
@@ -396,6 +405,10 @@ async def start_action(user: dict, action_id: str):
         merge_tenant_filter({"id": action_id}, user),
         {"_id": 0},
     )
+
+    from services.dashboard_read_model_hooks import notify_dashboard_data_changed
+
+    await notify_dashboard_data_changed(user, reason="action_start")
     return serialize_action_as_task(updated_action)
 
 

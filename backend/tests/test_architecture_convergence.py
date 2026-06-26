@@ -810,6 +810,22 @@ def test_ws5_ai_platform_modules_exist():
     assert "AssetIQ reliability AI" in render_prompt("reliability.grounded_assistant")
 
 
+def test_ws6_read_models_registry_exists():
+    """WS6 — executive read model registry and verification gate."""
+    from architecture.read_models_registry import (
+        READ_MODELS,
+        WS6_DASHBOARD_FAMILIES,
+        get_read_model,
+        validate_ws6_dashboard_coverage,
+    )
+
+    assert len(WS6_DASHBOARD_FAMILIES) == 8
+    assert len(READ_MODELS) >= 10
+    assert validate_ws6_dashboard_coverage() == []
+    assert get_read_model("executive_kpi") is not None
+    assert get_read_model("executive_kpi").collection == "executive_kpi_snapshots"
+
+
 def test_openai_imports_are_allowlisted():
     """Phase 4 — direct OpenAI imports must stay in allowlist or grandfathered baseline."""
     import importlib.util

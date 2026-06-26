@@ -312,6 +312,10 @@ async def update_threat(user: dict, threat_id: str, update_data: dict) -> dict:
         updated["risk_score"] = int(updated["risk_score"])
     await _mirror_threat_observation(user, updated)
     await _sync_threat_graph(user, updated, label="threat_update")
+    if update_data:
+        from services.dashboard_read_model_hooks import notify_dashboard_data_changed
+
+        await notify_dashboard_data_changed(user, reason="threat_update")
     return updated
 
 
@@ -348,6 +352,10 @@ async def delete_threat(
 
     await update_all_ranks(user["id"], user=user)
     cache.invalidate_stats(f"stats:{user['id']}")
+
+    from services.dashboard_read_model_hooks import notify_dashboard_data_changed
+
+    await notify_dashboard_data_changed(user, reason="threat_delete")
 
     return {
         "message": "Threat deleted",
