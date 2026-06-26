@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 from models.maintenance_program import TaskSource
+from services.maintenance_tenant_scope import maintenance_scoped_job
 from services.program_task_resolution import (
     scheduler_program_ids_for_equipment_type,
     scheduler_program_ids_for_failure_mode,
@@ -49,10 +50,12 @@ async def _propagate_task_template_to_v2_programs(
     modified = 0
 
     programs = await db.maintenance_programs_v2.find(
-        {
-            "equipment_type_id": equipment_type_id,
-            "tasks.traceability.task_template_id": task_template_id,
-        }
+        maintenance_scoped_job(
+            {
+                "equipment_type_id": equipment_type_id,
+                "tasks.traceability.task_template_id": task_template_id,
+            }
+        )
     ).to_list(5000)
 
     for prog in programs:
@@ -109,7 +112,9 @@ async def _propagate_task_template_to_programs(
     now = datetime.now(timezone.utc).isoformat()
 
     programs = await db.maintenance_programs.find(
-        {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id}
+        maintenance_scoped_job(
+            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id}
+        )
     ).to_list(5000)
 
     operations = []
@@ -396,7 +401,7 @@ async def _recalculate_v2_program_counters_for_equipment_type(equipment_type_id:
     now = datetime.now(timezone.utc).isoformat()
     updated = 0
     async for prog in db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"_id": 1, "tasks": 1},
     ):
         tasks = prog.get("tasks") or []
@@ -498,7 +503,7 @@ async def count_active_programs_for_strategy(equipment_type_id: str) -> int:
     """Count distinct equipment with active strategy-backed program tasks."""
     equipment_ids: set = set()
     async for prog in db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"_id": 0, "equipment_id": 1, "status": 1, "tasks": 1},
     ):
         status = (prog.get("status") or "active").lower()
@@ -520,11 +525,13 @@ async def count_active_programs_for_strategy(equipment_type_id: str) -> int:
 
     if should_read_legacy_maintenance_programs():
         async for prog in db.maintenance_programs.find(
-            {
-                "equipment_type_id": equipment_type_id,
-                "task_template_id": {"$exists": True, "$ne": None},
-                "is_active": True,
-            },
+            maintenance_scoped_job(
+                {
+                    "equipment_type_id": equipment_type_id,
+                    "task_template_id": {"$exists": True, "$ne": None},
+                    "is_active": True,
+                }
+            ),
             {"equipment_id": 1, "_id": 0},
         ):
             if prog.get("equipment_id"):

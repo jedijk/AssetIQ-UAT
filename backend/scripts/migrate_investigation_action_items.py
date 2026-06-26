@@ -25,7 +25,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 from motor.motor_asyncio import AsyncIOMotorClient  # noqa: E402
 
 
-async def migrate(*, dry_run: bool) -> int:
+async def migrate(*, dry_run: bool, purge_orphans: bool) -> int:
     mongo_url = os.environ.get("MONGO_URL")
     db_name = os.environ.get("DB_NAME", "assetiq-UAT").strip('"')
     if not mongo_url:
@@ -59,7 +59,12 @@ async def migrate(*, dry_run: bool) -> int:
         investigation = inv_cache[inv_id]
         if not investigation:
             print(f"  WARN: missing investigation {inv_id} for action {action_id}")
-            errors += 1
+            if purge_orphans and not dry_run:
+                await db.action_items.delete_one({"id": action_id})
+                print(f"  PURGED orphan action_item {action_id}")
+                migrated += 1
+            else:
+                errors += 1
             continue
 
         item.pop("_id", None)
@@ -87,8 +92,13 @@ async def migrate(*, dry_run: bool) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Backfill action_items → central_actions")
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing")
+    parser.add_argument(
+        "--purge-orphans",
+        action="store_true",
+        help="Delete action_items whose investigation no longer exists",
+    )
     args = parser.parse_args()
-    return asyncio.run(migrate(dry_run=args.dry_run))
+    return asyncio.run(migrate(dry_run=args.dry_run, purge_orphans=args.purge_orphans))
 
 
 if __name__ == "__main__":

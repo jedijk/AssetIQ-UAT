@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from database import db
+from services.maintenance_tenant_scope import maintenance_scoped_job
 from services.scheduler_config import should_read_legacy_maintenance_programs
 
 logger = logging.getLogger(__name__)
@@ -117,7 +118,7 @@ async def _build_program_discipline_map(program_ids: List[str]) -> Dict[str, Opt
     out: Dict[str, Optional[str]] = {}
 
     v2_rows = await db.maintenance_programs_v2.find(
-        {"id": {"$in": unique_ids}},
+        maintenance_scoped_job({"id": {"$in": unique_ids}}),
         {"_id": 0, "id": 1, "discipline": 1},
     ).to_list(len(unique_ids))
     for row in v2_rows:
@@ -126,7 +127,7 @@ async def _build_program_discipline_map(program_ids: List[str]) -> Dict[str, Opt
 
     # v2 task ids stored as maintenance_program_id on scheduled_tasks
     v2_task_rows = await db.maintenance_programs_v2.find(
-        {"tasks.id": {"$in": unique_ids}},
+        maintenance_scoped_job({"tasks.id": {"$in": unique_ids}}),
         {"_id": 0, "tasks.id": 1, "tasks.discipline": 1},
     ).to_list(200)
     for prog in v2_task_rows:
@@ -138,7 +139,7 @@ async def _build_program_discipline_map(program_ids: List[str]) -> Dict[str, Opt
     missing = [pid for pid in unique_ids if pid not in out]
     if missing and should_read_legacy_maintenance_programs():
         legacy_rows = await db.maintenance_programs.find(
-            {"id": {"$in": missing}},
+            maintenance_scoped_job({"id": {"$in": missing}}),
             {"_id": 0, "id": 1, "discipline": 1},
         ).to_list(len(missing))
         for row in legacy_rows:
@@ -189,7 +190,7 @@ async def build_instance_from_scheduled_task(
 
     assignee_meta = default_assignees.get(canonical_discipline or "") or {}
 
-    return {
+    doc = {
         "id": str(uuid4()),
         "scheduled_task_id": st.get("id"),
         "task_plan_id": st.get("maintenance_program_id"),
@@ -224,6 +225,11 @@ async def build_instance_from_scheduled_task(
         "updated_at": started_at,
         "created_by": triggered_by_user_id,
     }
+    tid = st.get("tenant_id") or st.get("company_id")
+    if tid:
+        doc["tenant_id"] = tid
+        doc["company_id"] = tid
+    return doc
 
 
 async def ensure_task_instance_for_scheduled_task(
@@ -387,6 +393,122 @@ async def sync_scheduled_tasks_to_instances(
         "errors": errors,
         "by_discipline": by_discipline,
         "candidate_total": len(candidate_tasks),
+        "dry_run": dry_run,
+        "duration_ms": run_record["duration_ms"],
+    }
+
+
+async def sync_all_unbridged_scheduled_tasks(
+    *,
+    dry_run: bool = False,
+    triggered_by: Optional[str] = "backfill",
+    triggered_by_user_id: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Create task_instances for every open scheduled_task missing a bridge row.
+
+    Unlike ``sync_scheduled_tasks_to_instances``, this is not limited to a
+    due-date window — used for Phase 1 convergence backfill.
+    """
+    from uuid import uuid4
+
+    run_id = str(uuid4())
+    started_at = datetime.now(timezone.utc)
+
+    bridged_ids: set[str] = set()
+    async for row in db.task_instances.find(
+        {"scheduled_task_id": {"$exists": True, "$nin": [None, ""]}},
+        {"scheduled_task_id": 1, "_id": 0},
+    ):
+        sid = row.get("scheduled_task_id")
+        if sid:
+            bridged_ids.add(str(sid))
+
+    cursor = db.scheduled_tasks.find(
+        {"status": {"$nin": ["completed", "cancelled", "cancelled_offline"]}},
+        {"_id": 0},
+    )
+    candidate_tasks = await cursor.to_list(10000)
+
+    unbridged = [
+        st for st in candidate_tasks
+        if st.get("id") and str(st["id"]) not in bridged_ids
+    ]
+    if limit is not None:
+        unbridged = unbridged[: max(0, limit)]
+
+    default_assignees = await _build_default_assignees()
+    discipline_cache: Dict[str, str] = {}
+    program_ids = [
+        st.get("maintenance_program_id")
+        for st in unbridged
+        if st.get("maintenance_program_id")
+    ]
+    program_disciplines = await _build_program_discipline_map(program_ids)
+
+    created = 0
+    skipped = len(candidate_tasks) - len(unbridged)
+    by_discipline: Dict[str, int] = {}
+    errors: List[Dict[str, str]] = []
+    to_insert: List[dict] = []
+
+    for st in unbridged:
+        sched_id = st.get("id")
+        if not sched_id:
+            skipped += 1
+            continue
+        try:
+            instance = await build_instance_from_scheduled_task(
+                st,
+                triggered_by_user_id=triggered_by_user_id,
+                started_at=started_at,
+                default_assignees=default_assignees,
+                program_disciplines=program_disciplines,
+                discipline_cache=discipline_cache,
+            )
+            to_insert.append(instance)
+            canonical_discipline = instance.get("discipline")
+            by_discipline[canonical_discipline or "_unknown"] = (
+                by_discipline.get(canonical_discipline or "_unknown", 0) + 1
+            )
+            created += 1
+        except Exception as ex:
+            errors.append({"scheduled_task_id": sched_id, "error": str(ex)})
+
+    if to_insert and not dry_run:
+        await db.task_instances.insert_many(to_insert)
+
+    completed_at = datetime.now(timezone.utc)
+    run_record = {
+        "id": run_id,
+        "scope": "all_unbridged",
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "duration_ms": int((completed_at - started_at).total_seconds() * 1000),
+        "triggered_by": triggered_by or "backfill",
+        "triggered_by_user_id": triggered_by_user_id,
+        "dry_run": dry_run,
+        "created": created,
+        "skipped": skipped,
+        "errors": errors,
+        "by_discipline": by_discipline,
+        "candidate_total": len(unbridged),
+    }
+    if not dry_run:
+        await db.task_generation_runs.insert_one(run_record.copy())
+
+    logger.info(
+        "sync_all_unbridged run_id=%s created=%d skipped=%d errors=%d dry_run=%s",
+        run_id, created, skipped, len(errors), dry_run,
+    )
+
+    return {
+        "run_id": run_id,
+        "candidates": len(unbridged),
+        "created": created,
+        "skipped": skipped,
+        "errors": errors,
+        "by_discipline": by_discipline,
         "dry_run": dry_run,
         "duration_ms": run_record["duration_ms"],
     }

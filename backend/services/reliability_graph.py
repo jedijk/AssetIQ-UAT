@@ -282,10 +282,6 @@ async def sync_edges_for_apply_strategy(
         {"equipment_type_id": equipment_type_id},
         {"_id": 0},
     )
-    if not strategy:
-        return {"edges_upserted": 0, "edges_retired": 0}
-
-    fm_ids = _failure_mode_ids_from_strategy(strategy)
 
     programs_cursor = db.maintenance_programs_v2.find(
         {"equipment_id": {"$in": list(equipment_ids)}},
@@ -295,6 +291,29 @@ async def sync_edges_for_apply_strategy(
     program_by_equipment = {
         p["equipment_id"]: p for p in programs if p.get("equipment_id")
     }
+
+    if not strategy:
+        created = 0
+        for equipment_id in equipment_ids:
+            program = program_by_equipment.get(equipment_id)
+            if not program:
+                continue
+            program_id = program.get("id") or equipment_id
+            await upsert_edge(
+                source_type="equipment",
+                source_id=equipment_id,
+                relation="has_program",
+                target_type="maintenance_program_v2",
+                target_id=program_id,
+                equipment_type_id=equipment_type_id,
+                equipment_id=equipment_id,
+                tenant_id=tenant_id,
+                metadata={"source_strategy_version": program.get("source_strategy_version")},
+            )
+            created += 1
+        return {"edges_upserted": created, "edges_retired": 0}
+
+    fm_ids = _failure_mode_ids_from_strategy(strategy)
 
     for equipment_id in equipment_ids:
         for fm_id in fm_ids:

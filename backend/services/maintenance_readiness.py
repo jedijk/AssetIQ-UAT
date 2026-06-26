@@ -7,6 +7,7 @@ import asyncio
 from typing import Any, Dict
 
 from database import db
+from services.maintenance_tenant_scope import maintenance_scoped_job
 from services.background_jobs import background_job_service
 from services.scheduler_config import (
     should_read_legacy_maintenance_programs,
@@ -25,11 +26,15 @@ async def _count_maintenance_domain() -> Dict[str, int]:
         legacy_program_count,
         reliability_edges_total,
     ) = await asyncio.gather(
-        db.equipment_type_strategies.count_documents({"strategy_needs_apply": True}),
-        db.equipment_type_strategies.count_documents({"status": "active"}),
-        db.maintenance_programs_v2.count_documents({}),
-        db.maintenance_programs.count_documents({}),
-        db.reliability_edges.count_documents({}),
+        db.equipment_type_strategies.count_documents(
+            maintenance_scoped_job({"strategy_needs_apply": True})
+        ),
+        db.equipment_type_strategies.count_documents(
+            maintenance_scoped_job({"status": "active"})
+        ),
+        db.maintenance_programs_v2.count_documents(maintenance_scoped_job({})),
+        db.maintenance_programs.count_documents(maintenance_scoped_job({})),
+        db.reliability_edges.count_documents(maintenance_scoped_job({})),
     )
 
     return {

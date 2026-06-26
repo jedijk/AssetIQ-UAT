@@ -62,7 +62,8 @@ async def work_execution_sample(db) -> tuple[bool, str]:
     lines.append(f"  Open scheduled_tasks: {open_scheduled}")
     lines.append(f"  Unbridged open scheduled_tasks (no task_instance): {unbridged}")
     if unbridged > 0 and work_items_source_mode() == "v2_instances":
-        lines.append("  WARN: unbridged tasks invisible in v2_instances mode — run bridge")
+        lines.append("  WARN: unbridged tasks invisible in v2_instances mode")
+        lines.append("  FIX: python scripts/backfill_scheduled_task_instances.py")
         failed = True
     return not failed, "\n".join(lines)
 
@@ -132,23 +133,28 @@ async def actions_sample(db) -> tuple[bool, str]:
 
 
 async def failure_modes_sample(db) -> tuple[bool, str]:
-    """1D — Mongo failure_modes vs static library."""
+    """1D — Mongo failure_modes vs static library (by legacy_id)."""
     from failure_modes import FAILURE_MODES_LIBRARY
 
-    mongo_count = await db.failure_modes.count_documents({})
-    static_count = len(FAILURE_MODES_LIBRARY)
+    static_ids = {fm["id"] for fm in FAILURE_MODES_LIBRARY}
+    mongo_legacy: set = set()
+    mongo_count = 0
+    async for doc in db.failure_modes.find({}, {"legacy_id": 1}):
+        mongo_count += 1
+        if doc.get("legacy_id") is not None:
+            mongo_legacy.add(doc["legacy_id"])
+
+    missing = static_ids - mongo_legacy
     lines = [
-        f"  Mongo failure_modes: {mongo_count}",
-        f"  Static FAILURE_MODES_LIBRARY: {static_count}",
+        f"  Mongo failure_modes documents: {mongo_count}",
+        f"  Static library entries: {len(static_ids)}",
+        f"  Static legacy_ids missing in Mongo: {len(missing)}",
     ]
-    failed = False
-    if mongo_count < static_count:
-        lines.append(
-            f"  WARN: {static_count - mongo_count} static FMs not in Mongo — run seed_failure_modes.py"
-        )
-        failed = True
+    failed = bool(missing)
+    if missing:
+        lines.append("  FIX: python scripts/seed_failure_modes.py --upsert-missing")
     else:
-        lines.append("  OK: Mongo collection covers static library size")
+        lines.append("  OK: Mongo covers all static library legacy_ids")
     return not failed, "\n".join(lines)
 
 

@@ -132,6 +132,9 @@ async def _db_sample_audit() -> tuple[bool, list[str]]:
     mongo_url = os.environ.get("MONGO_URL")
     assert mongo_url
 
+    os.environ.setdefault("JWT_SECRET_KEY", "graph-audit-script")
+    os.environ.setdefault("REQUIRE_JWT_SECRET_KEY", "false")
+
     db_name = os.environ.get("DB_NAME", "assetiq-UAT").strip('"')
     from motor.motor_asyncio import AsyncIOMotorClient
 

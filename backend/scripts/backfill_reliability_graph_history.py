@@ -130,16 +130,34 @@ async def _load_equipment_cache(
     query: Dict[str, Any] = {}
     if config.equipment_id:
         query["id"] = config.equipment_id
-    cache: Dict[str, Dict[str, Optional[str]]] = {}
+    nodes: Dict[str, Dict[str, Any]] = {}
     async for eq in db.equipment_nodes.find(
         query,
-        {"id": 1, "equipment_type_id": 1, "tenant_id": 1, "company_id": 1},
+        {"id": 1, "equipment_type_id": 1, "tenant_id": 1, "company_id": 1, "parent_id": 1},
     ):
         eq_id = eq.get("id")
         if not eq_id:
             continue
+        nodes[eq_id] = eq
+
+    def resolve_equipment_type_id(eq_id: str) -> Optional[str]:
+        seen: Set[str] = set()
+        current = eq_id
+        while current and current not in seen:
+            seen.add(current)
+            node = nodes.get(current)
+            if not node:
+                return None
+            et_id = node.get("equipment_type_id")
+            if et_id:
+                return et_id
+            current = node.get("parent_id")
+        return None
+
+    cache: Dict[str, Dict[str, Optional[str]]] = {}
+    for eq_id, eq in nodes.items():
         cache[eq_id] = {
-            "equipment_type_id": eq.get("equipment_type_id"),
+            "equipment_type_id": resolve_equipment_type_id(eq_id),
             "tenant_id": _tenant_id(eq),
         }
     return cache
@@ -220,7 +238,7 @@ async def backfill_maintenance_programs(
             stats.skipped += 1
             continue
         eq_info = equipment_cache.get(equipment_id, {})
-        equipment_type_id = eq_info.get("equipment_type_id")
+        equipment_type_id = eq_info.get("equipment_type_id") or program.get("equipment_type_id")
         if not equipment_type_id:
             stats.skipped += 1
             continue

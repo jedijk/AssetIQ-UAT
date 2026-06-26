@@ -120,6 +120,67 @@ async def seed_failure_modes_library(db: AsyncIOMotorDatabase, force_reseed: boo
         }
 
 
+async def upsert_missing_failure_modes(db: AsyncIOMotorDatabase) -> Dict[str, Any]:
+    """Insert static library failure modes not yet present in Mongo (by legacy_id)."""
+    from failure_modes import FAILURE_MODES_LIBRARY
+    from scripts.enhance_failure_modes import get_enhancement, ISO_MECHANISMS
+
+    collection = db["failure_modes"]
+    existing_legacy = set()
+    async for row in collection.find({}, {"legacy_id": 1}):
+        if row.get("legacy_id") is not None:
+            existing_legacy.add(row["legacy_id"])
+
+    now = datetime.now(timezone.utc)
+    to_insert: List[Dict[str, Any]] = []
+    for fm in FAILURE_MODES_LIBRARY:
+        legacy_id = fm.get("id")
+        if legacy_id in existing_legacy:
+            continue
+        name = fm.get("failure_mode", "")
+        enhancement = get_enhancement(name)
+        mechanism_code = enhancement.get("mechanism", "UNK")
+        mechanism_desc = ISO_MECHANISMS.get(mechanism_code, "Unknown")
+        to_insert.append({
+            "legacy_id": legacy_id,
+            "category": fm.get("category", ""),
+            "equipment": fm.get("equipment", ""),
+            "failure_mode": name,
+            "keywords": fm.get("keywords", []),
+            "severity": fm.get("severity", 5),
+            "occurrence": fm.get("occurrence", 5),
+            "detectability": fm.get("detectability", 5),
+            "rpn": fm.get("rpn", 125),
+            "recommended_actions": fm.get("recommended_actions", []),
+            "equipment_type_ids": fm.get("equipment_type_ids", []),
+            "mechanism": mechanism_code,
+            "mechanism_description": mechanism_desc,
+            "potential_effects": enhancement.get("potential_effects", []),
+            "potential_causes": enhancement.get("potential_causes", []),
+            "version": 1,
+            "is_validated": False,
+            "validated_by_name": None,
+            "validated_by_position": None,
+            "validated_by_id": None,
+            "validated_at": None,
+            "is_custom": False,
+            "is_builtin": True,
+            "created_by": "system",
+            "created_at": now,
+            "updated_at": now,
+        })
+
+    if not to_insert:
+        return {"status": "skipped", "inserted_count": 0, "message": "No missing failure modes"}
+
+    result = await collection.insert_many(to_insert)
+    return {
+        "status": "success",
+        "inserted_count": len(result.inserted_ids),
+        "message": f"Inserted {len(result.inserted_ids)} missing failure modes",
+    }
+
+
 async def ensure_failure_modes_seeded(db: AsyncIOMotorDatabase) -> bool:
     """
     Ensure failure modes are seeded. Called on app startup.
@@ -157,9 +218,14 @@ if __name__ == "__main__":
         
         # Check for --force flag
         force = '--force' in sys.argv
-        
-        print(f"Seeding failure modes (force={force})...")
-        result = await seed_failure_modes_library(db, force_reseed=force)
+        upsert_missing = '--upsert-missing' in sys.argv
+
+        if upsert_missing:
+            print("Upserting missing failure modes from static library...")
+            result = await upsert_missing_failure_modes(db)
+        else:
+            print(f"Seeding failure modes (force={force})...")
+            result = await seed_failure_modes_library(db, force_reseed=force)
         print(f"Result: {result}")
         
         client.close()

@@ -14,6 +14,7 @@ from models.maintenance_strategy_v2 import (
     CriticalityFrequency,
     MaintenanceTaskTemplate,
 )
+from services.maintenance_tenant_scope import maintenance_scoped
 from services.maintenance_scheduler_sync import propagate_strategy_schedule_updates
 from services.maintenance_strategy_helpers import clear_strategy_needs_apply
 from services.maintenance_strategy_propagation import (
@@ -54,7 +55,7 @@ async def _refresh_applied_equipment_timeline(
 async def get_task_templates(equipment_type_id: str, current_user: dict):
     """Get all task templates for an equipment type."""
     strategy = await db.equipment_type_strategies.find_one(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id}),
         {"_id": 0},
     )
 
@@ -73,9 +74,9 @@ async def add_task_template(
     current_user: dict,
 ):
     """Add a new task template to an equipment type strategy."""
-    strategy = await db.equipment_type_strategies.find_one({
-        "equipment_type_id": equipment_type_id
-    })
+    strategy = await db.equipment_type_strategies.find_one(
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id})
+    )
 
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
@@ -134,9 +135,9 @@ async def update_task_template(
     current_user: dict,
 ):
     """Update a task template; metadata-only changes propagate to programs and open scheduled tasks."""
-    strategy = await db.equipment_type_strategies.find_one({
-        "equipment_type_id": equipment_type_id
-    })
+    strategy = await db.equipment_type_strategies.find_one(
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id})
+    )
 
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
@@ -239,9 +240,9 @@ async def get_task_template_program_impact(
     current_user: dict,
 ):
     """Return how many active maintenance programs include this strategy task."""
-    strategy = await db.equipment_type_strategies.find_one({
-        "equipment_type_id": equipment_type_id
-    })
+    strategy = await db.equipment_type_strategies.find_one(
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id})
+    )
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
 
@@ -265,9 +266,9 @@ async def delete_task_template(
     current_user: dict,
 ):
     """Delete a task template; deactivates v2 program tasks and cancels open scheduled tasks."""
-    strategy = await db.equipment_type_strategies.find_one({
-        "equipment_type_id": equipment_type_id
-    })
+    strategy = await db.equipment_type_strategies.find_one(
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id})
+    )
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
 
