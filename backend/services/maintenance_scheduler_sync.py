@@ -16,6 +16,11 @@ from pymongo import InsertOne, UpdateOne
 from database import db
 from models.maintenance_program import TaskSource
 from models.maintenance_scheduler import CriticalityLevel, EquipmentMaintenanceProgram
+from services.maintenance_tenant_scope import (
+    maintenance_scoped_job,
+    maintenance_scoped_tenant,
+    tenant_id_from_record,
+)
 from services.scheduler_config import should_sync_legacy_maintenance_programs
 from services.scheduler_helpers import (
     build_task_to_failure_modes,
@@ -66,10 +71,14 @@ async def sync_strategy_programs_for_equipment(
     today = datetime.utcnow().date().isoformat()
     equip_criticality = normalize_program_criticality(equipment.get("criticality"))
     strategy_version = strategy.get("version", "1.0")
+    tenant_id = tenant_id_from_record(equipment) or tenant_id_from_record(strategy)
 
     existing_by_template: Dict[str, Dict[str, Any]] = {}
     async for doc in db.maintenance_programs.find(
-        {"equipment_id": equipment_id, "equipment_type_id": equipment_type_id},
+        maintenance_scoped_tenant(tenant_id, {
+            "equipment_id": equipment_id,
+            "equipment_type_id": equipment_type_id,
+        }),
     ):
         template_id = doc.get("task_template_id")
         if template_id:
@@ -162,7 +171,10 @@ async def sync_strategy_programs_for_equipment(
 
     stale_program_ids: List[str] = []
     async for prog in db.maintenance_programs.find(
-        {"equipment_id": equipment_id, "equipment_type_id": equipment_type_id},
+        maintenance_scoped_tenant(tenant_id, {
+            "equipment_id": equipment_id,
+            "equipment_type_id": equipment_type_id,
+        }),
         {"id": 1, "task_template_id": 1, "is_active": 1, "_id": 1},
     ):
         if not program_is_strategy_backed(prog):
@@ -323,8 +335,10 @@ async def sync_v2_program_tasks_to_scheduler(
     if not equipment_id:
         return 0
 
+    tenant_id = tenant_id_from_record(equipment)
+
     program_v2 = await db.maintenance_programs_v2.find_one(
-        {"equipment_id": equipment_id},
+        maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id}),
         {"_id": 0},
     )
     if not program_v2:
@@ -335,7 +349,10 @@ async def sync_v2_program_tasks_to_scheduler(
     )
     if strategy is None and equipment_type_id:
         strategy = await db.equipment_type_strategies.find_one(
-            {"equipment_type_id": equipment_type_id},
+            maintenance_scoped_tenant(
+                tenant_id or tenant_id_from_record(program_v2),
+                {"equipment_type_id": equipment_type_id},
+            ),
             {"_id": 0},
         )
 
@@ -350,7 +367,9 @@ async def sync_v2_program_tasks_to_scheduler(
 
     legacy_by_template: Dict[str, Dict[str, Any]] = {}
     legacy_by_v2: Dict[str, Dict[str, Any]] = {}
-    async for legacy in db.maintenance_programs.find({"equipment_id": equipment_id}):
+    async for legacy in db.maintenance_programs.find(
+        maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id})
+    ):
         tid = legacy.get("task_template_id")
         if tid:
             legacy_by_template[tid] = legacy
@@ -1019,14 +1038,18 @@ async def refresh_equipment_schedule(
     from services.maintenance_program_service import MaintenanceProgramService
     from services.scheduler_program_source import load_schedulable_programs
 
-    equipment = await db.equipment_nodes.find_one({"id": equipment_id}, {"_id": 0})
+    equipment = await db.equipment_nodes.find_one(
+        maintenance_scoped_job({"id": equipment_id}),
+        {"_id": 0},
+    )
     if not equipment:
         return {"equipment_id": equipment_id, "skipped": True, "reason": "equipment_not_found"}
 
     equipment_type_id = equipment.get("equipment_type_id")
+    equip_tenant = tenant_id_from_record(equipment)
     if strategy is None and equipment_type_id:
         strategy = await db.equipment_type_strategies.find_one(
-            {"equipment_type_id": equipment_type_id},
+            maintenance_scoped_tenant(equip_tenant, {"equipment_type_id": equipment_type_id}),
             {"_id": 0},
         )
 
@@ -1119,7 +1142,7 @@ async def propagate_strategy_schedule_updates(
     from services.strategy_propagation import resync_programs_with_strategy
 
     program_docs = await db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
         {"equipment_id": 1, "_id": 0},
     ).to_list(5000)
     equipment_ids = list(

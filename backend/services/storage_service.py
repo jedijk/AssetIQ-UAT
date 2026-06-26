@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 APP_NAME = "assetiq"
 
+
+class StorageBackendUnavailable(FileNotFoundError):
+    """Metadata exists but the blob backend (e.g. R2) is not configured on this host."""
+
 # ==================== R2 CLIENT (lazy init) ====================
 
 _r2_client = None
@@ -236,7 +240,11 @@ async def get_object_async(path: str) -> Tuple[bytes, str]:
     storage_type = doc.get("storage_type", "mongodb")
 
     # --- R2 PATH ---
-    if storage_type == "r2" and _r2_available():
+    if storage_type == "r2":
+        if not _r2_available():
+            raise StorageBackendUnavailable(
+                f"File metadata exists but R2 is not configured on this environment: {path}"
+            )
         try:
             client = _get_r2_client()
             resp = client.get_object(Bucket=_r2_bucket(), Key=path)

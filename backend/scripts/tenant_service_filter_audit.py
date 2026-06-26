@@ -10,7 +10,8 @@ SERVICES_DIR = BACKEND_DIR / "services"
 
 FIND_RE = re.compile(r"\bdb\.\w+\.(?:find|find_one|aggregate|count_documents)\b")
 TENANT_FILTER_RE = re.compile(
-    r"\b(?:merge_tenant_filter|tenant_read_filter|tenant_filter|prepend_tenant_match)\b"
+    r"\b(?:merge_tenant_filter|tenant_read_filter|tenant_filter|prepend_tenant_match"
+    r"|scheduler_scoped|maintenance_scoped|maintenance_scoped_tenant|maintenance_scoped_job)\b"
 )
 
 # Intentionally global or cross-tenant modules.

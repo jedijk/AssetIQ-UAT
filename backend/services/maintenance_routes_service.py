@@ -9,6 +9,7 @@ import logging
 import os
 from pathlib import Path
 from database import db, failure_modes_service
+from services.maintenance_tenant_scope import maintenance_scoped
 from maintenance_strategy_models import (
     MaintenanceStrategy, CriticalityLevel, MaintenanceFrequency,
     MaintenanceStrategyCreate, MaintenanceStrategyUpdate, GenerateStrategyRequest,
@@ -45,7 +46,9 @@ async def list_maintenance_strategies(
     if equipment_type_id:
         query["equipment_type_id"] = equipment_type_id
     
-    strategies = await db.maintenance_strategies.find(query, {"_id": 0}).to_list(1000)
+    strategies = await db.maintenance_strategies.find(
+        maintenance_scoped(current_user, query), {"_id": 0}
+    ).to_list(1000)
     
     # Apply search filter if provided
     if search:
@@ -65,7 +68,9 @@ async def get_maintenance_strategy(
     strategy_id: str, current_user: dict
 ):
     """Get a specific maintenance strategy by ID"""
-    strategy = await db.maintenance_strategies.find_one({"id": strategy_id}, {"_id": 0})
+    strategy = await db.maintenance_strategies.find_one(
+        maintenance_scoped(current_user, {"id": strategy_id}), {"_id": 0}
+    )
     if not strategy:
         raise HTTPException(status_code=404, detail="Maintenance strategy not found")
     return strategy
@@ -76,7 +81,7 @@ async def get_strategies_by_equipment_type(
 ):
     """Get maintenance strategy for an equipment type"""
     strategy = await db.maintenance_strategies.find_one(
-        {"equipment_type_id": equipment_type_id}, 
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id}),
         {"_id": 0}
     )
     return {"equipment_type_id": equipment_type_id, "strategy": strategy}
@@ -88,9 +93,9 @@ async def generate_maintenance_strategy(
     """Auto-generate a maintenance strategy for ALL criticality levels from FMEA data"""
     _block_legacy_v1_mutation()
     # Check if strategy already exists for this equipment type
-    existing = await db.maintenance_strategies.find_one({
-        "equipment_type_id": request.equipment_type_id
-    })
+    existing = await db.maintenance_strategies.find_one(
+        maintenance_scoped(current_user, {"equipment_type_id": request.equipment_type_id})
+    )
     if existing:
         raise HTTPException(
             status_code=400, 
@@ -202,7 +207,9 @@ async def generate_all_maintenance_strategies(
         eq_name = eq_type.get("name", "")
         
         # Check if strategy already exists
-        existing = await db.maintenance_strategies.find_one({"equipment_type_id": eq_id})
+        existing = await db.maintenance_strategies.find_one(
+            maintenance_scoped(current_user, {"equipment_type_id": eq_id})
+        )
         if existing:
             results["skipped"].append({"id": eq_id, "name": eq_name, "reason": "Already exists"})
             continue
@@ -314,9 +321,9 @@ async def create_maintenance_strategy(
     """Create a new maintenance strategy manually"""
     _block_legacy_v1_mutation()
     # Check if strategy already exists
-    existing = await db.maintenance_strategies.find_one({
-        "equipment_type_id": data.equipment_type_id
-    })
+    existing = await db.maintenance_strategies.find_one(
+        maintenance_scoped(current_user, {"equipment_type_id": data.equipment_type_id})
+    )
     if existing:
         raise HTTPException(
             status_code=400,
@@ -348,7 +355,9 @@ async def update_maintenance_strategy(
 ):
     """Update an existing maintenance strategy"""
     _block_legacy_v1_mutation()
-    strategy = await db.maintenance_strategies.find_one({"id": strategy_id})
+    strategy = await db.maintenance_strategies.find_one(
+        maintenance_scoped(current_user, {"id": strategy_id})
+    )
     if not strategy:
         raise HTTPException(status_code=404, detail="Maintenance strategy not found")
     
@@ -388,7 +397,9 @@ async def update_maintenance_strategy(
             {"$set": update_data}
         )
     
-    updated_strategy = await db.maintenance_strategies.find_one({"id": strategy_id}, {"_id": 0})
+    updated_strategy = await db.maintenance_strategies.find_one(
+        maintenance_scoped(current_user, {"id": strategy_id}), {"_id": 0}
+    )
     return updated_strategy
 
 
@@ -409,7 +420,9 @@ async def increment_strategy_version(
 ):
     """Increment the strategy version number"""
     _block_legacy_v1_mutation()
-    strategy = await db.maintenance_strategies.find_one({"id": strategy_id})
+    strategy = await db.maintenance_strategies.find_one(
+        maintenance_scoped(current_user, {"id": strategy_id})
+    )
     if not strategy:
         raise HTTPException(status_code=404, detail="Maintenance strategy not found")
     

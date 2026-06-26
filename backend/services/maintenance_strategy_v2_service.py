@@ -26,6 +26,7 @@ from models.maintenance_strategy_v2 import (
     TaskActivationState,
 )
 
+from services.maintenance_tenant_scope import maintenance_scoped
 from services.maintenance_scheduler_sync import (
     clear_equipment_type_schedule_after_strategy_delete,
     propagate_strategy_schedule_updates,
@@ -105,7 +106,9 @@ async def list_equipment_type_strategies(
     if status:
         query["status"] = status
     
-    strategies = await db.equipment_type_strategies.find(query, {"_id": 0}).to_list(500)
+    strategies = await db.equipment_type_strategies.find(
+        maintenance_scoped(current_user, query), {"_id": 0}
+    ).to_list(500)
     
     # Apply search filter
     if search:
@@ -127,7 +130,7 @@ async def get_equipment_type_strategy(
 ):
     """Get strategy for a specific equipment type"""
     strategy = await db.equipment_type_strategies.find_one(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id}),
         {"_id": 0}
     )
     
@@ -193,17 +196,17 @@ async def get_equipment_type_strategy(
     strategy["coverage_score"] = round(coverage_score, 1)
     
     # Count affected equipment from hierarchy
-    affected_equipment_count = await db.equipment_nodes.count_documents({
-        "equipment_type_id": equipment_type_id
-    })
+    affected_equipment_count = await db.equipment_nodes.count_documents(
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id})
+    )
     strategy["affected_equipment_count"] = affected_equipment_count
     
     # Count equipment that actually have strategy applied (have maintenance program with strategy tasks)
     programs_with_strategy = await db.maintenance_programs_v2.find(
-        {
+        maintenance_scoped(current_user, {
             "equipment_type_id": equipment_type_id,
             "strategy_tasks": {"$gt": 0}
-        },
+        }),
         {"equipment_id": 1}
     ).to_list(1000)
     equipment_with_strategy_applied = len(set([p.get("equipment_id") for p in programs_with_strategy if p.get("equipment_id")]))
@@ -860,7 +863,7 @@ async def get_affected_equipment(
     "active" (already covered).
     """
     equipment_nodes = await db.equipment_nodes.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id}),
         {"_id": 0, "id": 1, "name": 1, "tag": 1, "level": 1, "location": 1, "parent_id": 1, "criticality": 1}
     ).to_list(500)
 
@@ -912,7 +915,7 @@ async def get_strategy_audit_log(
 ):
     """Get audit log for an equipment type strategy"""
     audit_entries = await db.maintenance_strategy_audit.find(
-        {"entity_id": equipment_type_id},
+        maintenance_scoped(current_user, {"entity_id": equipment_type_id}),
         {"_id": 0}
     ).sort("timestamp", -1).limit(limit).to_list(limit)
     
@@ -929,7 +932,7 @@ async def get_failure_mode_strategies(
 ):
     """Get all failure mode strategies for an equipment type"""
     strategy = await db.equipment_type_strategies.find_one(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id}),
         {"_id": 0}
     )
     

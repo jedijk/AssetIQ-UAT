@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from database import db
 from models.maintenance_program import TaskSource
+from services.maintenance_tenant_scope import maintenance_scoped_job
 from services.scheduler_config import should_read_legacy_maintenance_programs
 from services.scheduler_helpers import (
     coerce_optional_str_id,
@@ -114,7 +115,7 @@ def expand_v2_program_to_scheduler_rows(
 async def get_active_strategy_type_ids() -> Set[str]:
     ids = set()
     async for doc in db.equipment_type_strategies.find(
-        {"$nor": [{"status": "disabled"}]},
+        maintenance_scoped_job({"$nor": [{"status": "disabled"}]}),
         {"equipment_type_id": 1, "_id": 0},
     ):
         etid = doc.get("equipment_type_id")
@@ -249,6 +250,7 @@ async def load_schedulable_programs(
     *,
     equipment_type_id: Optional[str] = None,
     equipment_ids: Optional[List[str]] = None,
+    user: Optional[dict] = None,
 ) -> List[Dict[str, Any]]:
     """
     Primary: v2 nested tasks. Fallback: legacy flat maintenance_programs for
@@ -262,7 +264,10 @@ async def load_schedulable_programs(
     if equipment_ids:
         v2_query["equipment_id"] = {"$in": equipment_ids}
 
-    v2_docs = await db.maintenance_programs_v2.find(v2_query).to_list(5000)
+    from services.maintenance_tenant_scope import maintenance_scoped
+
+    scoped_v2 = maintenance_scoped(user, v2_query) if user else maintenance_scoped_job(v2_query)
+    v2_docs = await db.maintenance_programs_v2.find(scoped_v2).to_list(5000)
     v2_rows: List[Dict[str, Any]] = []
     covered_pm_refs: Set[str] = set()
     for doc in v2_docs:
@@ -296,7 +301,8 @@ async def load_schedulable_programs(
     elif covered_equipment:
         legacy_query["equipment_id"] = {"$nin": list(covered_equipment)}
 
-    legacy_programs = await db.maintenance_programs.find(legacy_query).to_list(5000)
+    scoped_legacy = maintenance_scoped(user, legacy_query) if user else maintenance_scoped_job(legacy_query)
+    legacy_programs = await db.maintenance_programs.find(scoped_legacy).to_list(5000)
     schedulable_legacy = [
         p
         for p in legacy_programs

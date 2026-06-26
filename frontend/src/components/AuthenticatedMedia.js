@@ -38,11 +38,11 @@ export const useAuthenticatedMedia = (url) => {
         }
       } catch (err) {
         const status = err?.response?.status;
-        if (status !== 404) {
+        if (status !== 404 && status !== 503) {
           console.error("Failed to fetch authenticated media:", err);
         }
         if (isMounted) {
-          setError(status === 404 ? null : err.message);
+          setError(status === 404 || status === 503 ? null : err.message);
           setIsLoading(false);
         }
       }

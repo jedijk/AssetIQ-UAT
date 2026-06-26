@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from database import db
+from services.maintenance_tenant_scope import maintenance_scoped_job
 from services.pm_import_constants import (
     is_pm_import_incorporated_into_strategy,
     normalize_pm_import_display_status,
@@ -262,7 +263,7 @@ async def propagate_pm_import_task_active_state(
     await set_pm_import_session_task_active(session_id, task_id, is_active)
 
     session = await db.pm_import_sessions.find_one(
-        {"session_id": session_id},
+        maintenance_scoped_job({"session_id": session_id}),
         {"_id": 0, "tasks_extracted": 1},
     )
     equipment_id = None
@@ -276,7 +277,7 @@ async def propagate_pm_import_task_active_state(
     programs_updated = 0
     if equipment_id:
         stored = await db.maintenance_programs_v2.find_one(
-            {"equipment_id": equipment_id},
+            maintenance_scoped_job({"equipment_id": equipment_id}),
             {"_id": 0, "tasks": 1},
         )
         if stored:
@@ -359,7 +360,7 @@ async def propagate_pm_import_task_active_state(
 async def load_incorporated_pm_refs_for_equipment(equipment_id: str) -> set:
     """PM import refs merged/applied into strategy for one equipment node."""
     equipment = await db.equipment_nodes.find_one(
-        {"id": equipment_id},
+        maintenance_scoped_job({"id": equipment_id}),
         {"_id": 0, "tag": 1},
     )
     if not equipment:
@@ -367,7 +368,9 @@ async def load_incorporated_pm_refs_for_equipment(equipment_id: str) -> set:
 
     equipment_tag = equipment.get("tag")
     refs: set = set()
-    cursor = db.pm_import_sessions.find({}, {"_id": 0, "session_id": 1, "tasks_extracted": 1})
+    cursor = db.pm_import_sessions.find(
+        maintenance_scoped_job({}), {"_id": 0, "session_id": 1, "tasks_extracted": 1}
+    )
     async for session in cursor:
         session_id = session.get("session_id")
         if not session_id:
@@ -390,7 +393,7 @@ async def purge_standalone_pm_import_program_task(
     """Remove standalone CUSTOMER_IMPORTED program rows for an incorporated PM import task."""
     removed_from_v2 = 0
     stored = await db.maintenance_programs_v2.find_one(
-        {"equipment_id": equipment_id},
+        maintenance_scoped_job({"equipment_id": equipment_id}),
         {"_id": 0, "tasks": 1},
     )
     if stored:
@@ -459,7 +462,7 @@ async def fetch_pm_import_tasks_for_equipment(
 ) -> List[Dict[str, Any]]:
     """Collect Custom PM Import tasks mapped to this equipment node."""
     equipment = await db.equipment_nodes.find_one(
-        {"id": equipment_id},
+        maintenance_scoped_job({"id": equipment_id}),
         {"_id": 0, "tag": 1},
     )
     if not equipment:
@@ -471,7 +474,9 @@ async def fetch_pm_import_tasks_for_equipment(
         query["created_by"] = user_id
 
     matched: List[Dict[str, Any]] = []
-    cursor = db.pm_import_sessions.find(query, {"_id": 0})
+    cursor = db.pm_import_sessions.find(
+        maintenance_scoped_job(query), {"_id": 0}
+    )
     async for session in cursor:
         for pm_task in session.get("tasks_extracted") or []:
             if pm_task.get("review_status") == "rejected":
@@ -554,7 +559,7 @@ async def enrich_program_response_with_pm_import(
         return None, False, 0
 
     equipment = await db.equipment_nodes.find_one(
-        {"id": equipment_id},
+        maintenance_scoped_job({"id": equipment_id}),
         {"_id": 0, "name": 1, "tag": 1, "equipment_type_id": 1, "equipment_type_name": 1},
     )
 

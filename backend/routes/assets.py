@@ -5,7 +5,11 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import Response
 import logging
 
-from services.storage_service import get_object_async, is_storage_available
+from services.storage_service import (
+    StorageBackendUnavailable,
+    get_object_async,
+    is_storage_available,
+)
 from auth import require_permission
 
 logger = logging.getLogger(__name__)
@@ -56,6 +60,12 @@ async def serve_storage_file(
                 # Files are auth-gated; avoid shared/public caching.
                 "Cache-Control": "private, max-age=3600",
             }
+        )
+    except StorageBackendUnavailable as e:
+        logger.warning(str(e))
+        raise HTTPException(
+            status_code=503,
+            detail="File is stored in object storage (R2) which is not configured on this environment",
         )
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"File not found: {path}")

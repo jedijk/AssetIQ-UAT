@@ -18,6 +18,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
 from database import db
+from services.maintenance_tenant_scope import maintenance_scoped_job, maintenance_scoped_tenant, tenant_id_from_record
 from services.scheduler_helpers import (
     normalize_program_criticality,
     build_task_to_failure_modes,
@@ -51,6 +52,16 @@ from models.maintenance_program import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def _load_equipment_for_program(equipment_id: str) -> Dict[str, Any]:
+    equipment = await db.equipment_nodes.find_one(
+        maintenance_scoped_job({"id": equipment_id}),
+        {"_id": 0},
+    )
+    if not equipment:
+        raise ValueError(f"Equipment not found: {equipment_id}")
+    return equipment
 
 
 def _criticality_fields_from_equipment(equipment: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -117,24 +128,17 @@ class MaintenanceProgramService:
         user_id: Optional[str] = None
     ) -> MaintenanceProgram:
         """Get existing program or create new one for equipment"""
-        
-        # Check for existing program
+
+        equipment = await _load_equipment_for_program(equipment_id)
+        tenant_id = tenant_id_from_record(equipment)
+
         existing = await db.maintenance_programs_v2.find_one(
-            {"equipment_id": equipment_id},
+            maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id}),
             {"_id": 0}
         )
         
         if existing:
             return MaintenanceProgram(**existing)
-        
-        # Get equipment details
-        equipment = await db.equipment_nodes.find_one(
-            {"id": equipment_id},
-            {"_id": 0}
-        )
-        
-        if not equipment:
-            raise ValueError(f"Equipment not found: {equipment_id}")
         
         equipment_crit = equipment.get("criticality")
         equipment_criticality_level = "low"
@@ -173,7 +177,10 @@ class MaintenanceProgramService:
             program.tasks = tasks
             program.source_strategy_id = equipment.get("equipment_type_id")
             strategy_doc = await db.equipment_type_strategies.find_one(
-                {"equipment_type_id": equipment.get("equipment_type_id")},
+                maintenance_scoped_tenant(
+                    tenant_id,
+                    {"equipment_type_id": equipment.get("equipment_type_id")},
+                ),
                 {"version": 1, "_id": 0},
             )
             if strategy_doc:
@@ -416,7 +423,9 @@ class MaintenanceProgramService:
     ) -> Tuple[MaintenanceProgramTask, str]:
         """Add a task to a maintenance program. Returns (task, new_version)"""
         
-        program = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id})
+        program = await db.maintenance_programs_v2.find_one(
+            maintenance_scoped_job({"equipment_id": equipment_id})
+        )
         if not program:
             raise ValueError(f"No maintenance program found for equipment: {equipment_id}")
         
@@ -493,7 +502,9 @@ class MaintenanceProgramService:
     ) -> Tuple[Dict[str, Any], str]:
         """Update a task in a maintenance program. Returns (updated_task, new_version)"""
         
-        program = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id})
+        program = await db.maintenance_programs_v2.find_one(
+            maintenance_scoped_job({"equipment_id": equipment_id})
+        )
         if not program:
             raise ValueError(f"No maintenance program found for equipment: {equipment_id}")
         
@@ -589,7 +600,9 @@ class MaintenanceProgramService:
     ) -> str:
         """Delete a task from a maintenance program. Returns new_version"""
         
-        program = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id})
+        program = await db.maintenance_programs_v2.find_one(
+            maintenance_scoped_job({"equipment_id": equipment_id})
+        )
         if not program:
             raise ValueError(f"No maintenance program found for equipment: {equipment_id}")
         
@@ -1022,7 +1035,9 @@ class MaintenanceProgramService:
     ) -> Tuple[MaintenanceProgram, ProgramChangePreview]:
         """Regenerate a maintenance program from strategy"""
         
-        program_doc = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id})
+        program_doc = await db.maintenance_programs_v2.find_one(
+            maintenance_scoped_job({"equipment_id": equipment_id})
+        )
         if not program_doc:
             raise ValueError(f"No maintenance program found for equipment: {equipment_id}")
         
@@ -1261,7 +1276,9 @@ class MaintenanceProgramService:
         )
         
         # Fetch updated program
-        updated_doc = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id}, {"_id": 0})
+        updated_doc = await db.maintenance_programs_v2.find_one(
+            maintenance_scoped_job({"equipment_id": equipment_id}), {"_id": 0}
+        )
         return MaintenanceProgram(**updated_doc), preview
     
     # ============= Import from PM Import =============

@@ -28,6 +28,7 @@ from models.maintenance_program import (
     frequency_to_days,
 )
 from services.maintenance_program_service import MaintenanceProgramService
+from services.maintenance_tenant_scope import maintenance_scoped
 from services.maintenance_program_pm_import import (
     parse_pm_import_ref,
 )
@@ -113,7 +114,7 @@ async def list_maintenance_programs(
     
     # Get programs
     programs = await db.maintenance_programs_v2.find(
-        query, {"_id": 0}
+        maintenance_scoped(current_user, query), {"_id": 0}
     ).skip(offset).limit(limit).to_list(limit)
     
     # Apply search filter
@@ -127,7 +128,7 @@ async def list_maintenance_programs(
         ]
     
     # Get total count
-    total = await db.maintenance_programs_v2.count_documents(query)
+    total = await db.maintenance_programs_v2.count_documents(maintenance_scoped(current_user, query))
     
     return {
         "programs": programs,
@@ -147,7 +148,9 @@ async def get_programs_summary(
     if equipment_type_id:
         match_query["equipment_type_id"] = equipment_type_id
     
-    pipeline = [
+    from services.tenant_schema import prepend_tenant_match
+
+    pipeline = prepend_tenant_match([
         {"$match": match_query},
         {"$group": {
             "_id": "$status",
@@ -159,7 +162,7 @@ async def get_programs_summary(
             "ai_tasks": {"$sum": "$ai_tasks"},
             "manual_tasks": {"$sum": "$manual_tasks"}
         }}
-    ]
+    ], current_user)
     
     results = await db.maintenance_programs_v2.aggregate(pipeline).to_list(10)
     
@@ -199,7 +202,7 @@ async def get_maintenance_program(
     Returns program details including all tasks.
     """
     stored_program = await db.maintenance_programs_v2.find_one(
-        {"equipment_id": equipment_id},
+        maintenance_scoped(current_user, {"equipment_id": equipment_id}),
         {"_id": 0}
     )
 
@@ -230,7 +233,7 @@ async def get_maintenance_program(
     )
 
     equipment = await db.equipment_nodes.find_one(
-        {"id": equipment_id},
+        maintenance_scoped(current_user, {"id": equipment_id}),
         {"_id": 0, "name": 1, "tag": 1, "criticality": 1, "equipment_type_name": 1, "equipment_type_id": 1}
     )
 
@@ -238,7 +241,7 @@ async def get_maintenance_program(
     equipment_type_id = program.get("equipment_type_id") or (equipment or {}).get("equipment_type_id")
     if equipment_type_id:
         strategy = await db.equipment_type_strategies.find_one(
-            {"equipment_type_id": equipment_type_id},
+            maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id}),
             {"version": 1, "_id": 0}
         )
 
@@ -275,7 +278,9 @@ async def create_maintenance_program(
     - include_ai_recommendations: Generate AI recommendations
     """
     # Check if program already exists
-    existing = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id})
+    existing = await db.maintenance_programs_v2.find_one(
+        maintenance_scoped(current_user, {"equipment_id": equipment_id})
+    )
     if existing:
         raise HTTPException(
             status_code=400,
@@ -322,7 +327,9 @@ async def delete_maintenance_program(
     Delete a maintenance program.
     This will also cancel any scheduled tasks associated with this program.
     """
-    program = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id})
+    program = await db.maintenance_programs_v2.find_one(
+        maintenance_scoped(current_user, {"equipment_id": equipment_id})
+    )
     if not program:
         raise HTTPException(status_code=404, detail="Maintenance program not found")
 
@@ -362,7 +369,7 @@ async def get_program_tasks(
     - is_active: Filter by active status
     """
     program = await db.maintenance_programs_v2.find_one(
-        {"equipment_id": equipment_id},
+        maintenance_scoped(current_user, {"equipment_id": equipment_id}),
         {"_id": 0, "tasks": 1}
     )
     
@@ -772,7 +779,7 @@ async def get_version_history(
     Get version history for a maintenance program.
     """
     program = await db.maintenance_programs_v2.find_one(
-        {"equipment_id": equipment_id},
+        maintenance_scoped(current_user, {"equipment_id": equipment_id}),
         {"_id": 0, "version": 1, "version_history": 1}
     )
     
@@ -793,7 +800,7 @@ async def get_audit_log(
     Get audit log for a maintenance program.
     """
     audit_entries = await db.maintenance_program_audit.find(
-        {"equipment_id": equipment_id},
+        maintenance_scoped(current_user, {"equipment_id": equipment_id}),
         {"_id": 0}
     ).sort("timestamp", -1).limit(limit).to_list(limit)
     
@@ -821,7 +828,9 @@ async def bulk_generate_programs(
     for equipment_id in equipment_ids:
         try:
             # Check if already exists
-            existing = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id})
+            existing = await db.maintenance_programs_v2.find_one(
+                maintenance_scoped(current_user, {"equipment_id": equipment_id})
+            )
             if existing:
                 results["already_exists"].append(equipment_id)
                 continue
@@ -860,7 +869,7 @@ async def bulk_regenerate_programs(
     """
     # Get all programs for this equipment type
     programs = await db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id},
+        maintenance_scoped(current_user, {"equipment_type_id": equipment_type_id}),
         {"equipment_id": 1, "_id": 0}
     ).to_list(500)
     
