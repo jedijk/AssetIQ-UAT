@@ -4,7 +4,9 @@
 
 **Gate:** Phase 0 complete; no new product modules unless required for convergence.
 
-**No Phase 2 work** until every verification report in Workstream D passes.
+**Current status:** See [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md) — single source of truth for code gates vs live UAT data gates.
+
+**No Phase 2 work** until every verification report in Workstream D passes on **live UAT** (exit 0).
 
 ---
 
@@ -12,13 +14,14 @@
 
 | Criterion | Status | Evidence |
 |-----------|--------|----------|
-| Every verification script passes | **Done (UAT)** | `phase1_data_integrity_report.py`, `verify_uat_gates.py` — all OK |
+| Every verification script passes (live UAT) | **Not verified** | Requires UAT Atlas run — see Workstream D; **not** assumed from code gates alone |
 | No dual-write paths in active workflows | **Done (config)** | Legacy program flags off; legacy rows still exist (read-only) |
-| All maintenance data tenant scoped | **Done (B1)** | Maintenance domain services pass `tenant_service_filter_audit.py` |
-| All scheduled work visible to users | **Done (UAT)** | 0 unbridged open `scheduled_tasks` after backfill |
-| Reliability graph fully synchronized | **Done (UAT)** | Graph sync gate passes; maintenance + reactive backfill complete |
-| UAT 48h soak without critical issues | **Pending** | Strict mode on; soak not started |
-| Production ready for strict tenant mode | **Pending** | Prod backfill + enablement not done |
+| All maintenance data tenant scoped | **Done (code gate)** | `tenant_service_filter_audit.py` → 0 flagged (WS1) |
+| All scheduled work visible to users | **Not verified (UAT)** | Workstream A1 below — last documented count 248 unbridged; re-run `phase1_data_integrity_report.py` |
+| Reliability graph sync (code gate) | **Done (code gate)** | `verify_reliability_graph_sync.py` static checks pass; DB sample needs UAT |
+| Reliability graph fully synchronized (live UAT) | **Not verified** | DB sample section of graph sync gate not run on UAT in current cycle |
+| UAT 48h soak without critical issues | **Deferred** | Explicitly out of scope for current track |
+| Production ready for strict tenant mode | **Deferred** | Prod backfill + enablement not done |
 
 ---
 
@@ -106,11 +109,11 @@ cd backend && MONGO_URL=... python3 scripts/seed_failure_modes.py
 
 | Item | Status |
 |------|--------|
-| `tenant_service_filter_audit.py` | **Done** (heuristic) |
-| Flagged services (ratio &lt; 0.25) | **35 files** — includes `insights_service`, `investigation_service`, `task_instance_bridge`, etc. |
+| `tenant_service_filter_audit.py` | **Done (code gate)** — 0 flagged @ WS1 (`503a77e3`) |
+| Flagged services (ratio &lt; 0.25) | **0** (was 35+; fixed WS1) |
 | Graph tenant reads | **Done** (`reliability_graph`, `reliability_graph_query`) |
-| `reliability_edges` tenant backfill | **Done** on UAT (14,350/14,350) |
-| Acceptance: zero unsafe reads | **Not met** |
+| `reliability_edges` tenant backfill | **Done** on UAT (14,350/14,350) — historical ops report |
+| Acceptance: zero unsafe reads (live multi-tenant) | **Not met** — single pilot tenant; `phase2_tenancy_report.py` on UAT pending |
 
 ```bash
 cd backend && python3 scripts/tenant_service_filter_audit.py
@@ -134,7 +137,7 @@ cd backend && MONGO_URL=... DB_NAME=assetiq-UAT python3 scripts/phase2_tenancy_r
 
 | Item | Status |
 |------|--------|
-| `verify_reliability_graph_sync.py` | **Fails** on UAT (DB sample + gates) |
+| `verify_reliability_graph_sync.py` | **Code gate PASS** (static @ uncommitted fix); **UAT DB sample NOT TESTED** this cycle |
 | Edge upsert tenant scoping | **Done** |
 | `GRAPH_SYNC_ASYNC` / outbox monitoring | **Pending ops** |
 
@@ -146,7 +149,7 @@ Scheduled Task → Task Instance → Execution → Evidence → Graph → Strate
 |------|--------|
 | Scheduled → Instance | **Broken** (248 unbridged) |
 | Instance → Execution | OK when instance exists |
-| Evidence → Graph | Partial (sync gate fails) |
+| Evidence → Graph | Partial (code gate passes; UAT DB sample pending) |
 | Graph → Strategy | Code paths exist; validation open |
 
 ### C3. Graph data validation
@@ -165,15 +168,15 @@ cd backend && MONGO_URL=... python3 scripts/verify_reliability_graph_sync.py
 
 ## Workstream D — Verification
 
-All must return exit 0. **Current UAT: all fail or partial.**
+All must return exit 0 on **live UAT Atlas** (`DB_NAME=assetiq-UAT`). **Current cycle: not re-run** — treat table below as last documented state until refreshed.
 
-| Report | UAT (last run) |
-|--------|----------------|
+| Report | Last documented UAT state |
+|--------|---------------------------|
 | `verify_schedule_drift.py` | **FAIL** — 10 equipment missing v2 |
 | `verify_v2_program_coverage.py` | **FAIL** — 3 legacy-only equipment |
-| `verify_reliability_graph_sync.py` | **FAIL** |
-| `phase1_data_integrity_report.py` | **FAIL** (exit 2) |
-| `verify_uat_gates.py` (wrapper) | **FAIL** |
+| `verify_reliability_graph_sync.py` | **Code gate PASS** (static); **DB sample NOT TESTED** on UAT this cycle |
+| `phase1_data_integrity_report.py` | **FAIL** (exit 2) when last run on UAT |
+| `verify_uat_gates.py` (wrapper) | **FAIL** when last run on UAT (data + schedule gates) |
 
 ```bash
 cd backend && MONGO_URL=... DB_NAME=assetiq-UAT ENVIRONMENT=uat \
@@ -226,10 +229,10 @@ cd backend && MONGO_URL=... DB_NAME=assetiq-UAT ENVIRONMENT=uat \
 
 ## Deliverables checklist
 
-- [ ] Updated platform documentation (this file)
+- [ ] Updated platform documentation (this file + `ASSETIQ_TECHNICAL_STATUS.md`)
 - [ ] Tenant audit report (run `phase2_tenancy_report.py` on UAT)
-- [ ] Data integrity report (run `phase1_data_integrity_report.py` — PASS)
-- [ ] Graph integrity report (`verify_reliability_graph_sync` — PASS)
+- [ ] Data integrity report (run `phase1_data_integrity_report.py` on UAT — exit 0)
+- [ ] Graph integrity report (`verify_reliability_graph_sync.py` on UAT — static + DB sample exit 0)
 - [ ] Production readiness report
 - [ ] Updated architecture documentation
 

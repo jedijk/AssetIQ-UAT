@@ -69,12 +69,12 @@ def test_maintenance_program_mutations_require_scheduler_write():
     assert "Depends(_scheduler_write)" in source
 
 
-def test_investigations_ai_problem_check_uses_gateway():
-    source = (Path(__file__).resolve().parents[1] / "services" / "investigation_service.py").read_text()
-    assert "from services.ai_gateway import chat as ai_gateway_chat" in source
+def test_investigations_ai_problem_check_uses_ai_platform():
+    source = (Path(__file__).resolve().parents[1] / "services" / "investigation_files.py").read_text()
+    assert "from services.ai_platform import execute_json_prompt" in source
     idx = source.index("async def ai_problem_check")
     block = source[idx: idx + 2500]
-    assert "ai_gateway_chat" in block
+    assert "execute_json_prompt" in block
     assert 'endpoint="investigations.ai_problem_check"' in block
 
 
@@ -99,18 +99,18 @@ def test_tasks_reads_require_tasks_read():
     assert "Depends(_tasks_read)" in block
 
 
-def test_production_logs_ai_parse_uses_gateway():
+def test_production_logs_ai_parse_uses_ai_platform():
     source = (Path(__file__).resolve().parents[1] / "services" / "production_logs_service.py").read_text()
-    assert "from services.ai_gateway import chat as ai_gateway_chat" in source
     idx = source.index("async def ai_parse_file")
     block = source[idx: idx + 3500]
-    assert "ai_gateway_chat" in block
+    assert "from services.ai_platform import execute_json_prompt" in block
+    assert "execute_json_prompt" in block
     assert 'endpoint="production_logs.ai_parse"' in block
 
 
-def test_translation_service_uses_gateway():
+def test_translation_service_uses_ai_platform():
     source = (Path(__file__).resolve().parents[1] / "services" / "translation_service.py").read_text()
-    assert "from services.ai_gateway import chat as ai_gateway_chat" in source
+    assert "from services.ai_platform import execute_prompt" in source
     assert "AsyncOpenAI" not in source
 
 
@@ -125,7 +125,7 @@ def test_pm_import_service_uses_gateway():
 
 
 def test_production_logs_ingest_uses_tracked_jobs():
-    source = (Path(__file__).resolve().parents[1] / "services" / "production_logs_service.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "services" / "production_logs_ingest.py").read_text()
     assert "schedule_tracked_job" in source
     idx = source.index("async def ingest_logs")
     block = source[idx: idx + 1200]
@@ -357,12 +357,12 @@ async def test_viewer_ui_matrix_denies_observations_write():
 
 def test_threats_routes_require_permission_deps():
     source = (Path(__file__).resolve().parents[1] / "routes" / "threats.py").read_text()
-    service_source = (Path(__file__).resolve().parents[1] / "services" / "threat_service.py").read_text()
+    helpers_source = (Path(__file__).resolve().parents[1] / "services" / "threat_helpers.py").read_text()
     assert '_threats_read = require_permission("threats:read")' in source
     assert '_threats_write = require_permission("threats:write")' in source
     assert '_threats_delete = require_permission("threats:delete")' in source
     assert "Depends(_threats_write)" in source
-    assert "assert_user_can_access_equipment" in service_source
+    assert "assert_user_can_access_equipment" in helpers_source
 
 
 def test_actions_routes_require_permission_deps():
@@ -416,11 +416,11 @@ def test_permissions_updates_invalidate_resolver_cache():
 
 
 def test_threat_enrichment_extracted():
-    threats_source = (Path(__file__).resolve().parents[1] / "services" / "threat_service.py").read_text()
+    crud_source = (Path(__file__).resolve().parents[1] / "services" / "threat_crud.py").read_text()
     enrichment_source = (
         Path(__file__).resolve().parents[1] / "services" / "threat_enrichment.py"
     ).read_text()
-    assert "from services.threat_enrichment import" in threats_source
+    assert "from services.threat_enrichment import" in crud_source
     assert "async def enrich_with_creator_info" in enrichment_source
     assert "async def enrich_with_equipment_tags" in enrichment_source
 
@@ -450,7 +450,8 @@ def test_schedule_tracked_job_prefers_external_worker():
 def test_ril_copilot_dropped_direct_openai_client():
     source = (Path(__file__).resolve().parents[1] / "services" / "ril_copilot_service.py").read_text()
     assert "_get_openai_client" not in source
-    assert "ai_gateway_chat" in source or "from services.ai_gateway import chat" in source
+    assert "from services.ai_platform import execute_prompt" in source
+    assert "AsyncOpenAI" not in source
 
 
 def test_ai_risk_engine_uses_gateway():

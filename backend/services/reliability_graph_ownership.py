@@ -10,8 +10,12 @@ from dataclasses import dataclass
 from typing import Dict, FrozenSet, List, Optional, Tuple
 
 # Modules allowed to call upsert_edge directly (must still use edge_document_id semantics).
+# WS4 graph split: core defines upsert_edge; entities/strategy implement handler sync paths.
 APPROVED_UPSERT_MODULES: FrozenSet[str] = frozenset({
     "services/reliability_graph.py",
+    "services/reliability_graph_core.py",
+    "services/reliability_graph_entities.py",
+    "services/reliability_graph_strategy.py",
     "services/spare_parts_graph_sync.py",
 })
 

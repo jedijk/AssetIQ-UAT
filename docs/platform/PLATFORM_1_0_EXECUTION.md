@@ -2,23 +2,26 @@
 
 **Objective:** Build a robust, scalable, maintainable foundation so every future module shares one consistent architecture.
 
-**Gate:** Phase 1 UAT convergence complete (verification gates passed; data backfills done on UAT).
+**Gate:** Phase 1 **code/platform workstreams** largely complete; **live UAT data convergence** and **production readiness** are not complete. See [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md).
 
-**No major new product modules** until Platform 1.0 is complete.
+**No major new product modules** until Platform 1.0 success criteria are verified.
 
 **Explicitly deferred (not in scope):** Neo4j migration, Vite, Kubernetes, microservices, plugin marketplace, voice, multi-region, **production rollout**, **UAT 48h soak**, **production strict mode**, Redis clustering.
 
 ---
 
-## Current baseline (post–Phase 1 UAT)
+## Current baseline (code gates vs live UAT)
 
 | Area | Status |
 |------|--------|
-| UAT verification gates | **Pass** — `verify_uat_gates.py`, `phase1_data_integrity_report.py` |
+| **Authoritative status** | [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md) |
+| Code verification gates (CI / local) | **Pass** — platform standards, tenant audit, graph sync static, AI entry points |
+| UAT live data gates | **Not verified this cycle** — `phase1_data_integrity_report.py`, `verify_uat_gates.py` require UAT Atlas |
 | Maintenance domain tenant scoping (B1) | **Done** — `maintenance_tenant_scope.py` cluster + `77d97602` |
-| Broader tenant audit | **Done (WS1)** — `tenant_service_filter_audit.py` reports zero flagged services |
-| Reliability graph sync (UAT) | **Pass** — `verify_reliability_graph_sync.py` |
-| Graph ownership / dedup | **Done (WS2)** — `reliability_graph_ownership.py`, architecture doc |
+| Broader tenant audit (WS1) | **Done (code gate)** — `tenant_service_filter_audit.py` → 0 flagged |
+| Reliability graph sync (code gate) | **Pass** — `verify_reliability_graph_sync.py` static checks |
+| Reliability graph sync (UAT DB sample) | **Not tested** this cycle |
+| Graph ownership / dedup | **Done (WS2 code)** — `reliability_graph_ownership.py`; reactive chain maturity ~22% per graph plan |
 | Canonical data models | **Done (WS3)** — `canonical_models.py`, `CANONICAL_DATA_MODELS.md` |
 | AI gateway | **Done (WS5)** — unified `ai_platform` API; all vision/multimodal paths migrated |
 | Executive read models | **Done (WS6)** — dashboard routes read snapshots; materializers refresh on miss/invalidation |
@@ -80,7 +83,7 @@ cd backend && MONGO_URL=... DB_NAME=assetiq-UAT python3 scripts/phase2_tenancy_r
 | Document every edge type | **Done** — ontology aligned with storage types |
 | Ownership matrix (one creator per relationship) | **Done** — `reliability_graph_ownership.py` |
 | Remove duplicate graph creation logic | **Done** — upsert caller guard; AI twin via `annotate_equipment_failure_mode_risk` |
-| Validate graph after every workflow | **Done** — extended `verify_reliability_graph_sync.py` + audit (0 UAT gaps) |
+| Validate graph after every workflow | **Partial** — static gate passes; reactive chain edges immature; UAT DB sample pending |
 
 **Core lifecycle**
 
@@ -305,7 +308,7 @@ Provider Layer → Prompt Registry → Context Builder → Evidence Builder
 
 ## References
 
-- [`PHASE1_EXECUTION.md`](./PHASE1_EXECUTION.md) — Phase 1 UAT convergence (complete)
+- [`PHASE1_EXECUTION.md`](./PHASE1_EXECUTION.md) — Phase 1 UAT convergence checklist (live data gates not verified this cycle)
 - [`PHASE_0_STABILIZATION_REPORT.md`](./PHASE_0_STABILIZATION_REPORT.md)
 - [`RELIABILITY_GRAPH_SYNC.md`](./RELIABILITY_GRAPH_SYNC.md)
 - [`TENANT_MIDDLEWARE.md`](./TENANT_MIDDLEWARE.md)

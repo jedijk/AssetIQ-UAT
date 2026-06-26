@@ -80,14 +80,19 @@ def _static_path_checks() -> list[str]:
             "observation_service",
         ),
         (
-            BACKEND_ROOT / "services" / "threat_service.py",
-            ["sync_threat_edges"],
-            "threat_service",
+            BACKEND_ROOT / "services" / "threat_helpers.py",
+            ["dispatch_graph_sync", "sync_threat_edges"],
+            "threat_helpers graph dispatch",
         ),
         (
-            BACKEND_ROOT / "services" / "investigation_service.py",
-            ["sync_investigation_edges", "sync_cause_edge"],
-            "investigation_service",
+            BACKEND_ROOT / "services" / "investigation_crud.py",
+            ["dispatch_graph_sync", "sync_investigation_edges"],
+            "investigation_crud graph dispatch",
+        ),
+        (
+            BACKEND_ROOT / "services" / "investigation_subresources.py",
+            ["dispatch_graph_sync", "sync_cause_edge"],
+            "investigation_subresources graph dispatch",
         ),
         (
             BACKEND_ROOT / "services" / "action_service.py",

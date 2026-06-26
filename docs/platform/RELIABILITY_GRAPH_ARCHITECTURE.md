@@ -40,7 +40,7 @@ Observation/Threat → Investigation → Action → Outcome → Reliability Impa
 ## Write path rules (ownership)
 
 1. **All workflow code** calls `dispatch_graph_sync(sync_name, label, **kwargs)` — never `sync_*` or `upsert_edge` directly.
-2. **`upsert_edge`** lives only in `reliability_graph.py` (+ approved submodule `spare_parts_graph_sync.py`).
+2. **`upsert_edge`** lives only in approved graph modules (`reliability_graph_core.py`, `reliability_graph_entities.py`, `reliability_graph_strategy.py`, re-exported from `reliability_graph.py`) plus `spare_parts_graph_sync.py`. See `APPROVED_UPSERT_MODULES` in `reliability_graph_ownership.py`.
 3. **Ownership matrix** in `services/reliability_graph_ownership.py` — one canonical `owner` function per `(relation, source_type, target_type)`.
 4. **Metadata-only updates** (e.g. AI twin RUL on `has_failure_mode`) use `annotate_equipment_failure_mode_risk` — same edge id, enriched metadata.
 
