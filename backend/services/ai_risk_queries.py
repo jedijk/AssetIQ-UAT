@@ -19,8 +19,15 @@ async def find_equipment_by_name(user: dict, name: str) -> Optional[dict]:
     return await db.equipment_nodes.find_one(scoped(user, {"name": name}), {"_id": 0})
 
 
+def _ai_doc_id_query(signal_id: str) -> Dict[str, Any]:
+    return {"$or": [{"threat_id": signal_id}, {"observation_id": signal_id}]}
+
+
 async def find_ai_doc(user: dict, collection: str, threat_id: str) -> Optional[dict]:
-    return await db[collection].find_one(scoped(user, {"threat_id": threat_id}), {"_id": 0})
+    return await db[collection].find_one(
+        scoped(user, _ai_doc_id_query(threat_id)),
+        {"_id": 0},
+    )
 
 
 async def upsert_ai_doc(
@@ -30,8 +37,13 @@ async def upsert_ai_doc(
     payload: Dict[str, Any],
 ) -> None:
     await db[collection].update_one(
-        scoped(user, {"threat_id": threat_id}),
-        {"$set": with_tenant_id({**payload, "threat_id": threat_id}, user)},
+        scoped(user, _ai_doc_id_query(threat_id)),
+        {
+            "$set": with_tenant_id(
+                {**payload, "threat_id": threat_id, "observation_id": threat_id},
+                user,
+            )
+        },
         upsert=True,
     )
 

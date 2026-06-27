@@ -17,7 +17,6 @@ from services.threat_helpers import (
     _MITIGATED_THREAT_STATUSES,
     _find_threat_scoped,
     _installation_scoped_threat_query,
-    _mirror_threat_observation,
     _sync_threat_graph,
     assert_threat_installation_scope,
     get_failure_mode_by_name_or_id,

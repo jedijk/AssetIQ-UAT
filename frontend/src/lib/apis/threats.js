@@ -1,13 +1,15 @@
 import { api, aiApi } from "../apiClient";
 
-// Threats API
+// Work signals API (primary: /observations/signals/*; legacy /threats/* retained server-side)
 export const threatsAPI = {
   getAll: async (status = null, options = {}) => {
     const params = new URLSearchParams();
     if (status) params.append("status", status);
     if (options.language) params.append("language", options.language);
     const queryString = params.toString();
-    const response = await api.get(`/threats${queryString ? `?${queryString}` : ""}`);
+    const response = await api.get(
+      `/observations/signals${queryString ? `?${queryString}` : ""}`
+    );
     return response.data;
   },
 
@@ -15,7 +17,7 @@ export const threatsAPI = {
     const params = new URLSearchParams({ limit: String(limit) });
     if (options.language) params.append("language", options.language);
     if (options.excludeMitigated) params.append("exclude_mitigated", "true");
-    const response = await api.get(`/threats/top?${params.toString()}`);
+    const response = await api.get(`/observations/signals/top?${params.toString()}`);
     return response.data;
   },
 
@@ -23,12 +25,14 @@ export const threatsAPI = {
     const params = new URLSearchParams();
     if (options.language) params.append("language", options.language);
     const queryString = params.toString();
-    const response = await api.get(`/threats/${id}${queryString ? `?${queryString}` : ""}`);
+    const response = await api.get(
+      `/observations/signals/${id}${queryString ? `?${queryString}` : ""}`
+    );
     return response.data;
   },
 
   update: async (id, data) => {
-    const response = await api.patch(`/threats/${id}`, data);
+    const response = await api.patch(`/observations/signals/${id}`, data);
     return response.data;
   },
 
@@ -37,32 +41,32 @@ export const threatsAPI = {
     if (options.deleteActions) params.append("delete_actions", "true");
     if (options.deleteInvestigations) params.append("delete_investigations", "true");
     const queryString = params.toString();
-    const url = `/threats/${id}${queryString ? `?${queryString}` : ""}`;
+    const url = `/observations/signals/${id}${queryString ? `?${queryString}` : ""}`;
     const response = await api.delete(url);
     return response.data;
   },
 
   linkToEquipment: async (threatId, equipmentNodeId) => {
-    const response = await api.post(`/threats/${threatId}/link-equipment`, {
+    const response = await api.post(`/observations/signals/${threatId}/link-equipment`, {
       equipment_node_id: equipmentNodeId,
     });
     return response.data;
   },
 
   linkToFailureMode: async (threatId, failureModeId) => {
-    const response = await api.post(`/threats/${threatId}/link-failure-mode`, {
+    const response = await api.post(`/observations/signals/${threatId}/link-failure-mode`, {
       failure_mode_id: failureModeId,
     });
     return response.data;
   },
 
   recalculateScores: async () => {
-    const response = await api.post("/threats/recalculate-scores");
+    const response = await api.post("/observations/signals/recalculate-scores");
     return response.data;
   },
 
   getTimeline: async (threatId) => {
-    const response = await api.get(`/threats/${threatId}/timeline`);
+    const response = await api.get(`/observations/signals/${threatId}/timeline`);
     return response.data;
   },
 
@@ -71,7 +75,7 @@ export const threatsAPI = {
     if (options.language) params.append("language", options.language);
     const queryString = params.toString();
     const response = await aiApi.post(
-      `/threats/${id}/improve-description${queryString ? `?${queryString}` : ""}`
+      `/observations/signals/${id}/improve-description${queryString ? `?${queryString}` : ""}`
     );
     return response.data;
   },
@@ -120,4 +124,3 @@ export const observationsAPI = {
     return response.data;
   },
 };
-

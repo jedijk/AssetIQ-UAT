@@ -67,9 +67,7 @@ class ObservationService:
         source: str = "manual",
         user: Optional[dict] = None,
     ) -> Dict[str, Any]:
-        """Create a structured observation."""
-        now = datetime.now(timezone.utc)
-        
+        """Create a structured observation via canonical work signal lifecycle."""
         # Get equipment info if provided
         equipment_name = None
         if data.get("equipment_id"):
@@ -86,52 +84,44 @@ class ObservationService:
             fm = await self.failure_modes.find_one({"_id": ObjectId(data["failure_mode_id"])})
             if fm:
                 failure_mode_name = fm.get("failure_mode")
-        
-        doc = {
+
+        description = data["description"]
+        signal_doc: Dict[str, Any] = {
+            "title": description[:120] if description else "Observation",
+            "description": description,
             "equipment_id": data.get("equipment_id"),
             "equipment_name": equipment_name,
+            "linked_equipment_id": data.get("equipment_id"),
+            "asset": equipment_name,
             "efm_id": data.get("efm_id"),
             "task_id": data.get("task_id"),
             "form_submission_id": data.get("form_submission_id"),
             "failure_mode_id": data.get("failure_mode_id"),
             "failure_mode_name": failure_mode_name,
-            "description": data["description"],
             "severity": data.get("severity", "medium"),
-            "observation_type": data.get("observation_type", "general"),  # general, failure, near_miss, improvement
+            "observation_type": data.get("observation_type", "general"),
             "media_urls": data.get("media_urls", []),
-            "measured_values": data.get("measured_values", []),  # [{field, value, unit, status}]
+            "measured_values": data.get("measured_values", []),
             "location": data.get("location"),
             "tags": data.get("tags", []),
-            "source": source,  # manual, chat, form_threshold, automated
-            "status": "open",  # open, in_review, action_required, closed
-            "suggested_failure_modes": [],  # Populated by AI suggestion
-            "linked_action_ids": [],
+            "status": "open",
             "created_by": created_by,
-            "created_at": now,
-            "updated_at": now,
         }
-        with_tenant_id(doc, user)
 
-        inserted = await self._obs_repo.insert_document(doc, user=user)
-        doc["_id"] = inserted["_id"]
+        from services.work_signal_lifecycle import create_work_signal
 
-        obs_id = str(inserted["_id"])
-        from services.reliability_graph import dispatch_graph_sync
-
-        await dispatch_graph_sync(
-            "sync_observation_edges",
-            "observation_create",
-            observation_id=obs_id,
-            equipment_id=data.get("equipment_id"),
-            failure_mode_id=data.get("failure_mode_id"),
-            threat_id=data.get("threat_id"),
+        result = await create_work_signal(
+            signal_doc,
+            user=user,
+            source=source,
+            graph_label="observation_create",
         )
-        
-        # Update EFM observation count if linked
+        observation = result["observation"]
+
         if data.get("efm_id"):
             await self._increment_efm_observation_count(data["efm_id"])
-        
-        return self._serialize_observation(doc)
+
+        return self._serialize_observation(observation)
     
     async def get_observations(
         self,
@@ -398,72 +388,13 @@ class ObservationService:
         threat_id: str,
         user: Optional[dict] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Convert an existing threat to the new observation format."""
-        threat = await self.threats.find_one(
-            self._scoped_query({"id": threat_id}, user)
-        )
-        if not threat:
+        """Ensure canonical same-id observation exists for a work signal."""
+        from services.work_signal_lifecycle import ensure_observation_for_signal
+
+        observation = await ensure_observation_for_signal(threat_id, user=user)
+        if not observation:
             return None
-        
-        # Check if already converted
-        existing = await self._obs_repo.fetch_one({"threat_id": threat_id}, user=user)
-        if existing:
-            return self._serialize_observation(existing)
-        
-        # Convert threat to observation
-        obs_doc = {
-            "threat_id": threat_id,  # Link back to original threat
-            "equipment_id": threat.get("linked_equipment_id"),
-            "equipment_name": threat.get("asset"),
-            "efm_id": None,
-            "failure_mode_id": None,
-            "failure_mode_name": threat.get("failure_mode"),
-            "description": threat.get("description"),
-            "severity": self._map_risk_to_severity(threat.get("risk_score", 50)),
-            "observation_type": "failure",
-            "media_urls": [threat.get("image_url")] if threat.get("image_url") else [],
-            "source": "chat",
-            "status": "open" if threat.get("status") != "Closed" else "closed",
-            "suggested_failure_modes": [],
-            "linked_action_ids": [],
-            "created_by": threat.get("created_by"),
-            "created_at": datetime.fromisoformat(threat["created_at"]) if isinstance(threat.get("created_at"), str) else threat.get("created_at"),
-            "updated_at": datetime.now(timezone.utc),
-        }
-        if threat.get("tenant_id"):
-            obs_doc["tenant_id"] = threat["tenant_id"]
-        else:
-            with_tenant_id(obs_doc, user)
-        
-        obs_doc = await self._obs_repo.insert_document(obs_doc, user=user)
-        
-        # Update threat with observation link
-        await self.threats.update_one(
-            self._scoped_query({"id": threat_id}, user),
-            {"$set": {"observation_id": obs_id}}
-        )
-
-        obs_id = str(obs_doc["_id"])
-        from services.reliability_graph import dispatch_graph_sync
-
-        await dispatch_graph_sync(
-            "sync_observation_edges",
-            "threat_convert_observation",
-            observation_id=obs_id,
-            equipment_id=obs_doc.get("equipment_id"),
-            failure_mode_id=obs_doc.get("failure_mode_id"),
-            threat_id=threat_id,
-            escalate=True,
-        )
-        await dispatch_graph_sync(
-            "sync_threat_edges",
-            "threat_convert_threat",
-            threat_id=threat_id,
-            equipment_id=obs_doc.get("equipment_id"),
-            observation_id=obs_id,
-        )
-        
-        return self._serialize_observation(obs_doc)
+        return self._serialize_observation(observation)
     
     async def get_observations_from_threats(
         self,
@@ -725,7 +656,7 @@ class ObservationService:
             created_at_str = None
             
         return {
-            "id": str(doc["_id"]),
+            "id": doc.get("id") or str(doc["_id"]),
             "threat_id": doc.get("threat_id"),
             "equipment_id": doc.get("equipment_id"),
             "equipment_name": doc.get("equipment_name"),

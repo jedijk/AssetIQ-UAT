@@ -81,7 +81,7 @@ async def test_create_work_signal_writes_observation_then_threat():
     assert obs.get("legacy_threat_id") is None
     assert threat["id"] == "sig-99"
     assert threat["projection_of"] == "observation"
-    assert graph_sync.await_count == 2
+    assert graph_sync.await_count == 1
     publish.assert_called_once()
 
 

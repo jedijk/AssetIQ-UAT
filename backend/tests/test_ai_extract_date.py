@@ -1,9 +1,12 @@
 """Regression tests for AI photo extraction date normalization."""
+import os
 from datetime import datetime, timezone
 
 import pytest
 
 pytest.importorskip("email_validator")
+
+os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 
 from routes.ai_extract import (
     _calibrate_date_value_to_capture,

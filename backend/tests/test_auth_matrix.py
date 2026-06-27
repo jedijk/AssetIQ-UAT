@@ -358,10 +358,11 @@ async def test_viewer_ui_matrix_denies_observations_write():
 def test_threats_routes_require_permission_deps():
     source = (Path(__file__).resolve().parents[1] / "routes" / "threats.py").read_text()
     helpers_source = (Path(__file__).resolve().parents[1] / "services" / "threat_helpers.py").read_text()
-    assert '_threats_read = require_permission("threats:read")' in source
-    assert '_threats_write = require_permission("threats:write")' in source
-    assert '_threats_delete = require_permission("threats:delete")' in source
-    assert "Depends(_threats_write)" in source
+    assert '_signals_read = require_any_permission("observations:read", "threats:read")' in source
+    assert '_signals_write = require_any_permission("observations:write", "threats:write")' in source
+    assert '_signals_delete = require_any_permission("observations:delete", "threats:delete")' in source
+    assert "Depends(_signals_write)" in source
+    assert "/observations/signals" in source
     assert "assert_user_can_access_equipment" in helpers_source
 
 

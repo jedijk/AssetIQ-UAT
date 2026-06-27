@@ -1,8 +1,10 @@
 """
-Threat ↔ observation bridge — incremental dual-write and unified reads.
+Threat ↔ observation bridge — legacy helpers only (Convergence Phase 5).
 
-Threats (legacy) live in ``threats``; structured observations in ``observations``.
-This adapter mirrors threat creates into observations with ``legacy_threat_id``.
+**Deprecated for hot writes.** New work signals must use ``work_signal_lifecycle``
+(``create_work_signal`` / ``update_work_signal`` / ``ensure_observation_for_signal``).
+
+This module is retained for legacy backfill, unified list reads, and open-signal counts.
 """
 from __future__ import annotations
 

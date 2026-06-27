@@ -12,7 +12,6 @@ from services.criticality_score import compute_criticality_score
 from services.tenant_schema import merge_tenant_filter
 from services.threat_helpers import (
     _find_threat_scoped,
-    _mirror_threat_observation,
     _sync_threat_graph,
     assert_threat_installation_scope,
     get_failure_mode_by_name_or_id,

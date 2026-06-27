@@ -104,14 +104,6 @@ async def _sync_work_signal_graph(
         failure_mode_id=failure_mode_id,
         tenant_id=tid,
     )
-    await dispatch_graph_sync(
-        "sync_threat_edges",
-        label,
-        threat_id=signal_id,
-        equipment_id=equipment_id,
-        failure_mode_id=failure_mode_id,
-        tenant_id=tid,
-    )
 
 
 async def create_work_signal(

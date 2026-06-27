@@ -23,7 +23,7 @@ import {
 export function buildNavItems(t) {
   return [
     { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, navTestId: "dashboard" },
-    { path: "/threats", label: t("nav.observations"), icon: AlertTriangle, feature: "observations", navTestId: "observations" },
+    { path: "/observations", label: t("nav.observations"), icon: AlertTriangle, feature: "observations", navTestId: "observations" },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true, feature: "investigations", navTestId: "causal-engine" },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList, feature: "actions", navTestId: "actions" },
     // UI route kept for deep links; data via /work-items API (see docs/api/WORK_ITEMS_API.md)

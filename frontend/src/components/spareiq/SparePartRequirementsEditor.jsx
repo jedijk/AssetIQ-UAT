@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 
+import { useLanguage } from "../../contexts/LanguageContext";
 import { sparePartsAPI } from "../../lib/apis/spareParts";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -20,7 +20,7 @@ export default function SparePartRequirementsEditor({
   onChange,
   disabled = false,
 }) {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const { data, isLoading } = useQuery({
     queryKey: ["spare-parts", "equipment", equipmentId],
     queryFn: () => sparePartsAPI.list({ equipment_id: equipmentId }),

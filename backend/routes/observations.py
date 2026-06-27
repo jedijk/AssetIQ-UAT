@@ -276,14 +276,28 @@ async def link_failure_mode_to_observation(
         raise HTTPException(status_code=404, detail="Observation or failure mode not found")
     return result
 
-# --- Threat Conversion ---
+# --- Threat Conversion (deprecated) / Signal ensure ---
 
-@router.post("/threats/{threat_id}/convert-to-observation")
+@router.post("/observations/signals/{signal_id}/ensure")
+async def ensure_signal_observation(
+    signal_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Ensure canonical same-id observation exists for a work signal."""
+    result = await observation_service.convert_threat_to_observation(
+        signal_id, user=current_user
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    return result
+
+
+@router.post("/threats/{threat_id}/convert-to-observation", deprecated=True)
 async def convert_threat_to_observation(
     threat_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
-    """Convert an existing threat to the new observation format."""
+    """Deprecated: use POST /observations/signals/{signal_id}/ensure instead."""
     result = await observation_service.convert_threat_to_observation(
         threat_id, user=current_user
     )

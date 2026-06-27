@@ -362,7 +362,13 @@ const ProtectedRoute = ({ children }) => {
 const RedirectToWorkspace = () => {
   const { id } = useParams();
   const location = useLocation();
-  return <Navigate to={`/threats/${id}/workspace${location.search || ""}`} replace />;
+  return <Navigate to={`/observations/${id}/workspace${location.search || ""}`} replace />;
+};
+
+const RedirectThreatsToObservations = () => {
+  const location = useLocation();
+  const suffix = location.pathname.replace(/^\/threats/, "") || "";
+  return <Navigate to={`/observations${suffix}${location.search || ""}`} replace />;
 };
 
 const PublicRoute = ({ children }) => {
@@ -536,10 +542,10 @@ function App() {
                 <Route path="production" element={<Suspense fallback={<RouteFallback />}><DashboardPage initialTab="production" /></Suspense>} />
                 <Route path="reliability" element={<Suspense fallback={<RouteFallback />}><DashboardPage initialTab="reliability" /></Suspense>} />
                 <Route path="definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
-                <Route path="threats" element={<Suspense fallback={<RouteFallback />}><ThreatsPage /></Suspense>} />
-                {/* /threats/:id legacy "classic" view is obsolete — redirect to workspace */}
-                <Route path="threats/:id" element={<RedirectToWorkspace />} />
-                <Route path="threats/:id/workspace" element={<Suspense fallback={<RouteFallback />}><ObservationWorkspacePage /></Suspense>} />
+                <Route path="observations" element={<Suspense fallback={<RouteFallback />}><ThreatsPage /></Suspense>} />
+                <Route path="observations/:id" element={<RedirectToWorkspace />} />
+                <Route path="observations/:id/workspace" element={<Suspense fallback={<RouteFallback />}><ObservationWorkspacePage /></Suspense>} />
+                <Route path="threats/*" element={<RedirectThreatsToObservations />} />
                 <Route path="actions" element={<Suspense fallback={<RouteFallback />}><ActionsPage /></Suspense>} />
                 <Route path="actions/:actionId" element={<Suspense fallback={<RouteFallback />}><ActionDetailPage /></Suspense>} />
                 <Route path="library" element={<Suspense fallback={<RouteFallback />}><FailureModesPage /></Suspense>} />

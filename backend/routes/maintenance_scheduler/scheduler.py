@@ -62,9 +62,9 @@ async def cleanup_orphan_scheduled_tasks(
 
 @router.post("/run-scheduler")
 async def run_scheduler(
-    request: RunSchedulerRequest = None,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(require_permission("scheduler:write")),
+    request: RunSchedulerRequest = None,
 ):
     """
     Run the scheduler engine to generate scheduled tasks.

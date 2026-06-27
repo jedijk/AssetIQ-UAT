@@ -63,7 +63,7 @@ async def sync_observation_edges(
             equipment_id=equipment_id,
             tenant_id=tenant_id,
         )
-    if threat_id:
+    if threat_id and threat_id != observation_id:
         relation = "escalated_to" if escalate else "linked_to_threat"
         await upsert_edge(
             source_type="observation",

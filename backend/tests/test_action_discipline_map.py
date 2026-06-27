@@ -1,4 +1,8 @@
 """Tests for failure-mode action discipline mapping."""
+import os
+
+os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
+
 from services.failure_modes.action_discipline_map import (
     build_alias_map,
     normalize_discipline_value,

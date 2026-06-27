@@ -29,6 +29,7 @@ const staticRouteLabels = {
   '/': 'Dashboard',
   '/dashboard': 'Dashboard',
   '/production': 'Production',
+  '/observations': 'Observations',
   '/threats': 'Observations',
   '/actions': 'Actions',
   '/library': 'Strategy',
@@ -80,6 +81,8 @@ const staticRouteLabels = {
 
 // Dynamic route patterns (with :param placeholders)
 const dynamicRoutePatterns = [
+  { pattern: /^\/observations\/([^/]+)\/workspace$/, label: 'Observation Workspace', icon: AlertTriangle },
+  { pattern: /^\/observations\/([^/]+)$/, label: 'Observation Detail', icon: AlertTriangle },
   { pattern: /^\/threats\/([^/]+)\/workspace$/, label: 'Observation Workspace', icon: AlertTriangle },
   { pattern: /^\/threats\/([^/]+)$/, label: 'Observation Detail', icon: AlertTriangle },
   { pattern: /^\/actions\/([^/]+)$/, label: 'Action Detail', icon: ClipboardList },
@@ -93,6 +96,7 @@ const staticRouteIcons = {
   '/': LayoutDashboard,
   '/dashboard': LayoutDashboard,
   '/production': LayoutDashboard,
+  '/observations': AlertTriangle,
   '/threats': AlertTriangle,
   '/actions': ClipboardList,
   '/library': BookOpen,
@@ -142,9 +146,13 @@ const staticRouteIcons = {
  */
 export function normalizeBreadcrumbPath(path) {
   if (!path) return path;
+  const observationDetail = path.match(/^\/observations\/([^/]+)$/);
+  if (observationDetail) {
+    return `/observations/${observationDetail[1]}/workspace`;
+  }
   const threatDetail = path.match(/^\/threats\/([^/]+)$/);
   if (threatDetail) {
-    return `/threats/${threatDetail[1]}/workspace`;
+    return `/observations/${threatDetail[1]}/workspace`;
   }
   if (path === '/') {
     return '/dashboard';
@@ -169,8 +177,11 @@ export function getDetailAnchorPath(path) {
   if (/^\/actions\/[^/]+$/.test(normalized)) {
     return '/actions';
   }
+  if (/^\/observations\/[^/]+\/workspace$/.test(normalized)) {
+    return '/observations';
+  }
   if (/^\/threats\/[^/]+\/workspace$/.test(normalized)) {
-    return '/threats';
+    return '/observations';
   }
   if (/^\/reliability\/cases\/[^/]+$/.test(normalized)) {
     return '/reliability/cases';
@@ -183,7 +194,9 @@ export function isActionDetailPath(path) {
 }
 
 export function isObservationWorkspacePath(path) {
-  return /^\/threats\/[^/]+\/workspace$/.test(normalizeBreadcrumbPath(path));
+  const normalized = normalizeBreadcrumbPath(path);
+  return /^\/observations\/[^/]+\/workspace$/.test(normalized)
+    || /^\/threats\/[^/]+\/workspace$/.test(normalized);
 }
 
 /** Skip auto-inserting /actions when the user arrived from these routes. */
@@ -195,6 +208,7 @@ export function shouldSkipDetailAnchorInjection(entries) {
     beforePath === '/my-tasks'
     || isObservationWorkspacePath(beforePath)
     || beforePath === '/actions'
+    || beforePath === '/observations'
     || beforePath === '/threats'
     || beforePath === '/reliability/cases'
     || beforePath === '/dashboard'  // Skip anchor injection when coming from ops dashboard
@@ -231,8 +245,11 @@ export function getParentBreadcrumbPath(path) {
   if (!normalized || normalized === '/dashboard') {
     return null;
   }
+  if (/^\/observations\/[^/]+\/workspace$/.test(normalized)) {
+    return '/observations';
+  }
   if (/^\/threats\/[^/]+\/workspace$/.test(normalized)) {
-    return '/threats';
+    return '/observations';
   }
   if (/^\/actions\/[^/]+$/.test(normalized)) {
     return '/actions';

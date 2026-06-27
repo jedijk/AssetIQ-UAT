@@ -10,7 +10,7 @@ export const threatsAPI = {
     if (options.language) params.append("language", options.language);
     const queryString = params.toString();
     const response = await api.get<ThreatListResponse>(
-      `/threats${queryString ? `?${queryString}` : ""}`
+      `/observations/signals${queryString ? `?${queryString}` : ""}`
     );
     return response.data;
   },
@@ -19,7 +19,7 @@ export const threatsAPI = {
     const params = new URLSearchParams();
     if (options.language) params.append("language", options.language);
     const queryString = params.toString();
-    const response = await api.get(`/threats/${id}${queryString ? `?${queryString}` : ""}`);
+    const response = await api.get(`/observations/signals/${id}${queryString ? `?${queryString}` : ""}`);
     return response.data;
   },
 
@@ -31,7 +31,7 @@ export const threatsAPI = {
     if (options.deleteActions) params.append("delete_actions", "true");
     if (options.deleteInvestigations) params.append("delete_investigations", "true");
     const queryString = params.toString();
-    const response = await api.delete(`/threats/${id}${queryString ? `?${queryString}` : ""}`);
+    const response = await api.delete(`/observations/signals/${id}${queryString ? `?${queryString}` : ""}`);
     return response.data;
   },
 
@@ -40,7 +40,7 @@ export const threatsAPI = {
     if (options.language) params.append("language", options.language);
     const queryString = params.toString();
     const response = await aiApi.post(
-      `/threats/${id}/improve-description${queryString ? `?${queryString}` : ""}`
+      `/observations/signals/${id}/improve-description${queryString ? `?${queryString}` : ""}`
     );
     return response.data;
   },
