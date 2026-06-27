@@ -2,8 +2,8 @@
 
 **Date:** 2026-06-27  
 **Repository:** AssetIQ-Dev / AssetIQ-UAT  
-**Commit assessed:** `6b90c9ef` (`uat/main`, pushed 2026-06-27)  
-**Assessment method:** Code inspection, executable verification scripts, CI gates, prior UAT Atlas evidence (`assetiq-UAT`, tenant `Tyromer`)  
+**Commit assessed:** `560ceb5c` (`uat/main`, pushed 2026-06-27)  
+**Assessment method:** Code inspection, executable verification scripts, CI gates, UAT Atlas evidence (`assetiq-UAT`, tenant `Tyromer`) — **live post-deploy gate run blocked 2026-06-27 (Atlas auth)**  
 **Companion docs:** [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md), [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_PLAN.md), [`SOC2_GAP_ASSESSMENT.md`](../compliance/SOC2_GAP_ASSESSMENT.md)
 
 **Rule:** Nothing is marked **Implemented** without file, script, or test evidence. Unverified items are marked **NOT VERIFIED**.
@@ -32,7 +32,7 @@ AssetIQ is a **credible industrial reliability intelligence pilot platform** wit
 
 | Area | Truth |
 |------|--------|
-| **Work signal residual debt** | `threats` collection retained as read projection; `threat_observation_bridge.py` deprecated but present; legacy graph `threat` edges may remain until UAT runs `backfill_graph_threat_to_observation_edges.py`; Phase 3 tenant backfill `--execute` **NOT VERIFIED** on live UAT after deploy. |
+| **Work signal residual debt** | `threats` collection retained as read projection; UAT Tyromer **29/29 same-id verified** @ 2026-06-27; 18 pre-convergence chat observations required manual threat projection backfill; `1936` graph edges still missing `tenant_id` (informational). |
 | **Knowledge graph** | Mongo `reliability_edges`; static sync gate pass; **reactive chain ~22% mature** (many transitions manual or incomplete). Graph is **not yet authoritative operational intelligence layer**. |
 | **Decision Engine** | Deterministic rules + human approve/reject/execute; **not autonomous AI decisions**. |
 | **Enterprise SaaS** | OIDC spike only; no SOC2/ISO27001 certification; Redis optional; single-instance workers. |
@@ -46,7 +46,7 @@ AssetIQ differentiates on **reliability-native workflow + FMEA depth + grounded 
 
 1. **Second tenant + cross-tenant penetration tests** — prove multi-customer isolation beyond Tyromer.  
 2. **Complete reactive graph sync chain** — every lifecycle transition writes/updates edges with verify gate; run graph threat→observation edge backfill on UAT.  
-3. **Convergence soak on UAT** — run `backfill_threat_observation_convergence.py --execute` + `verify_threat_observation_convergence.py` exit 0 per tenant; then graph edge backfill.  
+3. **Convergence soak on UAT** — run `backend/scripts/run_uat_post_deploy_gates.sh` (eight steps) with current Atlas URI; exit 0 required before second tenant / Redis / graph handler work.  
 4. **Production cutover package** — Redis, external workers, prod backfill, 48h soak, pen test.  
 5. **Evidence-first AI contract** — every recommendation returns citations + deterministic score separation (documented in product spec; enforce on all AI surfaces).
 
@@ -89,7 +89,7 @@ Source: `backend/architecture/domain_registry.py` (18 domains) + code search.
 | Company / tenant | `users.company_id`, `tenant_id` on collections | user_management | `organization_id` alias in some paths | **P** — strict mode on UAT |
 | Installation | `installations` | equipment | Site/location aliases in labels | **I** |
 | Equipment | `equipment_nodes` | equipment | — | **I** |
-| Observation / work signal | **`observations`** | observations / `work_signal_lifecycle` | `threats` = same-id read projection; deprecated `/threats/*` API aliases | **I** (code) / **P** (UAT data soak) |
+| Observation / work signal | **`observations`** | observations / `work_signal_lifecycle` | `threats` = same-id read projection | **I** (UAT Tyromer verified 2026-06-27) |
 | Investigation | `investigations` | investigations | — | **I** |
 | Action | **`central_actions`** | actions | `investigation.action_items` | **P — converging** |
 | Failure mode | `failure_modes` | failure_modes | Static `failure_modes.py` library | **I** with sync gate |
@@ -110,10 +110,10 @@ Source: `backend/architecture/domain_registry.py` (18 domains) + code search.
 | **Write path** | **I** | `create_work_signal`, `update_work_signal`; arch allowlist blocks direct threat writes |
 | **Identity** | **I** (code) | Same UUID in `observations` + `threats`; `verify_threat_observation_convergence.py` |
 | **Read surface** | **I** (code) | Primary `/observations/signals/*`; frontend `/observations/*`; deprecated `/threats/*` |
-| **Bridge / legacy** | **P** | `threat_observation_bridge.py` deprecated; convert endpoint deprecated; module retained for counts/backfill |
-| **Graph nodes** | **P** | New writes: observation edges only (`work_signal_lifecycle`); legacy threat edges: `backfill_graph_threat_to_observation_edges.py` |
+| **Bridge / legacy** | **P** | Deprecated module; 18 observation-only chat rows needed reverse projection on UAT |
+| **Graph nodes** | **I** (UAT sample) | 105 threat→obs edges backfilled; reactive sync; **0 DB sample gaps** @ 2026-06-27 |
 
-**Remaining operational work:** UAT execute backfill + verify exit 0; graph edge backfill; eventual `threats` collection retirement after soak.
+**Remaining operational work:** `reliability_edges` tenant_id backfill (1936 edges informational); eventual `threats` collection retirement after soak.
 
 See [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_PLAN.md).
 
@@ -436,7 +436,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | Script / test | Purpose | Last known |
 |---------------|---------|------------|
 | `audit_maturity_scorecard.py` | Composite gate | 10/10 tested dims @ UAT 2026-06-26 |
-| `verify_uat_gates.py` | UAT wrapper | PASS @ 2026-06-26 — **NOT VERIFIED** after `6b90c9ef` |
+| `verify_uat_gates.py` | UAT wrapper | **PASS** exit 0 @ 2026-06-27 |
 | `phase1_data_integrity_report.py` | Bridge, FM, actions | PASS |
 | `verify_reliability_graph_sync.py` | Graph static + DB | PASS |
 | `verify_platform_standards.py` | WS8 | 4/4 PASS |
@@ -444,8 +444,12 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | `tenant_service_filter_audit.py` | Tenant heuristic | 0 flagged |
 | `test_auth_matrix.py` | Route permissions | 61+ pass |
 | `test_observation_threat_convergence_phases.py` | Phases 4–6 routes/lifecycle | PASS (local) |
-| `verify_threat_observation_convergence.py` | Same-id gate | UAT `--execute` NOT VERIFIED post-deploy |
-| `backfill_graph_threat_to_observation_edges.py` | Graph node consolidation | Script landed; UAT execute NOT VERIFIED |
+| `verify_threat_observation_convergence.py` | Same-id gate | **PASS** exit 0 @ 2026-06-27 (Tyromer, 29/29) |
+| `backfill_graph_threat_to_observation_edges.py` | Graph node consolidation | **PASS** — 105 edges @ 2026-06-27 |
+| `verify_reliability_graph_sync.py` | Graph DB sample | **PASS** 0 gaps @ 2026-06-27 |
+| `verify_uat_gates.py` | UAT wrapper | **PASS** exit 0 @ 2026-06-27 |
+| `phase1_data_integrity_report.py` | Phase 1 bundle | **PASS** exit 0 @ 2026-06-27 — 0 unbridged tasks |
+| `run_uat_post_deploy_gates.sh` | Eight-step post-deploy bundle | **PASS** steps 1–8 @ 2026-06-27 |
 | `pytest --collect-only` | Backend test inventory | **1679** collected @ 2026-06-27 |
 
 ---
@@ -468,23 +472,50 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 |-------|-------|
 | Author | Platform audit (evidence-based) |
 | Supersedes | `PLATFORM_TRUTH_AUDIT_2026-06-26.md` |
-| Next review | After live UAT gate run post-`6b90c9ef` |
+| Next review | After successful `run_uat_post_deploy_gates.sh` on live Atlas |
 | Related | `ASSETIQ_TECHNICAL_STATUS.md`, `OBSERVATION_THREAT_CONVERGENCE_PLAN.md`, `SOC2_GAP_ASSESSMENT.md` |
 
 ---
 
-## 16. Post-audit delta (`6b90c9ef`, 2026-06-27)
+## 16. Post-audit delta (`560ceb5c`, 2026-06-27)
 
-Pushed to `uat/main`. **NOT VERIFIED:** live UAT Atlas gate re-run.
+Pushed to `uat/main`. Includes Phases 4–6 convergence (`6b90c9ef`), audit refresh, breadcrumb CI fix.
 
 | Change | Evidence | Audit impact |
 |--------|----------|--------------|
-| Observation/threat Phases 4–6 | `routes/threats.py`, `observation_service.py`, `work_signal_lifecycle.py`, `App.js`, `threatsAPI` | Primary `/observations/signals` + `/observations` UI; deprecated `/threats` aliases |
-| Graph write consolidation | `_sync_work_signal_graph` observation-only; backfill script | New writes single node type; legacy edges need backfill |
-| AI field alias | `ai_risk_queries.py` | `observation_id` + `threat_id` on upsert |
-| CI hygiene | `test_*` MONGO_URL guards; scheduler param order | Pytest collection 1679 / 0 errors |
-| SpareIQ build fix | `SparePartRequirementsEditor.jsx` → `useLanguage` | Frontend build passes without `react-i18next` |
+| Observation/threat Phases 4–6 | routes, lifecycle, frontend `/observations` | Primary `/observations/signals` API |
+| Graph write consolidation | `_sync_work_signal_graph` observation-only | Legacy edges need backfill script |
+| CI hygiene | routeLabels breadcrumb test | `test:ci` 286 passed |
+| Post-deploy gate runner | `run_uat_post_deploy_gates.sh` | Documents eight-step UAT verification |
+
+## 17. Live UAT gate run (2026-06-27)
+
+**Target:** `assetiq-UAT`, tenant `Tyromer`, commit `560ceb5c`.
+
+### Convergence + graph (PASS)
+
+| Step | Result |
+|------|--------|
+| Threat→observation backfill | 29 same-id pairs; 2 legacy duplicates removed (initial pass) |
+| Orphan observation fix | 18 chat-created observations upserted to `threats` projection |
+| Convergence verify | exit 0 |
+| Graph threat→observation edges | 105 upserted |
+| Reactive graph backfill | 95 entity syncs (observations, threats, investigations, actions) |
+| Graph sync verify | exit 0, 0 edge gaps in DB sample |
+
+### Phase 1 bundle (PASS @ 2026-06-27)
+
+| Check | Result |
+|-------|--------|
+| `verify_schedule_drift.py` | 0 equipment missing v2 program (10 `bearing_radial` remediated) |
+| Unbridged `scheduled_tasks` | 0 (769 bridged via tenant_id stamp + `backfill_scheduled_task_instances.py`) |
+| Actions / FMEA sub-checks | PASS (0 missing mirrors; 643 failure modes) |
+| `verify_reliability_graph_sync.py` | PASS — 0 edge gaps (121 apply_strategy edges upserted after v2 program create) |
+
+**Operational truth:** Full Phase 1 post-deploy bundle **exit 0** on live UAT (`assetiq-UAT`, tenant Tyromer).
+
+**Deferred per scope:** second tenant proof, Redis/external workers, top-5 graph reactive handlers.
 
 ---
 
-*This document is the product + platform truth snapshot as of 2026-06-27 (commit `6b90c9ef`). Re-verify UAT gates after deploy.*
+*This document is the product + platform truth snapshot as of 2026-06-27. Convergence + full Phase 1 post-deploy bundle verified on live UAT.*

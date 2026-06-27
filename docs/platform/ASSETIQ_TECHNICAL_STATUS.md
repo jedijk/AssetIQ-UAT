@@ -1,15 +1,15 @@
 # ASSETIQ TECHNICAL STATUS
 
-**Current source of truth:** [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md) (also at [`docs/PLATFORM_TRUTH_AUDIT_2026-06-26.md`](../PLATFORM_TRUTH_AUDIT_2026-06-26.md))
+**Current source of truth:** [`PLATFORM_TRUTH_AUDIT_2026-06-27.md`](./PLATFORM_TRUTH_AUDIT_2026-06-27.md) (also at [`docs/PLATFORM_TRUTH_AUDIT_2026-06-27.md`](../PLATFORM_TRUTH_AUDIT_2026-06-27.md))
 
-> This document stays active for operational gate commands and exit codes until archived after the next live UAT gate run.
+> This document stays active for operational gate commands and exit codes until archived after the next **successful** live UAT gate run.
 
-**Version:** 2026-06-26 (UAT live verification)  
+**Version:** 2026-06-27 (post-deploy gates verified)  
 **Repository:** AssetIQ-Dev  
-**Branch / commit assessed:** `deploy-uat` @ `ebe2eb66`  
+**Branch / commit assessed:** `deploy-uat` @ `560ceb5c` (`uat/main`)  
 **Environment assessed:** Local code gates + **live UAT Atlas** (`assetiq-UAT`, tenant `Tyromer`)
 
-**Purpose:** Operational gate status and reproducible verification commands. Product/platform truth lives in [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md); this file reconciles due diligence, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable scripts.
+**Purpose:** Operational gate status and reproducible verification commands. Product/platform truth lives in [`PLATFORM_TRUTH_AUDIT_2026-06-27.md`](./PLATFORM_TRUTH_AUDIT_2026-06-27.md); this file reconciles due diligence, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable scripts.
 
 **Assessment method:** Run or inspect verification scripts listed below. Do not treat narrative “Done” checkboxes in older docs as proof unless backed by a script exit code or test run on the target environment.
 
@@ -22,9 +22,9 @@
 | Category | Status |
 |----------|--------|
 | **Code / CI gates** | **Pass** |
-| **UAT live data gates** | **Pass** — verified 2026-06-26 on `assetiq-UAT` |
+| **UAT live data gates** | **PASS** @ 2026-06-27 — all eight post-deploy steps exit 0 (schedule drift + task bridge remediated) |
 | **Production readiness** | **Deferred** — prod backfill, 48h soak explicitly out of scope |
-| **Platform 1.0 completion** | **Partial** — UAT data convergence verified; prod rollout pending |
+| **Platform 1.0 completion** | **Partial** — Phase 1 UAT bundle exit 0; prod rollout pending |
 
 ### What is verified as passing (code / CI gates)
 
@@ -55,7 +55,7 @@
 
 | Question | Answer |
 |----------|--------|
-| **Safe for UAT pilot use (single tenant, Tyromer)?** | **Yes, with caveats** — pilot has been running; code gates pass; **live UAT data gates must be re-run** after scheduler/graph changes. |
+| **Safe for UAT pilot use (single tenant, Tyromer)?** | **Yes, with caveats** — pilot on `560ceb5c`; post-deploy gates exit 0 @ 2026-06-27. |
 | **Production-ready?** | **No** — production tenant backfill, strict mode, soak, and prod ops checklist are explicitly deferred. |
 | **Enterprise-ready?** | **No** — SOC2/NIS2 not certified; multi-tenant proven only for one pilot tenant. |
 
@@ -83,7 +83,7 @@ Legend: **PASS** / **FAIL** / **PARTIAL** / **NOT TESTED** / **DEFERRED**
 | Route auth inventory | **PASS** | `route_auth_inventory.py` → 741 handlers | |
 | Frontend import lint | **PASS** | `check_frontend_imports.sh` | |
 | Frontend production build | **PASS** | `CI=true npm run build` | |
-| Frontend unit tests | **PASS** | `npm run test:ci` → 43 suites, 285 passed | CI gate in `frontend-ci.yml`; maintenance strategy filter tests added |
+| Frontend unit tests | **PASS** | `npm run test:ci` → 43 suites, 286 passed | Breadcrumb test aligned to `/observations` @ `560ceb5c` |
 | Server startup | **PASS** | `from server import app` OK | |
 | Backend full test suite | **NOT TESTED** (local full run) | CI runs `pytest tests/` with Mongo service | |
 
@@ -91,13 +91,13 @@ Legend: **PASS** / **FAIL** / **PARTIAL** / **NOT TESTED** / **DEFERRED**
 
 | Item | Status | Evidence | Notes |
 |------|--------|----------|-------|
-| UAT data integrity (full) | **PASS** | `phase1_data_integrity_report.py` exit 0 @ 2026-06-26 | 0 unbridged tasks; FM library complete; actions mirrored |
-| Scheduled Task → Task Instance bridge | **PASS** | Section 1A | 0 unbridged open scheduled_tasks |
-| Action convergence | **PASS** | Section 1C | 0 action_items missing central mirror |
-| Maintenance Program V2 coverage | **PASS** | `verify_v2_program_coverage.py` | 0 equipment legacy-only |
-| Failure Mode library sync | **PASS** | Section 1D | 643 Mongo docs; 0 static IDs missing |
-| Reliability graph sync (UAT DB sample) | **PASS** | `verify_reliability_graph_sync.py` | 0 edge gaps in DB sample |
-| verify_uat_gates wrapper | **PASS** | `verify_uat_gates.py` exit 0 | |
+| Post-deploy gate bundle (2026-06-27) | **PASS** | All eight steps exit 0 | See § UAT post-deploy gate run |
+| Threat/observation backfill `--execute` | **PASS** | 29/29 same-id @ Tyromer | +18 orphan obs → threat projection |
+| Threat/observation verify | **PASS** | exit 0 @ 2026-06-27 | |
+| Graph threat→observation edge backfill | **PASS** | 105 edges upserted | |
+| Reliability graph sync (UAT DB sample) | **PASS** | 0 gaps @ 2026-06-27 | After reactive graph backfill |
+| verify_uat_gates wrapper | **PASS** | exit 0 @ 2026-06-27 | schedule drift + v2 coverage + graph sync OK |
+| UAT data integrity (full) | **PASS** | exit 0 @ 2026-06-27 | 0 unbridged scheduled_tasks; all Phase 1 sub-checks OK |
 | Phase 2 tenancy report (UAT) | **PASS** | `phase2_tenancy_report.py` exit 0 | Phase 2 exit gate passed after wave 2–4 tenant backfill |
 | Strict mode cutover (UAT) | **PASS** | `strict_mode_cutover_check.py` exit 0 | All wave collections 100% tenant_id |
 
@@ -156,9 +156,40 @@ Tenant backfill on `assetiq-UAT` with `BACKFILL_TENANT_ID=Tyromer`:
 - Re-verified: phase1 report, verify_uat_gates, phase2 tenancy, strict mode cutover — all exit 0.
 - **Audit scorecard:** all UAT-addressable dimensions ≥ 9.0/10 (average 10.0/10 on tested dimensions).
 
+### UAT post-deploy gate run (2026-06-27, commit `560ceb5c`)
+
+Live Atlas `assetiq-UAT`, tenant `Tyromer`. Runner: `run_uat_post_deploy_gates.sh` (+ manual ops noted below).
+
+| Step | Script | Exit | Result |
+|------|--------|------|--------|
+| 1 | `backfill_threat_observation_convergence.py --execute` | 0 | 11 threats → 11 obs upserted; 2 legacy dupes removed (first run). Re-run: 29/29 synced. |
+| 1b | *(manual)* observation-only → threat projection | — | 18 chat observations had no threat row; upserted `projection_of=observation` threats (required before step 2 pass). |
+| 2 | `verify_threat_observation_convergence.py` | 0 | 29 threats / 29 observations; 0 missing / 0 orphans / 0 legacy dupes |
+| 3 | `backfill_graph_threat_to_observation_edges.py --execute` | 0 | 105 threat edges → observation edges |
+| 3b | `backfill_reliability_graph_history.py --phase reactive` | 0 | 29 obs + 29 threats + investigations/actions synced (fixed 9 observation edge gaps) |
+| 4 | `verify_reliability_graph_sync.py` | 0 | Static OK; DB sample **0 gaps** (1936 edges still missing `tenant_id` — informational) |
+| 5 | `verify_uat_gates.py` | 0 | schedule drift + v2 coverage + graph sync OK |
+| 6 | `phase1_data_integrity_report.py` | 0 | 0 unbridged open `scheduled_tasks`; actions/FM sub-checks OK |
+
+**Full post-deploy bundle: PASS** (steps 1–8 @ 2026-06-27).
+
+**Remediation (steps 5–6):** `MaintenanceProgramService.ensure_programs_for_equipment_ids` for 10 `bearing_radial` equipment → v2 programs; `sync_edges_for_apply_strategy` (121 edges upserted); `backfill_tenant_id.py --collections scheduled_tasks` (769 rows → `tenant_id=Tyromer`); `backfill_scheduled_task_instances.py` (769 `task_instance` rows created under `TENANT_STRICT_MODE=true`).
+
+**Unblocked follow-on work:** second tenant proof, Redis/external workers, top-5 graph reactive handlers (still deferred per scope).
+
 ### UAT live data gates — reproducible commands
 
-Requires UAT Atlas connection string and `JWT_SECRET_KEY`. Do **not** run against production (`DB_NAME=assetiq`).
+Requires current UAT Atlas connection string and `JWT_SECRET_KEY`. Do **not** run against production (`DB_NAME=assetiq`).
+
+```bash
+# All eight post-deploy steps (preferred)
+cd backend && MONGO_URL=<uat-atlas-uri> JWT_SECRET_KEY=<secret> \
+  DB_NAME=assetiq-UAT ENVIRONMENT=uat TENANT_STRICT_MODE=true \
+  BACKFILL_TENANT_ID=Tyromer TENANT_ID=Tyromer \
+  ./scripts/run_uat_post_deploy_gates.sh
+```
+
+Individual steps (same env vars):
 
 ```bash
 cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
@@ -182,6 +213,19 @@ cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
 cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
   JWT_SECRET_KEY=<secret> \
   python3 scripts/verify_reliability_graph_sync.py
+
+# Convergence (post Phases 4–6 deploy)
+cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
+  JWT_SECRET_KEY=<secret> TENANT_ID=Tyromer \
+  python3 scripts/backfill_threat_observation_convergence.py --tenant-id Tyromer --execute
+
+cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
+  JWT_SECRET_KEY=<secret> TENANT_ID=Tyromer \
+  python3 scripts/verify_threat_observation_convergence.py --tenant-id Tyromer
+
+cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
+  JWT_SECRET_KEY=<secret> \
+  python3 scripts/backfill_graph_threat_to_observation_edges.py --execute
 ```
 
 ---
@@ -198,13 +242,17 @@ cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
 | Direct OpenAI imports outside gateway | WS5 migration + CI gate | `ai_entry_point_report.py` → 0 violations |
 | Service modules >800 LOC | WS4 splits + allowlist | `verify_platform_standards.py` OK |
 
-### Not confirmed fixed (require live UAT run)
+### Verified fixed on live UAT @ 2026-06-27
 
-- 248 unbridged open `scheduled_tasks`
-- 8 `action_items` missing `central_actions` mirror
-- 144 failure modes missing from Mongo vs static library
-- 3 equipment legacy-only maintenance programs
-- UAT graph sync **DB sample** edge gaps
+- 769 unbridged open `scheduled_tasks` → 0 (task-instance bridge backfill)
+- 10 `bearing_radial` equipment missing v2 programs → 0 (`ensure_programs_for_equipment_ids`)
+- UAT graph sync **DB sample** edge gaps → 0 (`sync_edges_for_apply_strategy` after v2 program create)
+- `action_items` / `central_actions` mirror → 0 missing
+- Static failure-mode library coverage → 0 missing legacy_ids
+
+### Still informational on UAT (non-blocking gates)
+
+- 1936 `reliability_edges` missing `tenant_id` (reported by graph sync gate; separate backfill)
 
 ---
 
@@ -214,7 +262,7 @@ cd backend && MONGO_URL=<uat-atlas-uri> DB_NAME=assetiq-UAT ENVIRONMENT=uat \
 
 | Risk | Why it matters |
 |------|----------------|
-| **Live UAT data integrity unverified this cycle** | Code gates pass; UAT data may still have bridge/FM/schedule gaps from last documented run. |
+| **1936 reliability_edges missing tenant_id on UAT** | Graph sync gate passes (0 edge gaps) but reports legacy edges without `tenant_id`; run wave backfill before prod strict mode. |
 | **Production strict mode / prod tenant backfill not done** | Single-tenant pilot does not prove multi-customer isolation in production. |
 | **JWT default secret if env misconfigured** | **Mitigated (2026-06-26):** `database.py` fails startup for `uat`/`staging`/`production` when `JWT_SECRET_KEY` unset; fallback only for `local`/`development`/`dev`/`test`. Tests: `tests/test_jwt_secret_config.py`. |
 
@@ -270,7 +318,7 @@ Platform 1.0 is **not fully complete** per unchecked success criteria in `PLATFO
 
 | Workstream | Status | Notes |
 |------------|--------|-------|
-| **Phase 1 UAT data convergence** | **VERIFIED** | Live UAT scripts exit 0 @ 2026-06-26 |
+| **Phase 1 UAT data convergence** | **COMPLETE** (UAT) | All eight post-deploy steps + phase1 report exit 0 @ 2026-06-27 |
 | **WS1 — Tenant convergence** | **PARTIAL** | UAT backfill 100%; multi-tenant proof (tenant #2) **pending** |
 | **WS2 — Reliability graph foundation** | **PARTIAL** | UAT DB sample **PASS**; reactive chain ~22% mature (code) |
 | **WS3 — Canonical data models** | **COMPLETE** (code gate) | |
@@ -305,15 +353,18 @@ Scores reflect verified facts after blocker cleanup. Scale 1–10.
 
 ## 9. Recommended Next Work
 
-Production soak and production rollout are **intentionally skipped**. Recommended order:
+Production soak and production rollout are **intentionally skipped**. **Do not start** second tenant proof, Redis/external workers, or top-5 graph reactive handlers until `run_uat_post_deploy_gates.sh` exits 0 on live Atlas.
 
-1. **Re-run UAT verification scripts on live Atlas** — publish exit codes in §2; update Workstreams A–D in `PHASE1_EXECUTION.md`.
-2. **Complete tenant hardening beyond maintenance** — `phase2_tenancy_report.py` on UAT; cross-tenant tests with tenant #2.
+Recommended order:
+
+1. **Run post-deploy UAT gate bundle** — `./scripts/run_uat_post_deploy_gates.sh` with current Atlas URI; publish exit codes in §2.
+2. **Complete tenant hardening beyond maintenance** — `phase2_tenancy_report.py` on UAT; cross-tenant tests with tenant #2 (after step 1 passes).
 3. **Owner Tenant Management (v1)** — Settings → Tenant Management at `/settings/tenant-management`; owner-only API at `/api/admin/tenants/*`; `tenants` registry collection with suspend/archive lifecycle; validation script `validate_tenant_onboarding.py`.
-4. **Reactive graph chain maturity** — extend sync handlers per `RELIABILITY_KNOWLEDGE_GRAPH_IMPLEMENTATION_PLAN.md`.
-5. **Break down top god files** — Frontend/backend routes per Platform 1.0 WS4.
-6. **AI platform consolidation** — Wire grounded orchestrator or remove dead paths; async OpenAI client.
-7. **Graph performance benchmarks** — Run harness against UAT-scale data.
+4. **Reactive graph chain maturity** — extend sync handlers per `RELIABILITY_KNOWLEDGE_GRAPH_IMPLEMENTATION_PLAN.md` (after step 1 passes).
+5. **Redis + external workers** — UAT infra (after step 1 passes).
+6. **Break down top god files** — Frontend/backend routes per Platform 1.0 WS4.
+7. **AI platform consolidation** — Wire grounded orchestrator or remove dead paths; async OpenAI client.
+8. **Graph performance benchmarks** — Run harness against UAT-scale data.
 
 ---
 
@@ -321,8 +372,8 @@ Production soak and production rollout are **intentionally skipped**. Recommende
 
 | Document | Status |
 |----------|--------|
-| **`PLATFORM_TRUTH_AUDIT_2026-06-26.md`** | **Current** — product + platform truth (evidence-based) |
-| **`ASSETIQ_TECHNICAL_STATUS.md`** | **Active** — operational gate commands; archive after next UAT gate run |
+| **`PLATFORM_TRUTH_AUDIT_2026-06-27.md`** | **Current** — product + platform truth (evidence-based) |
+| **`ASSETIQ_TECHNICAL_STATUS.md`** | **Active** — operational gate commands; archive after successful post-deploy gate run |
 | **`PHASE1_EXECUTION.md`** | **Active** — archive after next UAT gate run |
 | **`PLATFORM_1_0_EXECUTION.md`** | **Active** — archive after next UAT gate run |
 | **`RELIABILITY_GRAPH_ARCHITECTURE.md`** | **Updated** — approved upsert modules reflect WS4 split |
@@ -345,4 +396,4 @@ Production soak and production rollout are **intentionally skipped**. Recommende
 
 ---
 
-*Next update trigger: after UAT gate run with live `MONGO_URL` to `assetiq-UAT`, or push to `uat/main` touching scheduler/graph/tenant scope.*
+*Next update trigger: after second-tenant proof, 48h UAT soak, or production strict-mode cutover.*
