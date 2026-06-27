@@ -150,6 +150,15 @@ export default function DashboardPageMain({ initialTab }) {
   
   const { canShowOperational, canShowProduction, canShowReliability, canShowExecutive, canShowBuilder } = dashboardTabFlags;
 
+  const canFetchDashboardData = !permissionsLoading;
+  const canReadObservations = hasPermission("observations", "read");
+  const canReadActions = hasPermission("actions", "read");
+  const canReadInvestigations = hasPermission("investigations", "read");
+  const canReadUsers = hasPermission("users", "read");
+  const canReadEquipment = hasPermission("equipment", "read");
+  const canReadTasks = hasPermission("tasks", "read");
+  const canReadForms = hasPermission("forms", "read");
+
   // Track if we've initialized the tab from permissions (prevents re-initialization on permission changes)
   const [tabInitialized, setTabInitialized] = useState(false);
   
@@ -299,6 +308,7 @@ export default function DashboardPageMain({ initialTab }) {
   const { data: usersData } = useQuery({
     queryKey: queryKeys.users.rbac(),
     queryFn: usersAPI.getAll,
+    enabled: canFetchDashboardData && canReadUsers,
     staleTime: 5 * 60 * 1000,
   });
   const usersList = usersData?.users || [];
@@ -307,6 +317,7 @@ export default function DashboardPageMain({ initialTab }) {
   const { data: equipmentData } = useQuery({
     queryKey: queryKeys.equipment.nodes(),
     queryFn: equipmentHierarchyAPI.getNodes,
+    enabled: canFetchDashboardData && canReadEquipment,
     staleTime: 5 * 60 * 1000,
   });
   const equipmentNodes = equipmentData?.nodes || [];
@@ -337,11 +348,13 @@ export default function DashboardPageMain({ initialTab }) {
   const { data: stats } = useQuery({
     queryKey: queryKeys.stats.all(),
     queryFn: statsAPI.get,
+    enabled: canFetchDashboardData && canReadTasks,
   });
 
   const { data: observationsData = [] } = useQuery({
     queryKey: [...queryKeys.threats.all(), language],
     queryFn: () => threatsAPI.getAll(null, { language }),
+    enabled: canFetchDashboardData && canReadObservations,
   });
   const allObservations = Array.isArray(observationsData) ? observationsData : [];
 
@@ -367,6 +380,7 @@ export default function DashboardPageMain({ initialTab }) {
   const { data: actionsData = { actions: [], stats: {} } } = useQuery({
     queryKey: queryKeys.actions.all(),
     queryFn: () => actionsAPI.getAll(),
+    enabled: canFetchDashboardData && canReadActions,
   });
   const allActions = Array.isArray(actionsData?.actions) ? actionsData.actions : (Array.isArray(actionsData) ? actionsData : []);
   const actionsStats = actionsData?.stats || {};
@@ -388,6 +402,7 @@ export default function DashboardPageMain({ initialTab }) {
   const { data: investigationsData = { investigations: [] }, isLoading: isLoadingInvestigations, error: investigationsError } = useQuery({
     queryKey: queryKeys.investigations.all(),
     queryFn: () => investigationAPI.getAll(),
+    enabled: canFetchDashboardData && canReadInvestigations,
     staleTime: 60 * 1000,
     retry: 2,
   });
@@ -411,6 +426,7 @@ export default function DashboardPageMain({ initialTab }) {
   const { data: formSubmissionsData = [] } = useQuery({
     queryKey: queryKeys.formSubmissions.dashboard(),
     queryFn: () => formAPI.getSubmissions({ limit: 10 }),
+    enabled: canFetchDashboardData && canReadForms,
     staleTime: 60 * 1000, // 1 minute
   });
   const recentSubmissions = Array.isArray(formSubmissionsData) ? formSubmissionsData : (formSubmissionsData?.submissions || []);
@@ -422,6 +438,7 @@ export default function DashboardPageMain({ initialTab }) {
   const { data: topObservationsData = [] } = useQuery({
     queryKey: queryKeys.threats.top(),
     queryFn: () => threatsAPI.getTop(10, { excludeMitigated: true }),
+    enabled: canFetchDashboardData && canReadObservations,
   });
   const topObservations = Array.isArray(topObservationsData) ? topObservationsData : [];
   

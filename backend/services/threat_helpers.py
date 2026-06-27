@@ -112,6 +112,25 @@ def normalize_threat_list_items(threats: List[dict]) -> List[dict]:
     for idx, t in enumerate(threats):
         if isinstance(t.get("risk_score"), float):
             t["risk_score"] = int(t["risk_score"])
+        try:
+            t["risk_score"] = int(t["risk_score"]) if t.get("risk_score") is not None else 0
+        except (TypeError, ValueError):
+            t["risk_score"] = 0
+
+        if not t.get("title"):
+            desc = t.get("description") or ""
+            t["title"] = desc[:120] if desc else "Observation"
+        if not t.get("asset"):
+            t["asset"] = t.get("asset_name") or t.get("equipment_name") or "Unlinked"
+        if not t.get("failure_mode"):
+            t["failure_mode"] = t.get("failure_mode_name") or "Unclassified"
+        if not t.get("risk_level"):
+            t["risk_level"] = t.get("severity") or "medium"
+        if not t.get("status"):
+            t["status"] = "Observation"
+        if not t.get("created_by"):
+            t["created_by"] = "unknown"
+
         for field, default in (
             ("equipment_type", "Equipment"),
             ("impact", "Unknown"),
@@ -127,7 +146,9 @@ def normalize_threat_list_items(threats: List[dict]) -> List[dict]:
         t.setdefault("action_plan_count", 0)
         t.setdefault("occurrence_count", 1)
         created_at = t.get("created_at")
-        if created_at and not isinstance(created_at, str):
+        if not created_at:
+            t["created_at"] = ""
+        elif not isinstance(created_at, str):
             t["created_at"] = (
                 created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at)
             )
