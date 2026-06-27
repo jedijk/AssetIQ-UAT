@@ -1,5 +1,7 @@
 # AssetIQ Platform & Product Truth Audit
 
+> **Superseded by [`PLATFORM_TRUTH_AUDIT_2026-06-27.md`](./PLATFORM_TRUTH_AUDIT_2026-06-27.md)** — retained for history.
+
 **Date:** 2026-06-26  
 **Repository:** AssetIQ-Dev  
 **Commit assessed:** `58f82e8c` (`deploy-uat`, local; includes scheduler/VM board tenant fixes not yet re-verified on live UAT Atlas)  

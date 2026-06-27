@@ -5,8 +5,11 @@ import {
 
 describe('breadcrumb route helpers', () => {
   test('readBreadcrumbOrigin normalizes observation paths', () => {
+    expect(readBreadcrumbOrigin({ breadcrumbOrigin: '/observations/abc' })).toBe(
+      '/observations/abc/workspace',
+    );
     expect(readBreadcrumbOrigin({ breadcrumbOrigin: '/threats/abc' })).toBe(
-      '/threats/abc/workspace',
+      '/observations/abc/workspace',
     );
   });
 
