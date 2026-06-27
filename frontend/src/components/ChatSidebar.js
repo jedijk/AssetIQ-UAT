@@ -64,6 +64,19 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   const [interimTranscript, setInterimTranscript] = useState(""); // Partial transcript while speaking
   const [autoSkipCountdown, setAutoSkipCountdown] = useState(null); // Countdown timer for auto-skip
   const [aiModeEnabled, setAiModeEnabled] = useState(false); // AI mode for better descriptions (slower)
+  const attachMenuOpenedAtRef = useRef(0);
+  const langPickerOpenedAtRef = useRef(0);
+
+  const dismissAttachMenuBackdrop = () => {
+    if (Date.now() - attachMenuOpenedAtRef.current < 400) return;
+    setShowAttachMenu(false);
+  };
+
+  const dismissLangPickerBackdrop = () => {
+    if (Date.now() - langPickerOpenedAtRef.current < 400) return;
+    setShowLangPicker(false);
+  };
+
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -1015,8 +1028,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             <div className="relative mb-1.5 sm:mb-2 h-7">
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setShowAttachMenu(false);
+                  if (!showLangPicker) langPickerOpenedAtRef.current = Date.now();
                   setShowLangPicker((open) => !open);
                 }}
                 className="inline-flex items-center justify-center gap-1.5 h-7 w-[5.5rem] px-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors"
@@ -1047,7 +1062,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   <div
                     className="fixed inset-0 z-40"
                     aria-hidden="true"
-                    onClick={() => setShowLangPicker(false)}
+                    onClick={dismissLangPickerBackdrop}
                   />
                   <div
                     role="menu"
@@ -1125,8 +1140,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               {/* Attachment Button with Menu */}
               <div className="relative">
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowLangPicker(false);
+                    if (!showAttachMenu) attachMenuOpenedAtRef.current = Date.now();
                     setShowAttachMenu(!showAttachMenu);
                   }}
                   className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
@@ -1139,7 +1156,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     {/* Backdrop to close menu */}
                     <div 
                       className="fixed inset-0 z-40" 
-                      onClick={() => setShowAttachMenu(false)}
+                      onClick={dismissAttachMenuBackdrop}
                     />
                     {/* Menu - positioned to fit on mobile */}
                     <div className="absolute bottom-12 left-0 z-50 w-44 sm:w-48 bg-white rounded-lg border border-slate-200 shadow-lg p-1">

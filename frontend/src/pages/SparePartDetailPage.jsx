@@ -98,17 +98,31 @@ export default function SparePartDetailPage() {
   });
 
   if (isLoading) {
-    return <div className="p-6 text-slate-500">{t("common.loading") || "Loading..."}</div>;
+    return (
+      <div className="app-page-shell">
+        <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 p-6 text-slate-500">
+          {t("common.loading") || "Loading..."}
+        </div>
+      </div>
+    );
   }
 
   if (!part) {
-    return <div className="p-6 text-slate-500">{t("spareiq.notFound") || "Spare part not found"}</div>;
+    return (
+      <div className="app-page-shell">
+        <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 p-6 text-slate-500">
+          {t("spareiq.notFound") || "Spare part not found"}
+        </div>
+      </div>
+    );
   }
 
   const categories = categoriesData?.categories || [];
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto" data-testid="spare-part-detail">
+    <div className="app-page-shell" data-testid="spare-part-detail">
+      <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 pb-6">
+        <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="mb-6">
         <Link to="/spareiq" className="inline-flex items-center text-sm text-slate-600 hover:text-slate-900 mb-3">
           <ArrowLeft className="w-4 h-4 mr-1" />
@@ -297,6 +311,8 @@ export default function SparePartDetailPage() {
             ))}
           </ul>
         </section>
+      </div>
+        </div>
       </div>
 
       <SparePartFormDialog

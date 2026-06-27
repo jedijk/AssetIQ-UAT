@@ -177,15 +177,6 @@ const MobileObservations = () => {
                   className="observation-card"
                   data-testid={`observation-${obs.id}`}
                 >
-                  {/* Risk Indicator */}
-                  <div 
-                    className="risk-indicator"
-                    style={{ background: riskConfig.gradient }}
-                  >
-                    <span className="risk-score">{obs.risk_score || "-"}</span>
-                  </div>
-
-                  {/* Content */}
                   <div className="obs-content">
                     <div className="obs-header">
                       <span 
@@ -423,7 +414,7 @@ const MobileObservations = () => {
           padding: 14px;
           display: flex;
           align-items: flex-start;
-          gap: 14px;
+          gap: 10px;
           box-shadow: 0 1px 3px rgba(0,0,0,0.04);
           cursor: pointer;
           transition: all 0.2s;
@@ -431,22 +422,6 @@ const MobileObservations = () => {
 
         .observation-card:active {
           transform: scale(0.98);
-        }
-
-        .risk-indicator {
-          width: 46px;
-          height: 46px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          color: white;
-        }
-
-        .risk-score {
-          font-size: 16px;
-          font-weight: 700;
         }
 
         .obs-content {
@@ -483,7 +458,7 @@ const MobileObservations = () => {
           color: #1f2937;
           line-height: 1.35;
           display: -webkit-box;
-          -webkit-line-clamp: 2;
+          -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }

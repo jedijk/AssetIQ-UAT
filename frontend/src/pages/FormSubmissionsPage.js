@@ -882,7 +882,11 @@ export default function FormSubmissionsPage() {
                       </div>
                       
                       {/* Actions - Desktop: View button, Mobile: Menu */}
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div
+                        className="flex items-center gap-1 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
                         {/* Reprint Label - only when form has label printing enabled */}
                         {(() => {
                           const cfg = labelConfigByTemplate[submission.form_template_id];

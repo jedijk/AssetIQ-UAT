@@ -32,6 +32,7 @@ export default function LayoutHeader({
   navItems,
   settingsMenuItems,
   isMobileView,
+  chatOpen = false,
   language,
   setLanguage,
   t,
@@ -59,7 +60,11 @@ export default function LayoutHeader({
   };
 
   return (
-    <header className="app-header bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 pointer-events-auto">
+    <header
+      className={`app-header bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 pointer-events-auto ${
+        chatOpen && isMobileView ? "z-[230]" : ""
+      }`}
+    >
         <div className="header-content relative max-w-full px-4">
           {/* Left Section - Logo & Nav */}
           <div className="flex items-center gap-2 sm:gap-3 lg:gap-6 min-w-0 flex-1 overflow-hidden">

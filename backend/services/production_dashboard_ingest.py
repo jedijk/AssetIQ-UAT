@@ -62,16 +62,16 @@ async def merge_production_dashboard_ingest(
     # String range on timestamp misses some stored shapes (e.g. space instead of T). Use calendar-day
     # regex fallbacks, then tighten to shift window when appending rows below.
     _ingest_dates = []
-    _scan_d = range_start.date()
-    _end_d = range_end.date()
+    _scan_d = scope.range_start.date()
+    _end_d = scope.range_end.date()
     while _scan_d <= _end_d and len(_ingest_dates) < 45:
         _ingest_dates.append(_scan_d.strftime("%Y-%m-%d"))
         _scan_d += timedelta(days=1)
     ingested_ts_match = [
         {
             "timestamp": {
-                "$gte": range_start.strftime("%Y-%m-%dT%H:%M:%S"),
-                "$lte": range_end.strftime("%Y-%m-%dT%H:%M:%S"),
+                "$gte": scope.range_start.strftime("%Y-%m-%dT%H:%M:%S"),
+                "$lte": scope.range_end.strftime("%Y-%m-%dT%H:%M:%S"),
             }
         },
     ]
@@ -308,14 +308,14 @@ async def merge_production_dashboard_ingest(
             len(submissions),
             len(extruder_subs),
             len(ingested),
-            range_start.isoformat(),
-            range_end.isoformat(),
+            scope.range_start.isoformat(),
+            scope.range_end.isoformat(),
         )
 
     payload = {
-        "date": target_date.strftime("%Y-%m-%d"),
-        "from_date": range_start.strftime("%Y-%m-%d"),
-        "to_date": range_end.strftime("%Y-%m-%d"),
+        "date": scope.target_date.strftime("%Y-%m-%d"),
+        "from_date": scope.range_start.strftime("%Y-%m-%d"),
+        "to_date": scope.range_end.strftime("%Y-%m-%d"),
         "scope.is_range": scope.is_range,
         "shift": scope.shift_param,
         "shifts": scope.shift_keys,

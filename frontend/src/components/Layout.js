@@ -581,6 +581,7 @@ const Layout = () => {
         navItems={navItems}
         settingsMenuItems={settingsMenuItems}
         isMobileView={isMobileView}
+        chatOpen={chatOpen}
         language={language}
         setLanguage={setLanguage}
         t={t}
