@@ -2766,7 +2766,12 @@
     "simpleModeUpdated": "Eenvoudige modus voor {name} is nu {state}",
     "simpleModeUpdateFailed": "Eenvoudige modus bijwerken mislukt",
     "simpleModeAriaOn": "Eenvoudige modus ingeschakeld voor {name}",
-    "simpleModeAriaOff": "Eenvoudige modus uitgeschakeld voor {name}"
+    "simpleModeAriaOff": "Eenvoudige modus uitgeschakeld voor {name}",
+    "newDeviceVerification": "Verificatie op nieuw apparaat",
+    "email2faUpdated": "Verificatie op nieuw apparaat voor {name} is nu {state}",
+    "email2faUpdateFailed": "Verificatie op nieuw apparaat bijwerken mislukt",
+    "email2faAriaOn": "Verificatie op nieuw apparaat ingeschakeld voor {name}",
+    "email2faAriaOff": "Verificatie op nieuw apparaat uitgeschakeld voor {name}"
   },
   "userStatistics": {
     "title": "Gebruikersstatistieken",

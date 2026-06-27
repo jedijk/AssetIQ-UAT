@@ -2765,7 +2765,12 @@
     "simpleModeUpdated": "Einfachmodus für {name} ist jetzt {state}",
     "simpleModeUpdateFailed": "Einfachmodus konnte nicht aktualisiert werden",
     "simpleModeAriaOn": "Einfachmodus aktiviert für {name}",
-    "simpleModeAriaOff": "Einfachmodus deaktiviert für {name}"
+    "simpleModeAriaOff": "Einfachmodus deaktiviert für {name}",
+    "newDeviceVerification": "Verifizierung auf neuem Gerät",
+    "email2faUpdated": "Verifizierung auf neuem Gerät für {name} ist jetzt {state}",
+    "email2faUpdateFailed": "Verifizierung auf neuem Gerät konnte nicht aktualisiert werden",
+    "email2faAriaOn": "Verifizierung auf neuem Gerät aktiviert für {name}",
+    "email2faAriaOff": "Verifizierung auf neuem Gerät deaktiviert für {name}"
   },
   "userStatistics": {
     "title": "User Statistics",

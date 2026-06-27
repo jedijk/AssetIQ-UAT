@@ -1,5 +1,5 @@
 import React from "react";
-import { Crown, Shield, ShieldCheck, ShieldAlert, Eye, Wrench, Settings, Smartphone } from "lucide-react";
+import { Crown, Shield, ShieldCheck, ShieldAlert, Eye, Wrench, Settings, Smartphone, Mail } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
 import { Switch } from "../../components/ui/switch";
@@ -93,4 +93,30 @@ const SimpleModeDropdownItem = ({ user, t, onToggle, isPending }) => {
   );
 };
 
-export { roleIcons, roleColors, UserAvatar, SimpleModeUserBadge, SimpleModeDropdownItem };
+const Email2faDropdownItem = ({ user, t, onToggle, isPending }) => {
+  const enabled = !!user.email_2fa_enabled;
+  return (
+    <DropdownMenuItem
+      onSelect={(e) => e.preventDefault()}
+      className="flex items-center justify-between gap-3 cursor-default"
+      data-testid={`email-2fa-toggle-${user.id}`}
+    >
+      <span className="flex items-center gap-2 text-sm min-w-0">
+        <Mail className="w-4 h-4 shrink-0" />
+        <span className="truncate">{t("userManagement.newDeviceVerification")}</span>
+      </span>
+      <Switch
+        checked={enabled}
+        disabled={isPending}
+        onCheckedChange={(checked) => onToggle(user, checked)}
+        aria-label={(enabled
+          ? t("userManagement.email2faAriaOn")
+          : t("userManagement.email2faAriaOff")
+        ).replace("{name}", user.name || "")}
+        data-testid={`email-2fa-switch-${user.id}`}
+      />
+    </DropdownMenuItem>
+  );
+};
+
+export { roleIcons, roleColors, UserAvatar, SimpleModeUserBadge, SimpleModeDropdownItem, Email2faDropdownItem };

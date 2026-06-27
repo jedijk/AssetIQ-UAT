@@ -55,7 +55,7 @@ import { Label } from "../../components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import ImageEditor from "../../components/ImageEditor";
 import SettingsPermissionsPage from "../../pages/SettingsPermissionsPage";
-import { roleIcons, roleColors, UserAvatar, SimpleModeUserBadge, SimpleModeDropdownItem } from "./userManagementShared";
+import { roleIcons, roleColors, UserAvatar, SimpleModeUserBadge, SimpleModeDropdownItem, Email2faDropdownItem } from "./userManagementShared";
 
 export function UserManagementDesktopView({
   navigate,
@@ -106,6 +106,8 @@ export function UserManagementDesktopView({
   handleEditProfile,
   handleChangeRole,
   handleToggleSimpleMode,
+  handleToggleEmail2fa,
+  email2faAvailable,
   handleConfirmRoleChange,
   handleSaveProfile,
   handleEditorClose,
@@ -490,6 +492,14 @@ export function UserManagementDesktopView({
                               onToggle={handleToggleSimpleMode}
                               isPending={updateProfileMutation.isPending}
                             />
+                            {email2faAvailable && (
+                              <Email2faDropdownItem
+                                user={user}
+                                t={t}
+                                onToggle={handleToggleEmail2fa}
+                                isPending={updateProfileMutation.isPending}
+                              />
+                            )}
                             <DropdownMenuSeparator />
                             {user.is_active ? (
                               <DropdownMenuItem 

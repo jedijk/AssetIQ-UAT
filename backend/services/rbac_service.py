@@ -405,7 +405,10 @@ class RBACService:
         
         # Get user ID - could be 'user_id', 'id', or stringified '_id'
         user_id = user.get("user_id") or user.get("id") or (str(user["_id"]) if "_id" in user else None)
-        
+
+        from services.email_2fa_service import email_2fa_enabled, resolve_email_2fa_preference
+        preferences = user.get("preferences") or {}
+
         return {
             "id": user_id,
             "email": user.get("email"),
@@ -420,6 +423,8 @@ class RBACService:
             "phone": user.get("phone"),
             "assigned_installations": user.get("assigned_installations", []),
             "default_simple_mode": bool(user.get("default_simple_mode", False)),
+            "email_2fa_available": email_2fa_enabled(),
+            "email_2fa_enabled": resolve_email_2fa_preference(user, preferences),
             "created_at": serialize_date(user.get("created_at")),
             "last_login": serialize_date(user.get("last_login")),
             "role_updated_at": serialize_date(user.get("role_updated_at")),

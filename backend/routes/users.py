@@ -724,13 +724,71 @@ async def update_user_profile(
     profile_data: dict,
     current_user: dict = Depends(_users_write)
 ):
-    """Update user profile (name, department, position, phone)."""
-    result = await rbac_service.update_user_profile(
-        user_id=user_id,
-        data=profile_data
-    )
+    """Update user profile (name, department, position, phone, simple mode, email 2FA)."""
+    profile_data = dict(profile_data or {})
+    email_2fa_value = profile_data.pop("email_2fa_enabled", None)
+
+    if email_2fa_value is not None:
+        from services.email_2fa_service import email_2fa_enabled, resolve_email_2fa_preference
+        from services.login_security_audit import log_login_security_event
+        from services.trusted_device_service import revoke_trusted_devices_for_user
+        from services.tenant_schema import tenant_id_from_user
+
+        if not email_2fa_enabled():
+            raise HTTPException(
+                status_code=400,
+                detail="Email verification login is not available on this environment",
+            )
+
+        target_user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        await db.users.update_one(
+            {"id": user_id},
+            {"$set": {"preferences.email_2fa_enabled": bool(email_2fa_value)}},
+        )
+        if email_2fa_value:
+            await revoke_trusted_devices_for_user(
+                user_id,
+                tenant_id=tenant_id_from_user(target_user),
+            )
+        await log_login_security_event(
+            "login_2fa_preference_updated",
+            tenant_id=tenant_id_from_user(target_user),
+            user_id=user_id,
+            email=target_user.get("email"),
+            details={
+                "email_2fa_enabled": bool(email_2fa_value),
+                "updated_by": current_user["id"],
+            },
+        )
+
+    if not profile_data and email_2fa_value is None:
+        result = await rbac_service.get_user(user_id)
+    else:
+        result = await rbac_service.update_user_profile(
+            user_id=user_id,
+            data=profile_data,
+        )
+
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if email_2fa_value is not None:
+        from services.email_2fa_service import email_2fa_enabled, resolve_email_2fa_preference
+
+        target_user = await db.users.find_one(
+            {"id": user_id},
+            {"_id": 0, "preferences": 1, "role": 1},
+        )
+        preferences = (target_user or {}).get("preferences") or {}
+        result["email_2fa_available"] = email_2fa_enabled()
+        result["email_2fa_enabled"] = resolve_email_2fa_preference(
+            target_user or {},
+            preferences,
+        )
+
     return result
 
 

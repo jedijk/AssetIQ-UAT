@@ -182,7 +182,9 @@ export default function SettingsUserManagementPage() {
   const updateProfileMutation = useMutation({
     mutationFn: rbacAPI.updateUserProfile,
     onMutate: async ({ userId, data }) => {
-      if (data?.default_simple_mode === undefined) return;
+      const hasSimpleMode = data?.default_simple_mode !== undefined;
+      const hasEmail2fa = data?.email_2fa_enabled !== undefined;
+      if (!hasSimpleMode && !hasEmail2fa) return;
       const queryKey = ["rbac-users", search, roleFilter];
       await queryClient.cancelQueries({ queryKey: ["rbac-users"] });
       const previous = queryClient.getQueryData(queryKey);
@@ -190,9 +192,13 @@ export default function SettingsUserManagementPage() {
         if (!old?.users) return old;
         return {
           ...old,
-          users: old.users.map((u) =>
-            u.id === userId ? { ...u, default_simple_mode: data.default_simple_mode } : u
-          ),
+          users: old.users.map((u) => {
+            if (u.id !== userId) return u;
+            const next = { ...u };
+            if (hasSimpleMode) next.default_simple_mode = data.default_simple_mode;
+            if (hasEmail2fa) next.email_2fa_enabled = data.email_2fa_enabled;
+            return next;
+          }),
         };
       });
       return { previous, queryKey };
@@ -201,6 +207,9 @@ export default function SettingsUserManagementPage() {
       await queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
       await refetch();
       if (variables?.data?.default_simple_mode !== undefined) {
+        return;
+      }
+      if (variables?.data?.email_2fa_enabled !== undefined) {
         return;
       }
       toast.success("Profile updated successfully");
@@ -212,6 +221,10 @@ export default function SettingsUserManagementPage() {
       }
       if (variables?.data?.default_simple_mode !== undefined) {
         toast.error(t("userManagement.simpleModeUpdateFailed"));
+        return;
+      }
+      if (variables?.data?.email_2fa_enabled !== undefined) {
+        toast.error(t("userManagement.email2faUpdateFailed"));
         return;
       }
       toast.error("Failed to update profile");
@@ -469,6 +482,23 @@ export default function SettingsUserManagementPage() {
     );
   };
 
+  const email2faAvailable = Boolean(usersData?.users?.[0]?.email_2fa_available);
+
+  const handleToggleEmail2fa = (user, enabled) => {
+    updateProfileMutation.mutate(
+      { userId: user.id, data: { email_2fa_enabled: enabled } },
+      {
+        onSuccess: () => {
+          toast.success(
+            t("userManagement.email2faUpdated")
+              .replace("{name}", user.name || "")
+              .replace("{state}", enabled ? t("simpleMode.on") : t("simpleMode.off"))
+          );
+        },
+      }
+    );
+  };
+
   const handleConfirmRoleChange = () => {
     if (changeRoleUser && selectedRole) {
       updateRoleMutation.mutate({
@@ -618,6 +648,8 @@ export default function SettingsUserManagementPage() {
     handleEditProfile,
     handleChangeRole,
     handleToggleSimpleMode,
+    handleToggleEmail2fa,
+    email2faAvailable,
     handleConfirmRoleChange,
     handleSaveProfile,
     handleEditorClose,

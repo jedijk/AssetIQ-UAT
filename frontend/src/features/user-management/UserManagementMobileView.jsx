@@ -54,7 +54,7 @@ import {
 } from "../../components/ui/dialog";
 import { Label } from "../../components/ui/label";
 import ImageEditor from "../../components/ImageEditor";
-import { roleIcons, roleColors, UserAvatar, SimpleModeUserBadge, SimpleModeDropdownItem } from "./userManagementShared";
+import { roleIcons, roleColors, UserAvatar, SimpleModeUserBadge, SimpleModeDropdownItem, Email2faDropdownItem } from "./userManagementShared";
 
 export function UserManagementMobileView({
   navigate,
@@ -105,6 +105,8 @@ export function UserManagementMobileView({
   handleEditProfile,
   handleChangeRole,
   handleToggleSimpleMode,
+  handleToggleEmail2fa,
+  email2faAvailable,
   handleConfirmRoleChange,
   handleSaveProfile,
   handleEditorClose,
@@ -366,6 +368,14 @@ export function UserManagementMobileView({
                           onToggle={handleToggleSimpleMode}
                           isPending={updateProfileMutation.isPending}
                         />
+                        {email2faAvailable && (
+                          <Email2faDropdownItem
+                            user={user}
+                            t={t}
+                            onToggle={handleToggleEmail2fa}
+                            isPending={updateProfileMutation.isPending}
+                          />
+                        )}
                         <DropdownMenuSeparator />
                         {user.is_active ? (
                           <DropdownMenuItem 

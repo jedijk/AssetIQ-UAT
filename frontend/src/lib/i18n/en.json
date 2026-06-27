@@ -2694,7 +2694,12 @@
     "simpleModeUpdated": "Simple Mode for {name} is now {state}",
     "simpleModeUpdateFailed": "Failed to update Simple Mode",
     "simpleModeAriaOn": "Simple Mode enabled for {name}",
-    "simpleModeAriaOff": "Simple Mode disabled for {name}"
+    "simpleModeAriaOff": "Simple Mode disabled for {name}",
+    "newDeviceVerification": "New device verification",
+    "email2faUpdated": "New device verification for {name} is now {state}",
+    "email2faUpdateFailed": "Failed to update new device verification",
+    "email2faAriaOn": "New device verification enabled for {name}",
+    "email2faAriaOff": "New device verification disabled for {name}"
   },
   "userStatistics": {
     "title": "User Statistics",
