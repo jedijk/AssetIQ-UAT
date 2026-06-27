@@ -100,6 +100,7 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
             task_source=program.get("task_source"),
             pm_import_task_id=coerce_optional_str_id(program.get("pm_import_task_id")),
             requires_downtime=bool(program.get("requires_downtime")),
+            tenant_id=program.get("tenant_id") or program.get("company_id"),
         )
         new_tasks.append(task.model_dump())
         created_ids.append(task.id)
@@ -109,14 +110,18 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
         await db.scheduled_tasks.insert_many(new_tasks)
         from services.reliability_graph import dispatch_graph_sync
 
-        for task_doc in new_tasks:
-            await dispatch_graph_sync(
-                "sync_edges_for_scheduled_task",
-                "scheduled_task_created",
-                scheduled_task=task_doc,
-                event="created",
-                tenant_id=task_doc.get("tenant_id"),
-            )
+        await asyncio.gather(
+            *[
+                dispatch_graph_sync(
+                    "sync_edges_for_scheduled_task",
+                    "scheduled_task_created",
+                    scheduled_task=task_doc,
+                    event="created",
+                    tenant_id=task_doc.get("tenant_id"),
+                )
+                for task_doc in new_tasks
+            ]
+        )
 
     if last_created_iso:
         if program.get("program_source") == "v2" and program.get("v2_program_id"):

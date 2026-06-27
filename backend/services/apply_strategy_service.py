@@ -88,6 +88,7 @@ async def apply_strategy_to_equipment(
         equipment_ids=equipment_ids,
         strategy_version=strategy_version,
         user_id=user_id,
+        tenant_id=tenant_id_from_user(current_user),
     )
     t_v2 = time.perf_counter() - t0
     v2_programs_created = v2_sync.get("programs_created", 0)

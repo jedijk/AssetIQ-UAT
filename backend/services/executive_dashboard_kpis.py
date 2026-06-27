@@ -21,6 +21,7 @@ from services.executive_dashboard_models import (
     format_currency,
 )
 from services.tenant_schema import merge_tenant_filter
+from services.visual_board_helpers import is_vmb_display_user
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +171,8 @@ async def build_executive_dashboard(
         _threat_ids_with_linked_actions(current_user),
     )
 
-    task_filter = merge_tenant_filter({"created_by": user_id}, current_user)
+    task_query = {} if is_vmb_display_user(current_user) else {"created_by": user_id}
+    task_filter = merge_tenant_filter(task_query, current_user)
     current_tasks = await db.scheduled_tasks.find(
         {
             **task_filter,

@@ -17,7 +17,7 @@ from services import spare_part_files_service as files_svc
 from services import spare_parts_import_service as import_svc
 from services import spare_parts_service as parts_svc
 
-router = APIRouter(tags=["SpareIQ"])
+router = APIRouter(tags=["Spares"])
 
 _spareiq_read = require_permission("spareiq:read")
 _spareiq_write = require_permission("spareiq:write")

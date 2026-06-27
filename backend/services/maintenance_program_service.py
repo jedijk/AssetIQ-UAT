@@ -35,6 +35,7 @@ from services.maintenance_program_pm_import import (
 from services.maintenance_program_helpers import (
     criticality_fields_from_equipment as _criticality_fields_from_equipment,
     load_equipment_for_program as _load_equipment_for_program,
+    stamp_tenant_from_equipment as _stamp_tenant_from_equipment,
 )
 from services.maintenance_program_enrichment import (
     enrich_criticality_context as _enrich_criticality_context,
@@ -125,17 +126,23 @@ class MaintenanceProgramService:
     async def get_or_create_program(
         equipment_id: str,
         generate_from_strategy: bool = True,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        tenant_id: Optional[str] = None,
     ) -> MaintenanceProgram:
         """Get existing program or create new one for equipment"""
 
-        equipment = await _load_equipment_for_program(equipment_id)
-        tenant_id = tenant_id_from_record(equipment)
+        equipment = await _load_equipment_for_program(equipment_id, tenant_id=tenant_id)
+        tenant_id = tenant_id or tenant_id_from_record(equipment)
 
         existing = await db.maintenance_programs_v2.find_one(
             maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id}),
             {"_id": 0}
         )
+        if not existing:
+            existing = await db.maintenance_programs_v2.find_one(
+                {"equipment_id": equipment_id},
+                {"_id": 0},
+            )
         
         if existing:
             return MaintenanceProgram(**existing)
@@ -172,7 +179,8 @@ class MaintenanceProgramService:
                 equipment_type_id=equipment.get("equipment_type_id"),
                 equipment_id=equipment_id,
                 criticality_level=strategy_criticality_band,
-                user_id=user_id
+                user_id=user_id,
+                tenant_id=tenant_id,
             )
             program.tasks = tasks
             program.source_strategy_id = equipment.get("equipment_type_id")
@@ -200,9 +208,9 @@ class MaintenanceProgramService:
         ))
         
         # Save to database
-        await db.maintenance_programs_v2.insert_one(
-            MaintenanceProgramService._program_to_db_document(program)
-        )
+        program_doc = MaintenanceProgramService._program_to_db_document(program)
+        _stamp_tenant_from_equipment(program_doc, equipment)
+        await db.maintenance_programs_v2.insert_one(program_doc)
         
         # Log audit
         await MaintenanceProgramService._log_audit(
@@ -215,20 +223,65 @@ class MaintenanceProgramService:
         return program
 
     @staticmethod
+    async def _find_program_doc_for_equipment(
+        equipment_id: str,
+        tenant_id: Optional[str],
+        projection: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        proj = projection or {"_id": 0}
+        doc = await db.maintenance_programs_v2.find_one(
+            maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id}),
+            proj,
+        )
+        if doc:
+            return doc
+        return await db.maintenance_programs_v2.find_one(
+            {"equipment_id": equipment_id},
+            proj,
+        )
+
+    @staticmethod
+    async def _apply_program_ensure_update(
+        equipment_id: str,
+        tenant_id: Optional[str],
+        update_fields: Dict[str, Any],
+    ) -> None:
+        result = await db.maintenance_programs_v2.update_one(
+            maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id}),
+            {"$set": update_fields},
+        )
+        if result.matched_count > 0:
+            return
+
+        legacy_fields = dict(update_fields)
+        if tenant_id:
+            legacy_fields["tenant_id"] = tenant_id
+        legacy = await db.maintenance_programs_v2.update_one(
+            {"equipment_id": equipment_id},
+            {"$set": legacy_fields},
+        )
+        if legacy.matched_count == 0:
+            raise ValueError(
+                f"Maintenance program v2 missing after ensure for equipment: {equipment_id}"
+            )
+
+    @staticmethod
     async def ensure_equipment_program_from_strategy(
         equipment_id: str,
         strategy_version: str,
         user_id: Optional[str] = None,
         activate: bool = True,
+        tenant_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Ensure maintenance_programs_v2 exists for equipment after scheduler apply-strategy.
         Creates a new program from strategy or regenerates an existing one.
         """
-        equipment = await _load_equipment_for_program(equipment_id)
-        tenant_id = tenant_id_from_record(equipment)
-        existing = await db.maintenance_programs_v2.find_one(
-            maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id}),
+        equipment = await _load_equipment_for_program(equipment_id, tenant_id=tenant_id)
+        tenant_id = tenant_id or tenant_id_from_record(equipment)
+        existing = await MaintenanceProgramService._find_program_doc_for_equipment(
+            equipment_id,
+            tenant_id,
             {"equipment_id": 1, "_id": 0},
         )
 
@@ -246,11 +299,12 @@ class MaintenanceProgramService:
                 equipment_id=equipment_id,
                 generate_from_strategy=True,
                 user_id=user_id,
+                tenant_id=tenant_id,
             )
             action = "created"
 
-        equipment = await _load_equipment_for_program(equipment_id)
-        tenant_id = tenant_id_from_record(equipment)
+        equipment = await _load_equipment_for_program(equipment_id, tenant_id=tenant_id)
+        tenant_id = tenant_id or tenant_id_from_record(equipment)
         update_fields: Dict[str, Any] = {
             "applied_strategy_version": strategy_version,
             "updated_at": datetime.utcnow().isoformat(),
@@ -263,14 +317,11 @@ class MaintenanceProgramService:
         if activate:
             update_fields["status"] = ProgramStatus.ACTIVE.value
 
-        result = await db.maintenance_programs_v2.update_one(
-            maintenance_scoped_tenant(tenant_id, {"equipment_id": equipment_id}),
-            {"$set": update_fields},
+        await MaintenanceProgramService._apply_program_ensure_update(
+            equipment_id,
+            tenant_id,
+            update_fields,
         )
-        if result.matched_count == 0:
-            raise ValueError(
-                f"Maintenance program v2 missing after ensure for equipment: {equipment_id}"
-            )
 
         return {"equipment_id": equipment_id, "action": action}
 
@@ -279,6 +330,7 @@ class MaintenanceProgramService:
         equipment_ids: List[str],
         strategy_version: str,
         user_id: Optional[str] = None,
+        tenant_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Ensure maintenance_programs_v2 exists for each equipment id."""
         created: List[str] = []
@@ -293,6 +345,7 @@ class MaintenanceProgramService:
                     equipment_id=equipment_id,
                     strategy_version=strategy_version,
                     user_id=user_id,
+                    tenant_id=tenant_id,
                 )
                 if result.get("action") == "created":
                     created.append(equipment_id)
@@ -318,12 +371,13 @@ class MaintenanceProgramService:
         equipment_type_id: str,
         equipment_id: str,
         criticality_level: str = "low",
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        tenant_id: Optional[str] = None,
     ) -> List[MaintenanceProgramTask]:
         """Generate maintenance tasks from equipment type strategy"""
         
-        equipment = await _load_equipment_for_program(equipment_id)
-        tenant_id = tenant_id_from_record(equipment)
+        equipment = await _load_equipment_for_program(equipment_id, tenant_id=tenant_id)
+        tenant_id = tenant_id or tenant_id_from_record(equipment)
 
         # Get strategy
         strategy = await db.equipment_type_strategies.find_one(

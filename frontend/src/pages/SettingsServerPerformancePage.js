@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatTime, formatDateTime } from "../lib/dateUtils";
 import {
-  ArrowLeft,
   Server,
   Cpu,
   HardDrive,
@@ -435,10 +434,6 @@ const SettingsServerPerformancePage = () => {
             <p className="text-slate-500 mb-6">
               Server Performance metrics are only available to account owners.
             </p>
-            <Button onClick={() => navigate(-1)} variant="outline">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -488,14 +483,6 @@ const SettingsServerPerformancePage = () => {
           {/* Mobile: Two rows */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate(-1)}
-                className="p-2 sm:px-3"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
               <div>
                 <h1 className="text-base sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
                   <Server className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />

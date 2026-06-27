@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { sparePartsAPI } from "../../lib/apis/spareParts";
 import { Button } from "../ui/button";
@@ -19,6 +20,7 @@ export default function SparePartRequirementsEditor({
   onChange,
   disabled = false,
 }) {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ["spare-parts", "equipment", equipmentId],
     queryFn: () => sparePartsAPI.list({ equipment_id: equipmentId }),
@@ -123,7 +125,7 @@ export default function SparePartRequirementsEditor({
         </Select>
       ) : availableParts.length === 0 ? (
         <p className="text-sm text-slate-500">
-          No spare parts linked to this equipment. Add parts in SpareIQ first.
+          {t("spareiq.addPartsFirstHint") || "No spare parts linked to this equipment. Add parts in Spares first."}
         </p>
       ) : (
         <p className="text-sm text-slate-500">All linked spare parts are already assigned.</p>

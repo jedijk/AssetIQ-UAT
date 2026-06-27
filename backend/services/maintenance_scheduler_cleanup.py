@@ -227,11 +227,17 @@ async def cleanup_stale_strategy_schedules(
 
 async def cleanup_schedules_without_strategy(
     equipment_type_id: Optional[str] = None,
+    user: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """
     Remove stale strategy schedule items and programs/tasks whose equipment-type
     strategy no longer exists.
     """
+    from services.maintenance_tenant_scope import maintenance_scoped
+
+    def _scope(query: Dict[str, Any]) -> Dict[str, Any]:
+        return maintenance_scoped(user, query) if user else maintenance_scoped_job(query)
+
     stale_cleanup = await cleanup_stale_strategy_schedules(equipment_type_id)
     no_program_cleanup = await cleanup_scheduled_tasks_without_active_programs(
         equipment_type_id,
@@ -254,7 +260,7 @@ async def cleanup_schedules_without_strategy(
 
     # Find ALL programs whose strategy no longer exists (regardless of task_source)
     async for prog in db.maintenance_programs.find(
-        maintenance_scoped_job(program_query),
+        _scope(program_query),
         {
             "id": 1,
             "strategy_id": 1,
@@ -287,7 +293,7 @@ async def cleanup_schedules_without_strategy(
 
     all_program_ids = {
         p["id"]
-        async for p in db.maintenance_programs.find(maintenance_scoped_job({}), {"id": 1, "_id": 0})
+        async for p in db.maintenance_programs.find(_scope({}), {"id": 1, "_id": 0})
         if p.get("id")
     }
 
@@ -349,7 +355,7 @@ async def cleanup_schedules_without_strategy(
     
     orphan_v2_program_ids: List[str] = []
     async for prog in db.maintenance_programs_v2.find(
-        maintenance_scoped_job(v2_program_query),
+        _scope(v2_program_query),
         {"id": 1, "equipment_type_id": 1, "_id": 0},
     ):
         eq_type = prog.get("equipment_type_id")

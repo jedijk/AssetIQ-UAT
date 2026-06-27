@@ -196,8 +196,8 @@ html, body {
 .app-page-shell {
     display: flex;
     flex-direction: column;
+    flex: 1 1 0%;
     min-height: 0;
-    height: calc(100dvh - var(--app-header-offset) - 2rem);
     overflow: hidden;
 }
 
@@ -226,7 +226,6 @@ html, body {
 .app-page-breadcrumb-band {
     width: 100%;
     max-width: 80rem;
-    margin-left: auto;
     margin-right: auto;
     padding-left: 1rem;
     padding-right: 1rem;

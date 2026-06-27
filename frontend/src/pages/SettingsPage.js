@@ -16,7 +16,6 @@ import {
   Database,
   BarChart3,
   ChevronRight,
-  ArrowLeft,
   Search,
   FileText,
   Shield,
@@ -321,10 +320,6 @@ export default function SettingsPage() {
     navigate(section.path);
   };
 
-  const handleBackToNav = () => {
-    setShowMobileNav(true);
-  };
-
   // On mobile, render settings pages directly without the Settings wrapper
   // This applies to all settings sub-pages (user-management, statistics, preferences, etc.)
   const isSettingsSubPage = location.pathname !== '/settings' && location.pathname.startsWith('/settings/');
@@ -344,20 +339,9 @@ export default function SettingsPage() {
       )}>
         {/* Sidebar Header */}
         <div className="p-4 border-b border-slate-200">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => navigate("/")}
-              data-testid="settings-back-btn"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-lg font-semibold text-slate-900">{t("settings.title")}</h1>
-              <p className="text-xs text-slate-500">{t("settings.subtitle")}</p>
-            </div>
+          <div>
+            <h1 className="text-lg font-semibold text-slate-900">{t("settings.title")}</h1>
+            <p className="text-xs text-slate-500">{t("settings.subtitle")}</p>
           </div>
         </div>
 
@@ -451,28 +435,8 @@ export default function SettingsPage() {
         "flex-1 overflow-hidden",
         showMobileNav ? "hidden md:block" : "block"
       )}>
-        {/* Mobile back button - Hidden on user-management page which has its own header */}
-        {!location.pathname.includes('/user-management') && (
-          <div className="md:hidden p-4 border-b border-slate-200 bg-white flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={handleBackToNav}
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <span className="font-medium text-slate-900 min-w-0 flex-1 break-words line-clamp-2">
-              {visibleSections.find(s => s.id === activeSection)
-                ? t(`settings.sections.${visibleSections.find(s => s.id === activeSection).sectionKey}.label`)
-                : t("settings.title")}
-            </span>
-          </div>
-        )}
-        
         <ScrollArea
-          className="h-full md:h-full"
-          style={{ height: location.pathname.includes('/user-management') ? '100%' : 'calc(100% - 56px)' }}
+          className="h-full"
           persistKey={`settings.content.${location.pathname}`}
         >
           <div className={cn(

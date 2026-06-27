@@ -29,7 +29,7 @@ MODULE_LABELS = {
     "strategy_iq": "StrategyIQ",
     "scheduling_iq": "SchedulingIQ",
     "digital_operator": "Digital Operator",
-    "spare_iq": "SpareIQ",
+    "spare_iq": "Spares",
     "visual_boards": "Visual Boards",
     "ril_copilot": "RIL Copilot",
     "executive_dashboards": "Executive Dashboards",

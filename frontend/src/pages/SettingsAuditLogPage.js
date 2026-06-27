@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, ArrowLeft, RefreshCw, Search, Filter, User, Clock, Calendar as CalendarIcon, Download } from "lucide-react";
+import { Shield, RefreshCw, Search, Filter, User, Clock, Calendar as CalendarIcon, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -176,10 +176,6 @@ export default function SettingsAuditLogPage() {
             <Shield className="w-5 h-5 text-slate-600" />
             <h1 className="text-xl font-semibold">Audit Log</h1>
           </div>
-          <Button variant="outline" onClick={() => navigate(-1)} className="gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
         </div>
         <Card>
           <CardHeader>
@@ -206,10 +202,6 @@ export default function SettingsAuditLogPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" onClick={() => navigate(-1)} className="gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
           <Button variant="outline" onClick={() => exportLog("csv")} className="gap-2">
             <Download className="w-4 h-4" />
             CSV

@@ -88,11 +88,21 @@ export const maintenanceSchedulerAPI = {
   // ============= Scheduler Engine =============
 
   /**
-   * Run scheduler engine
+   * Run scheduler engine.
+   * Uses background job + polling by default to avoid gateway timeouts.
    */
-  runScheduler: async (params = {}) => {
-    const response = await api.post('/maintenance-scheduler/run-scheduler', params);
-    return response.data;
+  runScheduler: async (params = {}, options = {}) => {
+    const runAsync = options.runAsync ?? params.run_async ?? true;
+    const response = await api.post('/maintenance-scheduler/run-scheduler', {
+      ...params,
+      run_async: runAsync,
+    });
+    const data = response.data;
+
+    if (data?.job_id && data?.status === 'pending') {
+      return pollSchedulerJob(data.job_id, options.poll);
+    }
+    return data;
   },
 
   /**

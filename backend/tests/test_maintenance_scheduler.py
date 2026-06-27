@@ -86,7 +86,7 @@ class TestPrograms:
 class TestScheduler:
     def test_run_scheduler(self, auth_headers):
         r = requests.post(f"{API}/maintenance-scheduler/run-scheduler",
-                          headers=auth_headers, json={}, timeout=60)
+                          headers=auth_headers, json={"run_async": False}, timeout=120)
         assert r.status_code == 200, r.text[:300]
         data = r.json()
         assert "tasks_created" in data
@@ -428,8 +428,8 @@ class TestStrategyPropagation:
         requests.post(
             f"{API}/maintenance-scheduler/run-scheduler",
             headers=auth_headers,
-            json={"equipment_type_id": etid},
-            timeout=30,
+            json={"equipment_type_id": etid, "run_async": False},
+            timeout=120,
         )
 
         d = requests.delete(

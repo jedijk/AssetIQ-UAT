@@ -21,7 +21,7 @@
     "formSubmissions": "Reports",
     "reliabilityIntelligence": "Reliability Intelligence",
     "visualManagement": "Visual Management",
-    "spareiq": "SpareIQ"
+    "spareiq": "Spares"
   },
   "spareiq": {
     "subtitle": "Central spare parts knowledge register",
@@ -50,6 +50,8 @@
     "documentUrl": "Document URL",
     "selectCategory": "Select category",
     "searchEquipment": "Search equipment...",
+    "searchEquipmentHint": "Type to search subunits and maintainable items",
+    "noEquipmentMatches": "No matching equipment",
     "componentPosition": "Component position",
     "upload": "Upload",
     "fileUploaded": "Document uploaded",
@@ -71,7 +73,7 @@
     "importWarnings": "Warnings",
     "importErrors": "Errors",
     "runImport": "Import",
-    "importComplete": "Import complete: {{created}} created, {{updated}} updated",
+    "importComplete": "Import complete: {created} created, {updated} updated",
     "importFailed": "Import failed",
     "importValidateFailed": "Validation failed",
     "equipmentPanelHint": "Spare parts linked to this equipment",
@@ -82,7 +84,8 @@
     "linked": "Spare part linked",
     "linkFailed": "Failed to link spare part",
     "unlink": "Unlink",
-    "noLinkCandidates": "No spare parts to link"
+    "noLinkCandidates": "No spare parts to link",
+    "addPartsFirstHint": "No spare parts linked to this equipment. Add parts in Spares first."
   },
   "settings": {
     "userManagement": "User Management",

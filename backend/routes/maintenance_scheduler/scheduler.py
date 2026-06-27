@@ -2,19 +2,21 @@
 Scheduler Engine: turns active maintenance programs into ScheduledTasks
 within the planning horizon.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 
 from auth import require_permission
 from models.maintenance_scheduler import (
     RunSchedulerRequest,
     CleanupOrphansRequest,
 )
+from services.background_jobs import background_job_service, JobStatus, tenant_id_from_user
 from services.maintenance_scheduling import (
     DEFAULT_HORIZON_DAYS,
     schedule_program,
     schedule_programs_for_equipment,
     schedule_programs_for_equipment_type,
 )
+from services.worker_config import use_external_background_worker
 
 router = APIRouter()
 
@@ -44,6 +46,7 @@ async def cleanup_orphan_scheduled_tasks(
 
     strategy_cleanup = await cleanup_schedules_without_strategy(
         equipment_type_id=request.equipment_type_id,
+        user=current_user,
     )
 
     return {
@@ -60,43 +63,54 @@ async def cleanup_orphan_scheduled_tasks(
 @router.post("/run-scheduler")
 async def run_scheduler(
     request: RunSchedulerRequest = None,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """
     Run the scheduler engine to generate scheduled tasks.
     Reviews all active maintenance programs and creates tasks within planning horizon.
+
+    Defaults to a background job (run_async=true) to avoid gateway timeouts on
+    large equipment types. Poll GET /maintenance-scheduler/jobs/{job_id} for status.
     """
     if request is None:
         request = RunSchedulerRequest()
 
-    from services.maintenance_program_service import MaintenanceProgramService
-    from services.maintenance_scheduler_sync import cleanup_schedules_without_strategy
-    from services.scheduler_program_source import load_schedulable_programs
+    from services.maintenance_scheduler_run import run_scheduler_impl
 
-    strategy_cleanup = await cleanup_schedules_without_strategy(
-        equipment_type_id=request.equipment_type_id,
-    )
+    if request.run_async:
+        user_id = current_user.get("id") or current_user.get("user_id")
+        tenant_id = tenant_id_from_user(current_user)
+        job_payload = {
+            "equipment_type_id": request.equipment_type_id,
+            "planning_horizon_days": request.planning_horizon_days,
+        }
+        if use_external_background_worker():
+            job_id = await background_job_service.enqueue_for_external_worker(
+                "run_scheduler",
+                user_id=user_id,
+                payload=job_payload,
+                max_retries=1,
+                tenant_id=tenant_id,
+            )
+        else:
+            job_id = await background_job_service.schedule_returning_job_id(
+                background_tasks,
+                "run_scheduler",
+                run_scheduler_impl,
+                request,
+                current_user,
+                user_id=user_id,
+                payload=job_payload,
+                max_retries=1,
+                tenant_id=tenant_id,
+            )
+        return {
+            "status": JobStatus.PENDING.value,
+            "job_id": job_id,
+            "message": "Scheduler run queued",
+            "equipment_type_id": request.equipment_type_id,
+            "worker_mode": "external" if use_external_background_worker() else "in_process",
+        }
 
-    await MaintenanceProgramService.sync_imported_program_tasks_to_scheduler(
-        equipment_type_id=request.equipment_type_id,
-        schedule=False,
-    )
-
-    schedulable_programs = await load_schedulable_programs(
-        equipment_type_id=request.equipment_type_id,
-    )
-    programs_skipped = 0
-
-    tasks_created = []
-    horizon = request.planning_horizon_days or DEFAULT_HORIZON_DAYS
-    for program in schedulable_programs:
-        created_ids = await schedule_program(program, horizon)
-        tasks_created.extend(created_ids)
-
-    return {
-        "message": "Scheduler run completed",
-        "tasks_created": len(tasks_created),
-        "programs_reviewed": len(schedulable_programs),
-        "programs_skipped_no_strategy": programs_skipped,
-        "strategy_cleanup": strategy_cleanup,
-    }
+    return await run_scheduler_impl(request, current_user)

@@ -34,6 +34,7 @@ from services.visual_board_helpers import (
     SCREENS_COLLECTION,
     TOKENS_COLLECTION,
     VERSIONS_COLLECTION,
+    VMB_DISPLAY_USER_ID,
     new_id,
     now_iso,
 )
@@ -597,7 +598,11 @@ async def resolve_token(raw_token: str) -> Dict[str, Any]:
 
 def tenant_display_user(tenant_id: Optional[str]) -> dict:
     """Synthetic user for tenant-scoped read queries on public displays."""
-    user: Dict[str, Any] = {"id": "vmb-display", "role": "viewer"}
+    user: Dict[str, Any] = {
+        "id": VMB_DISPLAY_USER_ID,
+        "role": "viewer",
+        "vmb_display": True,
+    }
     if tenant_id:
         user["company_id"] = tenant_id
     return user

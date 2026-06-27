@@ -112,7 +112,7 @@ export default function SparePartDetailPage() {
       <div className="mb-6">
         <Link to="/spareiq" className="inline-flex items-center text-sm text-slate-600 hover:text-slate-900 mb-3">
           <ArrowLeft className="w-4 h-4 mr-1" />
-          {t("nav.spareiq") || "SpareIQ"}
+          {t("nav.spareiq") || "Spares"}
         </Link>
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="flex items-start gap-3">

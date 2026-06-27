@@ -10,6 +10,7 @@ from typing import List, Optional, Set
 from fastapi import HTTPException
 
 from services.tenant_scope import scoped, scoped_job
+from services.visual_board_helpers import is_vmb_display_user
 
 logger = logging.getLogger(__name__)
 
@@ -36,16 +37,19 @@ class InstallationFilterService:
     def is_owner(self, user: dict) -> bool:
         """Check if user has owner role (bypasses all installation filtering)."""
         return user.get("role") == "owner"
+
+    def has_tenant_wide_installation_read(self, user: dict) -> bool:
+        """Owner and VMB kiosk users see all installations within the tenant."""
+        return self.is_owner(user) or is_vmb_display_user(user)
     
     async def get_user_installation_ids(self, user: dict) -> List[str]:
         """
         Get the equipment node IDs for installations assigned to the user.
         Returns empty list if no installations assigned (which means no data access).
-        Owner role gets ALL installations.
+        Owner role and VMB display users get ALL installations in the tenant.
         """
         try:
-            # Owner bypasses filtering - gets all installations
-            if self.is_owner(user):
+            if self.has_tenant_wide_installation_read(user):
                 all_installations = await self.db.equipment_nodes.find(
                     scoped(user, {"level": "installation"}),
                     {"_id": 0, "id": 1}
@@ -349,8 +353,7 @@ class InstallationFilterService:
     
     def has_installation_access(self, user: dict) -> bool:
         """Check if user has any installations assigned or is owner."""
-        # Owner always has access to all
-        if self.is_owner(user):
+        if self.has_tenant_wide_installation_read(user):
             return True
         assigned = user.get("assigned_installations", [])
         return len(assigned) > 0
@@ -359,7 +362,7 @@ class InstallationFilterService:
         """Return True when equipment_id is within the user's installation scope."""
         if not equipment_id:
             return False
-        if self.is_owner(user):
+        if self.has_tenant_wide_installation_read(user):
             return True
         installation_ids = await self.get_user_installation_ids(user)
         if not installation_ids:

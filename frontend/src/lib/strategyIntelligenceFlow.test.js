@@ -2,7 +2,9 @@ import {
   buildStrategyFlowNodes,
   normalizeScheduleProgramRow,
   matchesThreadSelectionRow,
+  matchesScheduleTaskToThreadSelection,
   resolveThreadSelectionFromTask,
+  scheduleTaskThreadRowId,
 } from "./strategyIntelligenceFlow";
 
 describe("buildStrategyFlowNodes", () => {
@@ -348,6 +350,29 @@ describe("buildStrategyFlowNodes", () => {
     );
 
     expect(matchesThreadSelectionRow(scheduleRows[0], selection)).toBe(true);
+  });
+
+  it("matches scheduled tasks by v2 program task id, not occurrence id", () => {
+    const selection = normalizeScheduleProgramRow({
+      id: "s1",
+      task_name: "Inspect seal",
+      equipment_id: "eq-9",
+    });
+
+    expect(
+      matchesScheduleTaskToThreadSelection(
+        {
+          id: "occurrence-42",
+          v2_task_id: "s1",
+          maintenance_program_id: "s1",
+          task_name: "Inspect seal",
+          equipment_id: "eq-9",
+        },
+        selection,
+      ),
+    ).toBe(true);
+
+    expect(scheduleTaskThreadRowId({ id: "occurrence-42", v2_task_id: "s1" })).toBe("s1");
   });
 
   it("shows zero when global stats report no active schedules", () => {

@@ -212,7 +212,7 @@ FEATURES = {
         "description": "Strategy library for failure modes and maintenance programs"
     },
     "spareiq": {
-        "name": "SpareIQ",
+        "name": "Spares",
         "description": "Spare parts knowledge register linked to equipment"
     },
     "library_ai_tools": {

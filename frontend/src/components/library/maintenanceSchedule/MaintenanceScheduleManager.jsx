@@ -331,7 +331,10 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
     const hasUnitFilter = !!filteredEquipmentIds;
     const hasDisciplineFilter = selectedDisciplines.length > 0;
     const hasSourceFilter = sourceFilter !== "all";
-    if (!hasUnitFilter && !hasDisciplineFilter && !hasSourceFilter) return timeline;
+    const hasThreadFilter = !!threadSelection;
+    if (!hasUnitFilter && !hasDisciplineFilter && !hasSourceFilter && !hasThreadFilter) {
+      return timeline;
+    }
 
     const filterEquipmentList = (list) => {
       if (!Array.isArray(list)) return list;
@@ -349,7 +352,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
       timeline: filterEquipmentList(timeline.timeline),
       equipment: filterEquipmentList(timeline.equipment),
     };
-  }, [timeline, filteredEquipmentIds, selectedDisciplines, sourceFilter, applyTaskListFilter]);
+  }, [timeline, filteredEquipmentIds, selectedDisciplines, sourceFilter, threadSelection, applyTaskListFilter]);
 
   const filteredTasksList = useMemo(
     () => applyTaskListFilter(tasksData?.tasks),

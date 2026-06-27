@@ -69,7 +69,7 @@ export default function SpareIQPage() {
             <Package className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">{t("nav.spareiq") || "SpareIQ"}</h1>
+            <h1 className="text-xl font-semibold text-slate-900">{t("nav.spareiq") || "Spares"}</h1>
             <p className="text-sm text-slate-500">{t("spareiq.subtitle") || "Central spare parts knowledge register"}</p>
           </div>
         </div>

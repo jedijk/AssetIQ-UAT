@@ -49,7 +49,7 @@ const staticRouteLabels = {
   '/supervisor': 'Supervisor Command Center',
   '/reliability/cases': 'Reliability Cases',
   '/definitions': 'Definitions',
-  '/spareiq': 'SpareIQ',
+  '/spareiq': 'Spares',
   '/settings': 'Settings',
   '/settings/preferences': 'Preferences',
   '/settings/general': 'General',

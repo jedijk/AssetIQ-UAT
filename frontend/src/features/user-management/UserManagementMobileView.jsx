@@ -18,7 +18,6 @@ import {
   KeyRound,
   Lock,
   PlayCircle,
-  ArrowLeft,
   Smartphone,
   Briefcase,
   Building2,
@@ -130,17 +129,7 @@ export function UserManagementMobileView({
         {/* Mobile Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => navigate("/")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-lg font-bold text-slate-900">Users & Roles</h1>
-            </div>
+            <h1 className="text-lg font-bold text-slate-900">Users & Roles</h1>
             <Button variant="ghost" size="icon" onClick={() => refetch()}>
               <RefreshCw className="w-4 h-4" />
             </Button>

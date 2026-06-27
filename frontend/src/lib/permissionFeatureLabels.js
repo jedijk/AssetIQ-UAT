@@ -16,6 +16,7 @@ export const PERMISSION_FEATURE_NAME_KEYS = {
   forms: "nav.formSubmissions",
   equipment: "nav.equipmentManager",
   library: "nav.library",
+  spareiq: "nav.spareiq",
   library_ai_tools: "permissions.features.library_ai_tools.name",
   reliability_intelligence: "nav.reliabilityIntelligence",
   chat: "permissions.features.chat.name",

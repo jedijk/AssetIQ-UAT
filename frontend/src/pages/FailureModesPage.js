@@ -1000,7 +1000,7 @@ const FailureModesPage = () => {
   }
 
   return (
-    <div className="app-page-shell app-page-content-band py-2 max-w-7xl mx-auto w-full" data-testid="failure-modes-page">
+    <div className="app-page-shell app-page-content-band flex-1 min-h-0 py-2 max-w-7xl mx-auto w-full" data-testid="failure-modes-page">
       {/* Back Button - shown when navigated from another page */}
       {location.state?.from && (
         <div className="mb-3 hidden sm:block flex-shrink-0">

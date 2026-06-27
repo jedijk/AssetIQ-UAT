@@ -124,6 +124,7 @@ async def get_maintenance_programs(
     programs = await load_schedulable_programs(
         equipment_type_id=equipment_type_id,
         equipment_ids=equipment_ids,
+        user=current_user,
     )
     if is_active:
         programs = [p for p in programs if p.get("is_active", True)]

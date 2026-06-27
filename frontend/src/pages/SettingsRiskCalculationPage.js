@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft,
   Settings,
   Calculator,
   RefreshCw,
@@ -33,7 +31,6 @@ function apiErrorMessage(error) {
 }
 
 const SettingsRiskCalculationPage = () => {
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [installations, setInstallations] = useState([]);
   const [selectedInstallation, setSelectedInstallation] = useState(null);
@@ -212,15 +209,6 @@ const SettingsRiskCalculationPage = () => {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/settings")}
-                className="gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Back</span>
-              </Button>
               <div>
                 <h1 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
                   <Calculator className="w-5 h-5 text-indigo-600" />

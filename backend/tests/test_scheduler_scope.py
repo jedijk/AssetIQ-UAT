@@ -3,7 +3,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from services.maintenance_scheduler_scope import scope_scheduled_tasks_query
+from services.maintenance_scheduler_scope import (
+    load_schedulable_program_rows,
+    scope_scheduled_tasks_query,
+)
 
 
 @pytest.mark.asyncio
@@ -66,3 +69,36 @@ async def test_scope_applies_tenant_filter_not_user_fields():
   assert scope_prog == {"maintenance_program_id": {"$in": ["prog-1"]}}
   tenant_part = next((p for p in inner if "tenant_id" in str(p)), None)
   assert tenant_part is not None
+
+
+@pytest.mark.asyncio
+async def test_scope_passes_user_to_load_schedulable_program_rows():
+  """Regression: program ids must resolve under the request tenant, not BACKFILL_TENANT_ID."""
+  query = {"due_date": {"$gte": "2026-01-01"}}
+  user = {"company_id": "tenant-abc", "user_id": "user-1"}
+  mock_load = AsyncMock(return_value=[{"id": "prog-1", "equipment_id": "eq-1"}])
+
+  with patch(
+      "services.maintenance_scheduler_scope.load_schedulable_program_rows",
+      new=mock_load,
+  ):
+      await scope_scheduled_tasks_query(query, equipment_type_id="type-1", user=user)
+
+  mock_load.assert_awaited_once_with("type-1", user=user)
+
+
+@pytest.mark.asyncio
+async def test_load_schedulable_program_rows_forwards_user():
+  mock_programs = AsyncMock(return_value=[{"id": "prog-1"}])
+
+  with patch(
+      "services.scheduler_program_source.load_schedulable_programs",
+      new=mock_programs,
+  ):
+      rows = await load_schedulable_program_rows("type-1", user={"company_id": "tenant-abc"})
+
+  assert rows == [{"id": "prog-1"}]
+  mock_programs.assert_awaited_once_with(
+      equipment_type_id="type-1",
+      user={"company_id": "tenant-abc"},
+  )

@@ -141,6 +141,7 @@ class ScheduledTask(BaseModel):
     ai_priority_reasoning: Optional[str] = None
     
     # Metadata
+    tenant_id: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -224,6 +225,7 @@ class RunSchedulerRequest(BaseModel):
     """Request to run the scheduler engine"""
     equipment_type_id: Optional[str] = None  # If specified, only schedule for this type
     planning_horizon_days: Optional[int] = None  # Override default planning horizon
+    run_async: bool = True  # Queue as background job (avoids gateway timeouts)
 
 
 class CleanupOrphansRequest(BaseModel):

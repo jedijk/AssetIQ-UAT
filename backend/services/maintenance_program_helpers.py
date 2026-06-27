@@ -4,17 +4,31 @@ from typing import Any, Dict, Optional
 
 from database import db
 from services.criticality_score import resolve_equipment_criticality_score
-from services.maintenance_tenant_scope import maintenance_scoped_job
+from services.maintenance_tenant_scope import maintenance_scoped_job, tenant_id_from_record
 
 
-async def load_equipment_for_program(equipment_id: str) -> Dict[str, Any]:
+async def load_equipment_for_program(
+    equipment_id: str,
+    tenant_id: Optional[str] = None,
+) -> Dict[str, Any]:
     equipment = await db.equipment_nodes.find_one(
-        maintenance_scoped_job({"id": equipment_id}),
+        maintenance_scoped_job({"id": equipment_id}, tenant_id=tenant_id),
         {"_id": 0},
     )
     if not equipment:
         raise ValueError(f"Equipment not found: {equipment_id}")
     return equipment
+
+
+def stamp_tenant_from_equipment(
+    doc: Dict[str, Any],
+    equipment: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Attach tenant_id from an equipment node before writing program documents."""
+    tid = tenant_id_from_record(equipment)
+    if tid:
+        doc["tenant_id"] = tid
+    return doc
 
 
 def criticality_fields_from_equipment(equipment: Optional[Dict[str, Any]]) -> Dict[str, Any]:

@@ -59,6 +59,7 @@ async def sync_imported_program_tasks_to_scheduler(
     equipment_type_id: Optional[str] = None,
     equipment_ids: Optional[List[str]] = None,
     user_id: Optional[str] = None,
+    user: Optional[dict] = None,
     schedule: bool = True,
     horizon_days: int = 365,
 ) -> Dict[str, Any]:
@@ -73,24 +74,29 @@ async def sync_imported_program_tasks_to_scheduler(
     )
     from services.pm_import_constants import is_pm_import_review_accepted
 
+    from services.maintenance_tenant_scope import maintenance_scoped
+
+    def _scope(query: Dict[str, Any]) -> Dict[str, Any]:
+        return maintenance_scoped(user, query) if user else maintenance_scoped_job(query)
+
     if equipment_ids:
         target_ids = list(dict.fromkeys(e for e in equipment_ids if e))
     elif equipment_type_id:
         nodes = await db.equipment_nodes.find(
-            maintenance_scoped_job({"equipment_type_id": equipment_type_id}),
+            _scope({"equipment_type_id": equipment_type_id}),
             {"id": 1, "_id": 0},
         ).to_list(500)
         target_ids = [n["id"] for n in nodes if n.get("id")]
     else:
         v2_docs = await db.maintenance_programs_v2.find(
-            maintenance_scoped_job({}),
+            _scope({}),
             {"equipment_id": 1, "_id": 0},
         ).to_list(500)
         target_ids = {
             p["equipment_id"] for p in v2_docs if p.get("equipment_id")
         }
         async for session in db.pm_import_sessions.find(
-            maintenance_scoped_job({}),
+            _scope({}),
             {"tasks_extracted": 1, "_id": 0},
         ):
             for pm_task in session.get("tasks_extracted") or []:
@@ -107,7 +113,7 @@ async def sync_imported_program_tasks_to_scheduler(
 
     for equipment_id in target_ids:
         stored_program = await db.maintenance_programs_v2.find_one(
-            maintenance_scoped_job({"equipment_id": equipment_id}),
+            _scope({"equipment_id": equipment_id}),
             {"_id": 0},
         )
         program, _, _ = await _enrich_program_response_with_pm_import(
@@ -127,7 +133,7 @@ async def sync_imported_program_tasks_to_scheduler(
             continue
 
         equipment = await db.equipment_nodes.find_one(
-            maintenance_scoped_job({"id": equipment_id}),
+            _scope({"id": equipment_id}),
             {
                 "_id": 0,
                 "name": 1,
@@ -177,7 +183,7 @@ async def sync_imported_program_tasks_to_scheduler(
             task_type = scheduler_task_type_from_program_task(task)
 
             existing = await db.maintenance_programs.find_one(
-                maintenance_scoped_job({"equipment_id": equipment_id, "v2_task_id": v2_task_id}),
+                _scope({"equipment_id": equipment_id, "v2_task_id": v2_task_id}),
             )
 
             update_fields: Dict[str, Any] = {
@@ -256,7 +262,7 @@ async def sync_imported_program_tasks_to_scheduler(
                 created = await schedule_program(program_doc, horizon_days)
                 scheduled_tasks += len(created)
 
-        deactivate_query: Dict[str, Any] = maintenance_scoped_job({
+        deactivate_query: Dict[str, Any] = _scope({
             "equipment_id": equipment_id,
             "task_source": TaskSource.CUSTOMER_IMPORTED.value,
         })

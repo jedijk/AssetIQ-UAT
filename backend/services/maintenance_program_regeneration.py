@@ -44,6 +44,10 @@ async def regenerate_program(
         maintenance_scoped_job({"equipment_id": equipment_id})
     )
     if not program_doc:
+        program_doc = await db.maintenance_programs_v2.find_one(
+            {"equipment_id": equipment_id}
+        )
+    if not program_doc:
         raise ValueError(f"No maintenance program found for equipment: {equipment_id}")
     
     program = MaintenanceProgram(**program_doc)

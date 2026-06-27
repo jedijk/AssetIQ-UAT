@@ -54,10 +54,14 @@ async def ensure_imported_pm_tasks_scheduled(
 
 async def load_schedulable_program_rows(
     equipment_type_id: Optional[str] = None,
+    user: Optional[dict] = None,
 ) -> List[dict]:
     from services.scheduler_program_source import load_schedulable_programs
 
-    return await load_schedulable_programs(equipment_type_id=equipment_type_id)
+    return await load_schedulable_programs(
+        equipment_type_id=equipment_type_id,
+        user=user,
+    )
 
 
 def scope_query_to_program_ids(query: Dict, program_ids: List[str]) -> None:
@@ -82,7 +86,7 @@ async def scope_scheduled_tasks_query(
     base_filters = dict(query)
 
     try:
-        rows = await load_schedulable_program_rows(equipment_type_id)
+        rows = await load_schedulable_program_rows(equipment_type_id, user=user)
     except Exception as exc:
         logger.warning("load_schedulable_program_rows failed: %s", exc)
         rows = []

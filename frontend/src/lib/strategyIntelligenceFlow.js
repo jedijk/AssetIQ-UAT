@@ -174,12 +174,24 @@ export function resolveThreadSelectionFromTask(task, scheduleRows = [], defaults
   return matched || candidate;
 }
 
+export function scheduleTaskThreadRowId(task) {
+  if (!task) return null;
+  return (
+    task.v2_task_id
+    || task.program_task_id
+    || task.maintenance_program_id
+    || task.template_id
+    || task.strategy_task_id
+    || task.id
+  );
+}
+
 export function matchesScheduleTaskToThreadSelection(task, selection) {
   if (!selection) return true;
   if (!task) return false;
   return matchesThreadSelectionRow(
     normalizeScheduleProgramRow({
-      id: task.template_id || task.strategy_task_id || task.id,
+      id: scheduleTaskThreadRowId(task),
       task_name: task.task_name || task.name,
       equipment_id: task.equipment_id,
       failure_mode_id: task.failure_mode_id,

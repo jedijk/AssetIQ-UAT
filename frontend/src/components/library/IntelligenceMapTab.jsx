@@ -680,7 +680,7 @@ const IntelligenceMapTab = () => {
                   title="Strategies"
                   count={stats?.strategies?.count}
                   subtitle={`${stats?.strategies?.task_templates || 0} Task Templates`}
-                  relationship={`${stats?.maintenance_programs?.count || 0} programs active`}
+                  relationship={`${stats?.maintenance_programs?.active || 0} programs active`}
                   onClick={navigateToStrategies}
                   color="purple"
                   isLoading={statsLoading}
@@ -702,10 +702,10 @@ const IntelligenceMapTab = () => {
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-1.5">
                             <Cog className="w-3 h-3 text-purple-600" />
-                            <span className="text-slate-600">From Strategy</span>
+                            <span className="text-slate-600">Strategy Programs</span>
                           </div>
                           <span className="font-semibold text-slate-900">
-                            {(stats?.equipment?.with_strategy_applied || 0).toLocaleString()}
+                            {(stats?.maintenance_programs?.from_strategy || 0).toLocaleString()}
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-4">
@@ -751,7 +751,7 @@ const IntelligenceMapTab = () => {
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-1.5">
                             <Cog className="w-3 h-3 text-teal-600" />
-                            <span className="text-slate-600">From Strategy</span>
+                            <span className="text-slate-600">Strategy Tasks</span>
                           </div>
                           <span className="font-semibold text-slate-900">
                             {(stats?.schedules?.from_strategy || 0).toLocaleString()}

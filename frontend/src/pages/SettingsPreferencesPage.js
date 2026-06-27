@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateCachedPreferences } from "../lib/dateUtils";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -16,7 +15,6 @@ import {
   ChevronDown,
   Search,
   Languages,
-  ArrowLeft,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Switch } from "../components/ui/switch";
@@ -69,7 +67,6 @@ const getCurrentTimeInTimezone = (timezone) => {
 
 export default function SettingsPreferencesPage() {
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [detectedTimezone] = useState(detectTimezone);
   const [timezoneOpen, setTimezoneOpen] = useState(false);
@@ -206,17 +203,9 @@ export default function SettingsPreferencesPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        {/* Mobile Header with Back Button */}
+        {/* Mobile Header */}
         {isMobile && (
-          <div className="flex items-center gap-3 mb-4">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8"
-              onClick={() => navigate("/")}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+          <div className="mb-4">
             <h1 className="text-lg font-bold text-slate-900">{t("settings.preferences.title")}</h1>
           </div>
         )}

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from database import db
 from models.maintenance_program import TaskSource
-from services.maintenance_tenant_scope import maintenance_scoped_job
+from services.maintenance_tenant_scope import maintenance_scoped, maintenance_scoped_job
 from services.scheduler_config import should_read_legacy_maintenance_programs
 from services.scheduler_helpers import (
     coerce_optional_str_id,
@@ -82,6 +82,7 @@ def expand_v2_program_to_scheduler_rows(
                 "program_source": "v2",
                 "v2_program_id": program_v2.get("id"),
                 "v2_task_id": task_id,
+                "tenant_id": program_v2.get("tenant_id") or program_v2.get("company_id"),
                 "equipment_id": equipment_id,
                 "equipment_name": program_v2.get("equipment_name", ""),
                 "equipment_tag": program_v2.get("equipment_tag"),
@@ -112,10 +113,15 @@ def expand_v2_program_to_scheduler_rows(
     return rows
 
 
-async def get_active_strategy_type_ids() -> Set[str]:
+async def get_active_strategy_type_ids(user: Optional[dict] = None) -> Set[str]:
     ids = set()
+    query = {"$nor": [{"status": "disabled"}]}
+    if user:
+        scoped = maintenance_scoped(user, query)
+    else:
+        scoped = maintenance_scoped_job(query)
     async for doc in db.equipment_type_strategies.find(
-        maintenance_scoped_job({"$nor": [{"status": "disabled"}]}),
+        scoped,
         {"equipment_type_id": 1, "_id": 0},
     ):
         etid = doc.get("equipment_type_id")
@@ -129,6 +135,7 @@ async def load_pm_import_scheduler_rows(
     equipment_type_id: Optional[str] = None,
     equipment_ids: Optional[List[str]] = None,
     covered_pm_refs: Optional[Set[str]] = None,
+    user: Optional[dict] = None,
 ) -> List[Dict[str, Any]]:
     """
     Build scheduler rows from Custom PM Import sessions.
@@ -151,8 +158,11 @@ async def load_pm_import_scheduler_rows(
 
     async def _equipment(equipment_id: str) -> Optional[Dict[str, Any]]:
         if equipment_id not in equipment_cache:
+            eq_query = {"id": equipment_id}
+            if user:
+                eq_query = maintenance_scoped(user, eq_query)
             equipment_cache[equipment_id] = await db.equipment_nodes.find_one(
-                {"id": equipment_id},
+                eq_query,
                 {
                     "_id": 0,
                     "id": 1,
@@ -165,9 +175,13 @@ async def load_pm_import_scheduler_rows(
             )
         return equipment_cache[equipment_id]
 
+    session_query: Dict[str, Any] = {}
+    if user:
+        session_query = maintenance_scoped(user, session_query)
+
     async for session in db.pm_import_sessions.find(
-        {},
-        {"_id": 0, "session_id": 1, "file_name": 1, "tasks_extracted": 1},
+        session_query,
+        {"_id": 0, "session_id": 1, "file_name": 1, "tasks_extracted": 1, "tenant_id": 1, "company_id": 1},
     ):
         for pm_task in session.get("tasks_extracted") or []:
             if not is_pm_import_review_accepted(pm_task):
@@ -215,6 +229,7 @@ async def load_pm_import_scheduler_rows(
                     "program_source": "pm_import",
                     "v2_program_id": None,
                     "v2_task_id": task_id,
+                    "tenant_id": session.get("tenant_id") or session.get("company_id"),
                     "equipment_id": equipment_id,
                     "equipment_name": equipment.get("name") or em.get("name") or "",
                     "equipment_tag": equipment.get("tag") or em.get("tag"),
@@ -256,7 +271,7 @@ async def load_schedulable_programs(
     Primary: v2 nested tasks. Fallback: legacy flat maintenance_programs for
     equipment that has no v2 program document yet.
     """
-    active_strategy_types = await get_active_strategy_type_ids()
+    active_strategy_types = await get_active_strategy_type_ids(user)
 
     v2_query: Dict[str, Any] = {}
     if equipment_type_id:
@@ -282,6 +297,7 @@ async def load_schedulable_programs(
         equipment_type_id=equipment_type_id,
         equipment_ids=equipment_ids,
         covered_pm_refs=covered_pm_refs,
+        user=user,
     )
     v2_rows.extend(pm_import_rows)
 

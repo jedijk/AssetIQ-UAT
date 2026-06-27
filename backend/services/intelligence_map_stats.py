@@ -439,6 +439,7 @@ async def get_intelligence_map_stats(
             "maintenance_programs": {
                 "count": programs_count,
                 "active": programs_active_count,  # Strategy programs + PM import driven equipment programs
+                "from_strategy": active_v2_program_count,
                 "from_pm_import": len(pm_only_equipment),  # PM-only equipment (not also from strategy)
                 "total_tasks": program_stats.get("total_tasks", 0),
                 "active_tasks": program_stats.get("active_tasks", 0),

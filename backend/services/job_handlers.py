@@ -132,8 +132,36 @@ async def handle_process_domain_event_outbox(job: dict) -> dict:
     return {"status": "ok", "processed": processed}
 
 
+async def handle_run_scheduler(job: dict) -> dict:
+    """Run maintenance scheduler from a persisted background_jobs payload."""
+    payload = job.get("payload") or {}
+    equipment_type_id = payload.get("equipment_type_id")
+    planning_horizon_days = payload.get("planning_horizon_days")
+
+    user_id = job.get("user_id")
+    current_user: dict = {"id": user_id, "role": "admin"}
+    if user_id:
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if user:
+            current_user = user
+
+    from models.maintenance_scheduler import RunSchedulerRequest
+    from services.maintenance_scheduler_run import run_scheduler_impl
+
+    request = RunSchedulerRequest(
+        equipment_type_id=equipment_type_id,
+        planning_horizon_days=planning_horizon_days,
+        run_async=False,
+    )
+    result = await run_scheduler_impl(request, current_user)
+    if isinstance(result, dict):
+        return result
+    return {"status": "completed"}
+
+
 JOB_HANDLERS: Dict[str, Callable[..., Any]] = {
     "apply_strategy": handle_apply_strategy,
+    "run_scheduler": handle_run_scheduler,
     "pm_import_ai_review": handle_pm_import_ai_review,
     "asset_health_daily_refresh": handle_asset_health_daily_refresh,
     "reliability_snapshots_daily_refresh": handle_reliability_snapshots_daily_refresh,

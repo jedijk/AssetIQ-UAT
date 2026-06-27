@@ -72,7 +72,6 @@ function PageHeader({ title, subtitle, onRefresh, isRefreshing, refreshLabel }) 
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <BackButton />
             <div>
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="w-6 h-6 text-emerald-600" />

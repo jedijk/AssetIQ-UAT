@@ -664,7 +664,6 @@ export default function SettingsPermissionsPage({ embedded = false }) {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <BackButton />
               <div>
                 <div className="flex items-center gap-2">
                   <Shield className="w-6 h-6 text-blue-600" />
