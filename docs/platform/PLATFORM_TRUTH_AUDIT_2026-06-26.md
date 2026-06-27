@@ -29,7 +29,7 @@ AssetIQ is a **credible single-tenant industrial reliability pilot platform** wi
 
 | Area | Truth |
 |------|--------|
-| **Canonical data model** | Dual observation model: `threats` (legacy UI/API) + `observations` (structured); bridge in `threat_observation_bridge.py`. **Not one entity.** |
+| **Work signal (observation/threat)** | **Phase 1+2 converged:** `create_work_signal` / `update_work_signal` are the sole approved write path; same UUID in `observations` + `threats` projection; verify gate in CI/UAT. **Structural debt remains:** two collections, `/threats` UI/API, bridge module until Phases 4–6 (see [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_PLAN.md)). |
 | **Knowledge graph** | Mongo `reliability_edges`; static sync gate pass; **reactive chain ~22% mature** (many transitions manual or incomplete). Graph is **not yet authoritative operational intelligence layer**. |
 | **Decision Engine** | Deterministic rules + human approve/reject/execute; **not autonomous AI decisions**. |
 | **Enterprise SaaS** | OIDC spike only; no SOC2/ISO27001 certification; Redis optional; single-instance workers. |
@@ -43,7 +43,7 @@ AssetIQ differentiates on **reliability-native workflow + FMEA depth + grounded 
 
 1. **Second tenant + cross-tenant penetration tests** — prove multi-customer isolation beyond Tyromer.  
 2. **Complete reactive graph sync chain** — every lifecycle transition writes/updates edges with verify gate.  
-3. **Observation/threat convergence** — one canonical observation API and UI path.  
+3. **Observation/threat structural cutover (Phases 4–6)** — UI/route rename, retire bridge, graph node consolidation; Phase 1+2 write convergence **already landed**.  
 4. **Production cutover package** — Redis, external workers, prod backfill, 48h soak, pen test.  
 5. **Evidence-first AI contract** — every recommendation returns citations + deterministic score separation (already documented in product spec; enforce in all AI surfaces).
 
@@ -59,7 +59,7 @@ Maturity based on code + tests + UAT gates, not slide decks.
 | **Equipment Hierarchy** | ISO 14224 asset tree, scoping, criticality | `equipment_nodes` | `equipment_nodes`, `installations` | `equipment_search_service`, `routes/equipment/` | **I** | `domain_registry` equipment; hierarchy utils tests | Legacy level aliases; large route files |
 | **Equipment Types** | Type registry, strategy linkage | `equipment_types` | `equipment_types` | `equipment_type_registry.py` | **I** | Domain registry; type-strategy routes | NOT VERIFIED: full UI coverage |
 | **Failure Modes (FMEA)** | Library, RPN, recommended actions | `failure_modes` | `failure_modes`, `equipment_failure_modes` | `services/failure_modes/`, `efm_service` | **I** | UAT 643 docs; `seed_failure_modes.py`; FM tests | Static + Mongo dual source; sync gate required |
-| **Observations** | Operational risk signals from field | `observations` + legacy `threats` | `observations`, `threats` | `observation_service`, `threat_*` services | **P** | `threat_observation_bridge.py`; `/observations`, `/threats` routes | **Duplicate models**; UI still "threats" in places |
+| **Observations** | Operational risk signals from field | **`observations`** (canonical write); `threats` = read projection | `observations`, `threats` | `work_signal_lifecycle`, `observation_service`, `/threats` read API | **I** (lifecycle) / **P** (surface) | `work_signal_lifecycle.py`; `verify_threat_observation_convergence.py`; Phase 1+2 landed | Writes converged; UI still `/threats`; bridge not retired (Phases 4–6) |
 | **AI Risk Analysis** | Interpret observation, suggest risk | AI output + threat fields | `threats`, AI usage logs | `ai_risk_analysis.py`, `ai_platform` | **P** | `ai_platform.py`, prompt registry, cost guard | OpenAI-only; not all paths use grounded orchestrator |
 | **Investigations** | Structured RCA, evidence, causes | `investigations` | `investigations`, `cause_nodes`, `evidence_items`, `timeline_events` | `investigation_crud`, `investigation_subresources` | **I** | Domain registry; graph sync hooks in crud | Legacy `action_items` mirror path |
 | **Actions** | Track mitigation work | `central_actions` | `central_actions` | `action_service`, `routes/actions.py` | **I** | Phase 1 action mirror gate pass; delete cache fix | Was dual with investigation `action_items` |
@@ -86,7 +86,7 @@ Source: `backend/architecture/domain_registry.py` + code search.
 | Company / tenant | `users.company_id`, `tenant_id` on collections | user_management | `organization_id` alias in some paths | **P** — strict mode on UAT |
 | Installation | `installations` | equipment | Site/location aliases in labels | **I** |
 | Equipment | `equipment_nodes` | equipment | — | **I** |
-| Observation | **`observations`** (target) | observations | **`threats`** still primary in UI/API; `legacy_threat_id` bridge | **P — conflict** |
+| Observation | **`observations`** (canonical write target) | observations / work_signal_lifecycle | `threats` = same-id read projection; `/threats` UI/API; `threat_observation_bridge` until Phase 5 | **I** (Phase 1+2) / **P** (Phases 4–6) |
 | Investigation | `investigations` | investigations | — | **I** |
 | Action | **`central_actions`** | actions | `investigation.action_items`, linked threat actions | **P — converging** |
 | Failure mode | `failure_modes` | failure_modes | Static `failure_modes.py` library | **I** with sync gate |
@@ -100,7 +100,19 @@ Source: `backend/architecture/domain_registry.py` + code search.
 | AI recommendation | Prompt output + citations | ai_platform | Contract enforced on analyze-risk, insights, PM import; doc: `AI_RECOMMENDATION_CONTRACT.md` | **P** — chat FM suggestions not yet versioned |
 | Executive KPI | `executive_kpi_snapshots` | analytics | Live compute vs snapshot | **I** (materialized) |
 
-**Highest-impact duplicate:** Observations exist as **`threats` + `observations`** with `threat_observation_bridge.py` mirroring. This splits lifecycle, graph sync, and reporting.
+**Work signal convergence status (2026-06-26):**
+
+| Layer | Status | Evidence |
+|-------|--------|----------|
+| **Write path** | **Converged (Phase 1+2)** | `create_work_signal`, `update_work_signal`; arch allowlist blocks direct threat writes |
+| **Identity** | **Converged** | Same UUID in `observations` + `threats` when backfilled; `verify_threat_observation_convergence.py` |
+| **Read surface** | **Partial (Phase 4 pending)** | UI/API still `/threats`, `threatsAPI`; product copy says "Observations" |
+| **Bridge / legacy** | **Partial (Phase 5 pending)** | `threat_observation_bridge.py` retained for pre-convergence docs and convert endpoint |
+| **Graph nodes** | **Partial (Phase 6 pending)** | Both `observation` and `threat` edge sync on converged writes |
+
+Phase 1+2 fixed **operational truth** (one lifecycle, one ID). Remaining work is **structural deduplication** (routes, UI, retire bridge, single graph node type) — not a failed merge.
+
+See [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_PLAN.md).
 
 ---
 
@@ -108,7 +120,7 @@ Source: `backend/architecture/domain_registry.py` + code search.
 
 | Transition | Mode | Evidence | Gap |
 |------------|------|----------|-----|
-| Field signal → Observation | Manual + AI-assisted | Chat, forms, mobile; AI risk on threat | Dual threat/observation paths |
+| Field signal → Observation | Manual + AI-assisted | `create_work_signal` (chat, forms, mobile) | Legacy `/observations`-only creates and convert endpoint until Phase 5 |
 | Observation → AI risk | AI-assisted | `ai_risk_analysis.py` | Deterministic scores separate (product spec §6.4) |
 | Observation → Investigation | Manual + event | Investigation routes, threat link | NOT VERIFIED: auto-create rules |
 | Investigation → Action | Deterministic + manual | `investigation_action_sync`, `central_actions` | Mirror convergence ongoing |
@@ -164,7 +176,7 @@ Per `docs/ASSETIQ_PHASE2_PRODUCT_REVERSE_ENGINEERING.md` §6.4 and code review.
 
 | Evidence type | Linked to recommendations? | Evidence |
 |---------------|---------------------------|----------|
-| Observations / threats | **P** | Threat/investigation links; dual model weakens trace |
+| Observations / threats | **I** (converged writes) / **P** (read surface) | Same-id gate; investigation links; UI still threat-keyed until Phase 4 |
 | Form submissions | **I** | Form service, investigation evidence |
 | Images / attachments | **P** | Attachment routes; R2 UAT issues NOT VERIFIED fixed |
 | Maintenance history | **I** | Equipment history, task instances |
@@ -323,7 +335,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | # | Problem | Evidence | Business impact | Tech impact | Effort | Dependencies | Outcome |
 |---|---------|----------|-----------------|-------------|--------|--------------|---------|
 | 1 | Single tenant proven | Tyromer only; phase2 report | Blocks enterprise sales | Isolation bugs latent | 2–4 wk | Test tenant data | Second tenant + pen test |
-| 2 | Observation/threat dual model | Phase **1+2 landed** (`update_work_signal`, backfill/verify scripts); plan: `OBSERVATION_THREAT_CONVERGENCE_PLAN.md` | Reporting fragmentation | Graph/sync duplication | 4–6 wk | UAT backfill `--execute` + verify exit 0 | One observation canonical API |
+| 2 | Observation/threat **structural cutover** (Phases 4–6) | Phase **1+2 landed** — `update_work_signal`, backfill/verify scripts; plan: `OBSERVATION_THREAT_CONVERGENCE_PLAN.md` | Residual reporting/UI fragmentation until route rename | Graph dual-node sync until Phase 6 | 2–4 wk (Phases 4–6) | UAT backfill `--execute` + verify exit 0 (Phase 3) | Single read API + retired bridge |
 | 3 | Production cutover blocked | Status doc §5 deferred | No prod revenue at scale | Data integrity risk | 4–8 wk | Ops, Atlas prod | Prod backfill + strict mode |
 | 4 | Graph reactive chain incomplete | ~22% maturity note | Weak "knowledge graph" claim | Traceability gaps | 6–10 wk | Graph plan doc | All lifecycle edges synced |
 | 5 | JWT secret fallback | **Mitigated 2026-06-26** — startup fails for uat/staging/production without `JWT_SECRET_KEY` | Account takeover if misconfig (local dev only) | Security incident | Done (code) | Deploy config on Railway | `tests/test_jwt_secret_config.py` |
@@ -359,7 +371,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 
 ### Phase 1 — Truth & tenant proof (0–90 days)
 
-**DoD:** Second tenant on UAT; cross-tenant test suite green; observation/threat migration plan approved; UAT soak signed off; all verify scripts exit 0 on schedule.
+**DoD:** Second tenant on UAT; cross-tenant test suite green; observation/threat **Phase 3 backfill executed** on UAT tenants; Phase 1+2 convergence verified (`verify_threat_observation_convergence.py` exit 0); UAT soak signed off; all verify scripts exit 0 on schedule.
 
 ### Phase 2 — Graph as intelligence layer (90–180 days)
 
@@ -378,7 +390,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | Criterion | Current | Phase to meet |
 |-----------|---------|---------------|
 | Multi-tenancy verified | One tenant | Phase 1 |
-| One canonical model per domain | Threat/observation split | Phase 1–2 |
+| One canonical model per domain | Work signal **writes converged**; read surface + bridge until Phase 4–6 | Phase 1 (backfill) + Phase 2 (cutover) |
 | End-to-end traceable workflow | Core path yes; graph partial | Phase 2 |
 | Grounded auditable AI | Partial | Phase 2 |
 | Graph authoritative | Partial | Phase 2 |
@@ -430,6 +442,8 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | `test_maintenance_scheduler_run.py` | Async run-scheduler job | PASS (local) |
 | `test_ensure_program_tenant_scope.py` | Program ensure tenant stamp | PASS (local) |
 | `test_visual_board_data_service.py` | VMB display user scope | 13 pass (local) |
+| `verify_threat_observation_convergence.py` | Same-id observation/threat gate | Scripts landed; UAT `--execute` NOT VERIFIED |
+| `backfill_threat_observation_convergence.py` | Upsert observations from threats | Scripts landed |
 | `test_architecture_convergence.py` | Domain boundaries | 74 pass |
 
 ---
@@ -440,7 +454,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 
 | Month | Focus | Deliverables |
 |-------|-------|--------------|
-| **1** | Truth & safety | Second tenant; cross-tenant tests; JWT hardening **landed**; re-run UAT gates weekly; observation/threat plan **published** (`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`) |
+| **1** | Truth & safety | Second tenant; cross-tenant tests; JWT hardening **landed**; re-run UAT gates weekly; observation/threat **Phase 1+2 landed** — run Phase 3 backfill `--execute` per tenant |
 | **2** | Graph & AI trust | Complete top 5 graph sync handlers; enforce citations on all AI user endpoints; Redis on UAT; start 48h soak |
 | **3** | Enterprise path | OIDC with pilot #2; external worker POC; pen test; prod cutover runbook (no prod execute unless approved); frontend modularization of top 3 god pages |
 
