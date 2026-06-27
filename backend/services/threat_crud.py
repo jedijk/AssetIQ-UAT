@@ -80,10 +80,7 @@ async def list_top_threats(
 
 async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[str] = None):
     try:
-        threat = await db.threats.find_one(
-            {"id": threat_id},
-            {"_id": 0}
-        )
+        threat = await _find_threat_scoped(user, threat_id)
         if not threat:
             raise HTTPException(status_code=404, detail="Threat not found")
 
@@ -96,8 +93,8 @@ async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[st
                 equipment_node = cache.get_equipment(linked_equipment_id)
                 if not equipment_node:
                     equipment_node = await db.equipment_nodes.find_one(
-                        {"id": linked_equipment_id},
-                        {"_id": 0}
+                        merge_tenant_filter({"id": linked_equipment_id}, user),
+                        {"_id": 0},
                     )
                     if equipment_node:
                         cache.set_equipment(linked_equipment_id, equipment_node)
@@ -106,8 +103,8 @@ async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[st
                 equipment_node = cache.get_equipment(cache_key)
                 if not equipment_node:
                     equipment_node = await db.equipment_nodes.find_one(
-                        {"name": asset_name},
-                        {"_id": 0}
+                        merge_tenant_filter({"name": asset_name}, user),
+                        {"_id": 0},
                     )
                     if equipment_node:
                         cache.set_equipment(cache_key, equipment_node)
@@ -377,8 +374,8 @@ async def recalculate_all_threat_scores(user: dict):
         return {"message": "No threats found", "updated_count": 0}
 
     equipment_nodes = await db.equipment_nodes.find(
-        {"created_by": user["id"]},
-        {"_id": 0, "id": 1, "name": 1, "criticality": 1}
+        merge_tenant_filter({"created_by": user["id"]}, user),
+        {"_id": 0, "id": 1, "name": 1, "criticality": 1},
     ).to_list(1000)
 
     asset_data = {}

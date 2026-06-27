@@ -86,6 +86,8 @@ SERVICE_LOC_ALLOWLIST: dict[str, int] = {
 TENANT_FILTER_ALLOWLIST: frozenset[str] = frozenset({
     "services/tenant_schema.py",
     "services/tenant_isolation_audit.py",
+    "services/tenant_management_service.py",
+    "services/tenant_registry.py",
     "services/permissions_defaults.py",
     "services/rbac_service.py",
     "services/observability_metrics.py",
