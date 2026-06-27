@@ -12,6 +12,7 @@ import { publicAssetUrl } from "../lib/assetUrl";
 import { authAPI } from "../lib/apis/auth";
 import { parseAuthError, formatCountdown, buildUnlockMailto } from "../lib/authErrors";
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "../components/ui/input-otp";
 
 const OIDC_STATE_KEY = "oidc_state";
 
@@ -25,7 +26,7 @@ const MAX_RETRY_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 3000;
 
 const LoginPage = () => {
-  const { login } = useAuth();
+  const { login, verify2FA, resend2FA } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
@@ -39,6 +40,12 @@ const LoginPage = () => {
   const [lockoutReason, setLockoutReason] = useState(null);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
+  const [twoFactorStep, setTwoFactorStep] = useState(false);
+  const [challengeToken, setChallengeToken] = useState("");
+  const [maskedEmail, setMaskedEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const [verifying2fa, setVerifying2fa] = useState(false);
   
   // Server startup state
   const [serverStarting, setServerStarting] = useState(false);
@@ -102,7 +109,16 @@ const LoginPage = () => {
   // Perform login attempt
   const performLogin = useCallback(async (emailValue, passwordValue, isRetry = false) => {
     try {
-      await login(emailValue, passwordValue);
+      const result = await login(emailValue, passwordValue);
+      if (result?.requires2fa) {
+        setTwoFactorStep(true);
+        setChallengeToken(result.challengeToken);
+        setMaskedEmail(result.maskedEmail || emailValue);
+        setOtpCode("");
+        setResendSeconds(60);
+        setAuthError(null);
+        return true;
+      }
       
       // Success - clear server starting state
       setServerStarting(false);
@@ -210,6 +226,58 @@ const LoginPage = () => {
 
     return () => clearInterval(timer);
   }, [rateLimitSeconds]);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return undefined;
+    const timer = setInterval(() => {
+      setResendSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendSeconds]);
+
+  const handleVerify2FA = async (codeOverride) => {
+    const code = (codeOverride || otpCode).replace(/\D/g, "");
+    if (code.length !== 6) {
+      setAuthError("Enter the 6-digit code sent to your email.");
+      return;
+    }
+    setVerifying2fa(true);
+    setAuthError(null);
+    try {
+      await verify2FA(challengeToken, code);
+      setTwoFactorStep(false);
+      toast.success(t("chat.welcomeMessage").split("!")[0] + "!");
+      navigate(from, { replace: true });
+    } catch (error) {
+      const parsed = parseAuthError(error);
+      setAuthError(parsed.message || "Invalid verification code");
+    } finally {
+      setVerifying2fa(false);
+    }
+  };
+
+  const handleResend2FA = async () => {
+    if (resendSeconds > 0) return;
+    try {
+      await resend2FA(challengeToken);
+      setResendSeconds(60);
+      toast.success("Verification code sent");
+    } catch (error) {
+      const parsed = parseAuthError(error);
+      setAuthError(parsed.message || "Could not resend code");
+      if (parsed.retryAfterSeconds) {
+        setResendSeconds(parsed.retryAfterSeconds);
+      }
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setTwoFactorStep(false);
+    setChallengeToken("");
+    setMaskedEmail("");
+    setOtpCode("");
+    setAuthError(null);
+  };
 
   const isLockedOut = lockoutSeconds > 0;
   const isSubmitting = loading || ssoLoading || isLockedOut;
@@ -456,6 +524,63 @@ const LoginPage = () => {
             </Alert>
           )}
 
+          {twoFactorStep ? (
+            <div className="space-y-5" data-testid="login-2fa-form">
+              <p className="text-sm text-slate-600">
+                We sent a verification code to <strong>{maskedEmail}</strong>.
+                Enter it to continue. This device will be remembered after successful verification.
+              </p>
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(value) => {
+                    setOtpCode(value.replace(/\D/g, ""));
+                    if (value.replace(/\D/g, "").length === 6) {
+                      handleVerify2FA(value.replace(/\D/g, ""));
+                    }
+                  }}
+                  data-testid="login-2fa-otp"
+                >
+                  <InputOTPGroup>
+                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                      <InputOTPSlot key={index} index={index} />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+              <Button
+                type="button"
+                disabled={verifying2fa || otpCode.length !== 6}
+                onClick={() => handleVerify2FA()}
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700"
+                data-testid="login-2fa-submit"
+              >
+                {verifying2fa ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Verifying…
+                  </>
+                ) : (
+                  "Verify and sign in"
+                )}
+              </Button>
+              <div className="flex items-center justify-between text-sm">
+                <button type="button" className="text-blue-600 hover:underline" onClick={handleBackToLogin}>
+                  Use another account
+                </button>
+                <button
+                  type="button"
+                  className="text-blue-600 hover:underline disabled:text-slate-400 disabled:no-underline"
+                  disabled={resendSeconds > 0}
+                  onClick={handleResend2FA}
+                  data-testid="login-2fa-resend"
+                >
+                  {resendSeconds > 0 ? `Resend in ${resendSeconds}s` : "Resend code"}
+                </button>
+              </div>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
             <div className="space-y-2">
               <Label htmlFor="email">{t("auth.email")}</Label>
@@ -516,8 +641,9 @@ const LoginPage = () => {
               )}
             </Button>
           </form>
+          )}
 
-          {oidcEnabled && (
+          {!twoFactorStep && oidcEnabled && (
             <>
               <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">

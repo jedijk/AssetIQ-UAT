@@ -16,6 +16,26 @@ class UserLogin(BaseModel):
     password: str
 
 
+class LoginResponse(BaseModel):
+    requires_2fa: bool = False
+    token: Optional[str] = None
+    user: Optional["UserResponse"] = None
+    must_change_password: Optional[bool] = False
+    csrf_token: Optional[str] = None
+    challenge_token: Optional[str] = None
+    delivery_method: Optional[str] = None
+    masked_email: Optional[str] = None
+
+
+class TwoFactorVerifyRequest(BaseModel):
+    challenge_token: str
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class TwoFactorResendRequest(BaseModel):
+    challenge_token: str
+
+
 class UserResponse(BaseModel):
     id: str
     email: str

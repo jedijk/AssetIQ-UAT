@@ -37,6 +37,8 @@ function isPreLoginAuthUrl(url) {
   const u = url || "";
   return (
     u.includes("/auth/login") ||
+    u.includes("/auth/2fa/verify") ||
+    u.includes("/auth/2fa/resend") ||
     u.includes("/auth/register") ||
     u.includes("/auth/forgot-password") ||
     u.includes("/auth/reset-password") ||

@@ -1923,7 +1923,10 @@
     "resetPassword": "Wachtwoord Resetten",
     "newPassword": "Nieuw Wachtwoord",
     "resetLinkSent": "Reset link verzonden! Controleer uw e-mail.",
-    "passwordResetSuccess": "Wachtwoord is succesvol gereset."
+    "passwordResetSuccess": "Wachtwoord is succesvol gereset.",
+    "email2faMenu": "Verificatie op nieuw apparaat",
+    "email2faEnabled": "E-mailverificatie op nieuwe apparaten ingeschakeld",
+    "email2faDisabled": "E-mailverificatie op nieuwe apparaten uitgeschakeld"
   },
   "ai": {
     "riskAnalysis": "AI Risicoanalyse",

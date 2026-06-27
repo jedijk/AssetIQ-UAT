@@ -12,6 +12,21 @@ export const authAPI = {
     return response.data;
   },
 
+  verify2FA: async (challengeToken, code) => {
+    const response = await api.post("/auth/2fa/verify", {
+      challenge_token: challengeToken,
+      code,
+    });
+    return response.data;
+  },
+
+  resend2FA: async (challengeToken) => {
+    const response = await api.post("/auth/2fa/resend", {
+      challenge_token: challengeToken,
+    });
+    return response.data;
+  },
+
   resetPassword: async (token, newPassword) => {
     const response = await api.post("/auth/reset-password", {
       token,

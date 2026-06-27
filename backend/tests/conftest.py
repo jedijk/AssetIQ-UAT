@@ -38,6 +38,7 @@ CI_THREAT_ID = os.environ.get("CI_THREAT_ID", "ci-threat-001")
 #   REACT_APP_BACKEND_URL=http://127.0.0.1:8765
 #   ENVIRONMENT=test
 #   RATE_LIMIT_ENABLED=false
+#   EMAIL_2FA_IN_TEST=true  # opt-in 2FA during pytest integration runs
 
 
 def _login_url() -> Optional[str]:

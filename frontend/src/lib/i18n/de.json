@@ -1922,7 +1922,10 @@
     "resetPassword": "Passwort zurücksetzen",
     "newPassword": "Neues Passwort",
     "resetLinkSent": "Link gesendet! Prüfen Sie Ihre E-Mail.",
-    "passwordResetSuccess": "Passwort wurde erfolgreich zurückgesetzt."
+    "passwordResetSuccess": "Passwort wurde erfolgreich zurückgesetzt.",
+    "email2faMenu": "Verifizierung auf neuem Gerät",
+    "email2faEnabled": "E-Mail-Verifizierung auf neuen Geräten aktiviert",
+    "email2faDisabled": "E-Mail-Verifizierung auf neuen Geräten deaktiviert"
   },
   "ai": {
     "riskAnalysis": "KI-Risikoanalyse",

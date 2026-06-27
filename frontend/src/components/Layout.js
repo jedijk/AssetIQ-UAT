@@ -25,6 +25,7 @@ import {
   filterNavItems,
   filterSettingsMenuItems,
 } from "./layout/layoutNavConfig";
+import { preferencesAPI } from "../lib/apis/definitions";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
 const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.7";
@@ -492,6 +493,39 @@ const Layout = () => {
     window.dispatchEvent(new CustomEvent("operatorViewChanged"));
   };
 
+  const [email2faAvailable, setEmail2faAvailable] = useState(false);
+  const [email2faEnabled, setEmail2faEnabled] = useState(false);
+  const [email2faUpdating, setEmail2faUpdating] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    preferencesAPI.getPreferences()
+      .then((prefs) => {
+        setEmail2faAvailable(Boolean(prefs.email_2fa_available));
+        setEmail2faEnabled(Boolean(prefs.email_2fa_enabled));
+      })
+      .catch(() => {});
+  }, [user?.id]);
+
+  const toggleEmail2fa = async () => {
+    if (!email2faAvailable || email2faUpdating) return;
+    setEmail2faUpdating(true);
+    try {
+      const next = !email2faEnabled;
+      const prefs = await preferencesAPI.updatePreferences({ email_2fa_enabled: next });
+      setEmail2faEnabled(Boolean(prefs.email_2fa_enabled));
+      toast.success(
+        next
+          ? (t("auth.email2faEnabled") || "Email verification on new devices enabled")
+          : (t("auth.email2faDisabled") || "Email verification on new devices disabled"),
+      );
+    } catch (error) {
+      toast.error(error.response?.data?.detail || error.message || "Could not update security setting");
+    } finally {
+      setEmail2faUpdating(false);
+    }
+  };
+
   const { isOwner, isPreviewing, previewRoleLabel } = useRolePreview();
   const [rolePreviewDialogOpen, setRolePreviewDialogOpen] = useState(false);
 
@@ -595,6 +629,10 @@ const Layout = () => {
         logout={logout}
         operatorViewEnabled={operatorViewEnabled}
         toggleOperatorView={toggleOperatorView}
+        email2faAvailable={email2faAvailable}
+        email2faEnabled={email2faEnabled}
+        email2faUpdating={email2faUpdating}
+        toggleEmail2fa={toggleEmail2fa}
         isOwner={isOwner}
         isPreviewing={isPreviewing}
         previewRoleLabel={previewRoleLabel}

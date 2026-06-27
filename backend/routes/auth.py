@@ -27,7 +27,15 @@ from auth import (
     clear_session_auth_cookies,
     attach_csrf_response_header,
 )
-from models.api_models import UserCreate, UserLogin, UserResponse, TokenResponse
+from models.api_models import (
+    UserCreate,
+    UserLogin,
+    UserResponse,
+    TokenResponse,
+    LoginResponse,
+    TwoFactorVerifyRequest,
+    TwoFactorResendRequest,
+)
 from pydantic import BaseModel, EmailStr, field_validator
 from utils.spam_protection import is_disposable_email, validate_honeypot, verify_recaptcha
 from utils.mongo_regex import exact_case_insensitive
@@ -300,6 +308,69 @@ async def register(request: Request, user_data: RegisterWithProtection):
     }
 
 
+def _serialize_user_response(user: dict) -> UserResponse:
+    created_at = user.get("created_at")
+    if hasattr(created_at, "isoformat"):
+        created_at = created_at.isoformat()
+    elif not isinstance(created_at, str):
+        created_at = str(created_at) if created_at else None
+    return UserResponse(
+        id=user["id"],
+        email=user["email"],
+        name=user["name"],
+        created_at=created_at,
+        department=user.get("department"),
+        position=user.get("position"),
+        role=user.get("role"),
+        phone=user.get("phone"),
+        must_change_password=user.get("must_change_password", False),
+        has_seen_intro=user.get("has_seen_intro", True),
+        default_simple_mode=user.get("default_simple_mode", False),
+        terms_accepted_version=user.get("terms_accepted_version"),
+    )
+
+
+async def _complete_login(
+    user: dict,
+    *,
+    request: Request,
+    response: Response,
+    ip_address: str,
+    email: str,
+    audit_event: str = "login_password_success",
+) -> LoginResponse:
+    from services.login_security_audit import log_login_security_event
+    from services.tenant_schema import tenant_id_from_user
+
+    await record_login_attempt(email, success=True, ip_address=ip_address)
+    token = create_token(user["id"])
+    must_change_password = user.get("must_change_password", False)
+    csrf_token = None
+    cookie_enabled = os.environ.get("AUTH_SET_COOKIE_ON_LOGIN", "true").lower() == "true"
+    if cookie_enabled:
+        try:
+            csrf_token = set_session_auth_cookies(response, request, token)
+        except Exception as e:
+            logger.warning(f"Auth cookie setup failed: {type(e).__name__}: {e}")
+            csrf_token = None
+
+    await log_login_security_event(
+        audit_event,
+        tenant_id=tenant_id_from_user(user),
+        user_id=user["id"],
+        email=user.get("email"),
+        ip_address=ip_address,
+    )
+
+    return LoginResponse(
+        requires_2fa=False,
+        token=token,
+        must_change_password=must_change_password,
+        csrf_token=csrf_token,
+        user=_serialize_user_response(user),
+    )
+
+
 async def notify_admins_new_user(user_email: str, user_name: str):
     """Notify owner(s) about new user registration requiring approval."""
     # Get owner users only
@@ -330,7 +401,7 @@ async def notify_admins_new_user(user_email: str, user_name: str):
             except Exception as e:
                 logger.error(f"Failed to send approval notification to {owner['email']}: {e}")
 
-@router.post("/auth/login", response_model=TokenResponse)
+@router.post("/auth/login", response_model=LoginResponse)
 @limiter.limit(STRICT_AUTH_RATE_LIMIT)
 async def login(request: Request, credentials: UserLogin, response: Response):
     # Get client IP for audit logging
@@ -406,49 +477,142 @@ async def login(request: Request, credentials: UserLogin, response: Response):
             detail="This organization is suspended or archived. Contact your platform administrator.",
         )
     
-    # Record successful login
-    await record_login_attempt(credentials.email, success=True, ip_address=ip_address)
-    
-    token = create_token(user["id"])
-    must_change_password = user.get("must_change_password", False)
-    has_seen_intro = user.get("has_seen_intro", True)  # Default to True for existing users
-
-    csrf_token = None
-    cookie_enabled = os.environ.get("AUTH_SET_COOKIE_ON_LOGIN", "true").lower() == "true"
-    if cookie_enabled:
-        try:
-            csrf_token = set_session_auth_cookies(response, request, token)
-        except Exception as e:
-            # Never fail login just because cookie config failed
-            logger.warning(f"Auth cookie setup failed: {type(e).__name__}: {e}")
-            csrf_token = None
-    
-    # Convert datetime to string for Pydantic model
-    created_at = user.get("created_at")
-    if hasattr(created_at, 'isoformat'):
-        created_at = created_at.isoformat()
-    elif not isinstance(created_at, str):
-        created_at = str(created_at) if created_at else None
-    
-    return TokenResponse(
-        token=token,
-        must_change_password=must_change_password,
-        csrf_token=csrf_token,
-        user=UserResponse(
-            id=user["id"],
-            email=user["email"],
-            name=user["name"],
-            created_at=created_at,
-            department=user.get("department"),
-            position=user.get("position"),
-            role=user.get("role"),
-            phone=user.get("phone"),
-            must_change_password=must_change_password,
-            has_seen_intro=has_seen_intro,
-            default_simple_mode=user.get("default_simple_mode", False),
-            terms_accepted_version=user.get("terms_accepted_version")
+    tenant_id = tenant_id_from_user(user)
+    if tenant_id and not await is_tenant_login_allowed(tenant_id):
+        await record_login_attempt(credentials.email, success=False, ip_address=ip_address)
+        raise HTTPException(
+            status_code=403,
+            detail="This organization is suspended or archived. Contact your platform administrator.",
         )
+
+    from services.email_2fa_service import create_email_challenge, email_2fa_enabled, user_email_2fa_enabled
+    from services.login_security_audit import log_login_security_event
+    from services.trusted_device_service import (
+        find_valid_trusted_device,
+        read_trusted_device_cookie,
+        touch_trusted_device,
     )
+
+    if email_2fa_enabled() and user_email_2fa_enabled(user):
+        raw_device_token = read_trusted_device_cookie(request)
+        trusted = None
+        if raw_device_token:
+            trusted = await find_valid_trusted_device(
+                user_id=user["id"],
+                tenant_id=tenant_id,
+                raw_token=raw_device_token,
+            )
+        if trusted:
+            await touch_trusted_device(trusted["id"], ip_address)
+            await log_login_security_event(
+                "login_trusted_device_used",
+                tenant_id=tenant_id,
+                user_id=user["id"],
+                email=user.get("email"),
+                ip_address=ip_address,
+            )
+            return await _complete_login(
+                user,
+                request=request,
+                response=response,
+                ip_address=ip_address,
+                email=credentials.email,
+                audit_event="login_trusted_device_used",
+            )
+
+        challenge_token, masked_email = await create_email_challenge(
+            user,
+            ip_address=ip_address,
+            user_agent=request.headers.get("user-agent"),
+        )
+        await log_login_security_event(
+            "login_2fa_required",
+            tenant_id=tenant_id,
+            user_id=user["id"],
+            email=user.get("email"),
+            ip_address=ip_address,
+        )
+        return LoginResponse(
+            requires_2fa=True,
+            challenge_token=challenge_token,
+            delivery_method="email",
+            masked_email=masked_email,
+        )
+
+    return await _complete_login(
+        user,
+        request=request,
+        response=response,
+        ip_address=ip_address,
+        email=credentials.email,
+    )
+
+
+@router.post("/auth/2fa/verify", response_model=LoginResponse)
+@limiter.limit(STRICT_AUTH_RATE_LIMIT)
+async def verify_2fa(request: Request, body: TwoFactorVerifyRequest, response: Response):
+    ip_address = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
+    from services.email_2fa_service import verify_email_challenge
+    from services.login_security_audit import log_login_security_event
+    from services.tenant_schema import tenant_id_from_user
+    from services.trusted_device_service import (
+        register_trusted_device,
+        set_trusted_device_cookie,
+    )
+
+    if not body.code.isdigit():
+        raise HTTPException(status_code=400, detail="Verification code must contain digits only")
+
+    user = await verify_email_challenge(body.challenge_token, body.code, ip_address=ip_address)
+    raw_device_token = await register_trusted_device(
+        user_id=user["id"],
+        tenant_id=tenant_id_from_user(user),
+        ip_address=ip_address,
+        user_agent=request.headers.get("user-agent"),
+    )
+    set_trusted_device_cookie(response, request, raw_device_token)
+    await log_login_security_event(
+        "login_trusted_device_created",
+        tenant_id=tenant_id_from_user(user),
+        user_id=user["id"],
+        email=user.get("email"),
+        ip_address=ip_address,
+    )
+    return await _complete_login(
+        user,
+        request=request,
+        response=response,
+        ip_address=ip_address,
+        email=user["email"],
+        audit_event="login_2fa_success",
+    )
+
+
+@router.post("/auth/2fa/resend")
+@limiter.limit("3/minute")
+async def resend_2fa(request: Request, body: TwoFactorResendRequest):
+    ip_address = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
+    from services.email_2fa_service import resend_email_challenge
+
+    masked_email = await resend_email_challenge(body.challenge_token, ip_address=ip_address)
+    return {
+        "status": "sent",
+        "masked_email": masked_email,
+        "expires_in_seconds": int(os.environ.get("EMAIL_2FA_CODE_EXPIRY_MINUTES", "10")) * 60,
+    }
+
+
+@router.delete("/auth/trusted-devices/current")
+async def revoke_current_trusted_device(request: Request, response: Response, current_user: dict = Depends(get_current_user)):
+    from services.trusted_device_service import clear_trusted_device_cookie, revoke_trusted_devices_for_user
+    from services.tenant_schema import tenant_id_from_user
+
+    count = await revoke_trusted_devices_for_user(
+        current_user["id"],
+        tenant_id=tenant_id_from_user(current_user),
+    )
+    clear_trusted_device_cookie(response, request)
+    return {"status": "ok", "revoked_count": count}
 
 
 @router.post("/auth/logout", response_model=dict)
@@ -539,6 +703,16 @@ async def change_password(
         "ip_address": ip_address,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
+
+    from services.email_2fa_service import invalidate_challenges_for_user
+    from services.trusted_device_service import revoke_trusted_devices_for_user
+    from services.tenant_schema import tenant_id_from_user
+
+    await invalidate_challenges_for_user(current_user["id"])
+    await revoke_trusted_devices_for_user(
+        current_user["id"],
+        tenant_id=tenant_id_from_user(current_user),
+    )
     
     logger.info(f"Password changed for user {current_user['email']}")
     
@@ -969,6 +1143,14 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
         {"token": body.token},
         {"$set": {"used": True, "used_at": datetime.now(timezone.utc)}}
     )
+
+    user_doc = await db.users.find_one({"email": email}, {"_id": 0, "id": 1})
+    if user_doc:
+        from services.email_2fa_service import invalidate_challenges_for_user
+        from services.trusted_device_service import revoke_trusted_devices_for_user
+
+        await invalidate_challenges_for_user(user_doc["id"])
+        await revoke_trusted_devices_for_user(user_doc["id"])
     
     return {
         "status": "success",

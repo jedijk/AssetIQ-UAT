@@ -327,6 +327,20 @@ INDEX_DEFINITIONS = {
         {"keys": [("user_id", 1), ("timestamp", -1)]},
         {"keys": [("email", 1), ("timestamp", -1)]},
     ],
+
+    "trusted_devices": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("user_id", 1), ("device_token_hash", 1)]},
+        {"keys": [("tenant_id", 1), ("user_id", 1)]},
+        {"keys": [("expires_at", 1)]},
+    ],
+
+    "email_2fa_challenges": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("challenge_token_hash", 1)], "unique": True},
+        {"keys": [("user_id", 1), ("consumed_at", 1)]},
+        {"keys": [("expires_at", 1)]},
+    ],
     
     # Custom equipment types
     "custom_equipment_types": [

@@ -157,10 +157,6 @@ export const AuthProvider = ({ children }) => {
     }
     
     const loginUrl = `${API_URL}/auth/login`;
-    console.log("[Auth] ===== LOGIN ATTEMPT =====");
-    console.log("[Auth] API_URL:", API_URL);
-    console.log("[Auth] Login URL:", loginUrl);
-    console.log("[Auth] ========================");
     
     // Mark that we're authenticating to prevent the useEffect from calling fetchUser
     setIsAuthenticating(true);
@@ -174,14 +170,63 @@ export const AuthProvider = ({ children }) => {
           headers: getDbEnvHeaders(),
         },
       );
-      const { token: newToken, user: userData, must_change_password, csrf_token: csrfToken } = response.data;
+      const data = response.data;
+      if (data.requires_2fa) {
+        setIsAuthenticating(false);
+        return {
+          requires2fa: true,
+          challengeToken: data.challenge_token,
+          maskedEmail: data.masked_email,
+        };
+      }
+      return await finalizeLoginSession(data, API_URL);
+    } catch (error) {
+      setIsAuthenticating(false);
+      console.error("[Auth] Login failed:", error.response?.status, error.response?.data || error.message);
+      throw error;
+    }
+  };
+
+  const verify2FA = async (challengeToken, code) => {
+    const API_URL = getApiUrl();
+    setIsAuthenticating(true);
+    try {
+      const response = await axios.post(
+        `${API_URL}/auth/2fa/verify`,
+        { challenge_token: challengeToken, code },
+        {
+          withCredentials: AUTH_MODE === "cookie",
+          headers: getDbEnvHeaders(),
+        },
+      );
+      return await finalizeLoginSession(response.data, API_URL);
+    } catch (error) {
+      setIsAuthenticating(false);
+      throw error;
+    }
+  };
+
+  const resend2FA = async (challengeToken) => {
+    const API_URL = getApiUrl();
+    const response = await axios.post(
+      `${API_URL}/auth/2fa/resend`,
+      { challenge_token: challengeToken },
+      {
+        withCredentials: AUTH_MODE === "cookie",
+        headers: getDbEnvHeaders(),
+      },
+    );
+    return response.data;
+  };
+
+  async function finalizeLoginSession(data, API_URL) {
+    const { token: newToken, user: userData, must_change_password, csrf_token: csrfToken } = data;
 
     if (AUTH_MODE === "bearer") {
       localStorage.setItem("token", newToken);
       axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
       setToken(newToken);
     } else {
-      // Cookie mode: token is in HttpOnly cookie, keep state token null.
       axios.defaults.withCredentials = true;
       setToken(null);
       if (csrfToken) {
@@ -193,48 +238,32 @@ export const AuthProvider = ({ children }) => {
     enforceDatabaseEnvironmentForRole(userData?.role);
     setLoading(false);
     setMustChangePassword(must_change_password || userData.must_change_password || false);
-    
-    // Check if user needs to accept terms (after password change if applicable)
+
     const userTermsVersion = userData.terms_accepted_version;
     const needsTermsAcceptance = !userTermsVersion || userTermsVersion !== CURRENT_TERMS_VERSION;
-    // Only show terms if password change is not required first
     setMustAcceptTerms(needsTermsAcceptance && !(must_change_password || userData.must_change_password));
-    
-    // Fetch and cache user preferences for date/time formatting
+
     await fetchAndCachePreferences(API_URL);
-    
-    // Sync intro seen status with localStorage
-    // If user must change password or accept terms, don't show intro yet
+
     if (must_change_password || userData.must_change_password || needsTermsAcceptance) {
       localStorage.setItem("assetiq_intro_seen", "true");
     } else if (userData.has_seen_intro === false) {
-      // User doesn't need to change password and hasn't seen intro - show it
       localStorage.removeItem("assetiq_intro_seen");
     } else if (userData.has_seen_intro === true) {
-      // User has already seen intro
       localStorage.setItem("assetiq_intro_seen", "true");
     }
-    
-    // Apply default simple mode on first login if set by admin
+
     if (userData.default_simple_mode && !localStorage.getItem("operatorViewEnabled")) {
       localStorage.setItem("operatorViewEnabled", "true");
     }
 
-    // Set default hidden hierarchy levels for new users
     if (!localStorage.getItem("hierarchy-hidden-levels")) {
       localStorage.setItem("hierarchy-hidden-levels", JSON.stringify(["installation", "plant_unit"]));
     }
 
-    // Clear the authenticating flag now that login is complete
     setIsAuthenticating(false);
-    
     return { ...userData, must_change_password: must_change_password || userData.must_change_password };
-    } catch (error) {
-      setIsAuthenticating(false);
-      console.error("[Auth] Login failed:", error.response?.status, error.response?.data || error.message);
-      throw error;
-    }
-  };
+  }
 
   const loginWithSsoToken = async (token, userData) => {
     const API_URL = getApiUrl();
@@ -378,6 +407,8 @@ export const AuthProvider = ({ children }) => {
       token, 
       loading, 
       login,
+      verify2FA,
+      resend2FA,
       loginWithSsoToken,
       register,
       logout, 

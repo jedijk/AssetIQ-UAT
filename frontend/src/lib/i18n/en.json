@@ -1858,7 +1858,10 @@
     "resetPassword": "Reset Password",
     "newPassword": "New Password",
     "resetLinkSent": "Reset link sent! Check your email.",
-    "passwordResetSuccess": "Password has been reset successfully."
+    "passwordResetSuccess": "Password has been reset successfully.",
+    "email2faMenu": "New device verification",
+    "email2faEnabled": "Email verification on new devices enabled",
+    "email2faDisabled": "Email verification on new devices disabled"
   },
   "ai": {
     "riskAnalysis": "AI Risk Analysis",

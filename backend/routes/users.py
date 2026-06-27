@@ -10,6 +10,7 @@ import uuid
 import base64
 import os
 import jwt
+from typing import Optional
 from database import db, rbac_service, JWT_SECRET, JWT_ALGORITHM
 from auth import get_current_user, hash_password, verify_password, require_permission
 from routes.auth import validate_password_complexity
@@ -1001,6 +1002,7 @@ class UserPreferencesUpdate(BaseModel):
     time_format: str = None  # "12h" or "24h"
     language: str = None
     discipline: str = None  # Filter discipline for simple mode
+    email_2fa_enabled: Optional[bool] = None
 
 
 @router.get("/users/me/preferences")
@@ -1008,9 +1010,11 @@ async def get_user_preferences(
     current_user: dict = Depends(get_current_user)
 ):
     """Get current user's preferences including timezone settings."""
+    from services.email_2fa_service import email_2fa_enabled, resolve_email_2fa_preference
+
     user = await db.users.find_one(
         {"id": current_user["id"]},
-        {"_id": 0, "preferences": 1}
+        {"_id": 0, "preferences": 1, "role": 1}
     )
     
     # Return defaults if no preferences set
@@ -1020,11 +1024,19 @@ async def get_user_preferences(
         "date_format": "YYYY-MM-DD",
         "time_format": "24h",
         "language": "en",
-        "discipline": None  # No filter by default
+        "discipline": None,  # No filter by default
+        "email_2fa_available": email_2fa_enabled(),
+        "email_2fa_enabled": False,
     }
     
     preferences = user.get("preferences", {}) if user else {}
-    return {**defaults, **preferences}
+    merged = {**defaults, **preferences}
+    merged["email_2fa_available"] = email_2fa_enabled()
+    merged["email_2fa_enabled"] = resolve_email_2fa_preference(
+        current_user,
+        preferences,
+    )
+    return merged
 
 
 @router.put("/users/me/preferences")
@@ -1047,6 +1059,27 @@ async def update_user_preferences(
         update_data["preferences.language"] = preferences.language
     if preferences.discipline is not None:
         update_data["preferences.discipline"] = preferences.discipline if preferences.discipline != "all" else None
+    if preferences.email_2fa_enabled is not None:
+        from services.email_2fa_service import email_2fa_enabled
+        from services.login_security_audit import log_login_security_event
+        from services.trusted_device_service import revoke_trusted_devices_for_user
+        from services.tenant_schema import tenant_id_from_user
+
+        if not email_2fa_enabled():
+            raise HTTPException(status_code=400, detail="Email verification login is not available on this environment")
+        update_data["preferences.email_2fa_enabled"] = bool(preferences.email_2fa_enabled)
+        if preferences.email_2fa_enabled:
+            await revoke_trusted_devices_for_user(
+                current_user["id"],
+                tenant_id=tenant_id_from_user(current_user),
+            )
+        await log_login_security_event(
+            "login_2fa_preference_updated",
+            tenant_id=tenant_id_from_user(current_user),
+            user_id=current_user["id"],
+            email=current_user.get("email"),
+            details={"email_2fa_enabled": bool(preferences.email_2fa_enabled)},
+        )
     
     if update_data:
         await db.users.update_one(
@@ -1060,16 +1093,26 @@ async def update_user_preferences(
         {"_id": 0, "preferences": 1}
     )
     
+    from services.email_2fa_service import email_2fa_enabled, resolve_email_2fa_preference
+
     defaults = {
         "timezone": "UTC",
         "timezone_auto_detect": True,
         "date_format": "YYYY-MM-DD",
         "time_format": "24h",
-        "language": "en"
+        "language": "en",
+        "email_2fa_available": email_2fa_enabled(),
+        "email_2fa_enabled": False,
     }
     
     preferences_result = user.get("preferences", {}) if user else {}
-    return {**defaults, **preferences_result}
+    merged = {**defaults, **preferences_result}
+    merged["email_2fa_available"] = email_2fa_enabled()
+    merged["email_2fa_enabled"] = resolve_email_2fa_preference(
+        current_user,
+        preferences_result,
+    )
+    return merged
 
 
 @router.get("/timezones")

@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Menu, X, PanelLeftOpen, PanelLeftClose, Settings, HelpCircle, LogOut, User, Shield, Eye,
+  Menu, X, PanelLeftOpen, PanelLeftClose, Settings, HelpCircle, LogOut, User, Shield, Eye, Mail,
   Info, MessageCircleQuestion, Tag, Sparkles, Route,
 } from "lucide-react";
 import AnimatedDrawer from "../animations/AnimatedDrawer";
@@ -44,6 +44,10 @@ export default function LayoutHeader({
   logout,
   operatorViewEnabled,
   toggleOperatorView,
+  email2faAvailable,
+  email2faEnabled,
+  email2faUpdating,
+  toggleEmail2fa,
   isOwner,
   isPreviewing,
   previewRoleLabel,
@@ -401,6 +405,23 @@ export default function LayoutHeader({
                           {previewRoleLabel}
                         </span>
                       )}
+                    </DropdownMenuItem>
+                  )}
+                  {email2faAvailable && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.preventDefault();
+                        toggleEmail2fa();
+                      }}
+                      className="cursor-pointer"
+                      data-testid="toggle-email-2fa"
+                      disabled={email2faUpdating}
+                    >
+                      <Mail className="w-4 h-4 mr-2" />
+                      {t("auth.email2faMenu") || "New device verification"}
+                      <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded ${email2faEnabled ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
+                        {email2faEnabled ? (t("simpleMode.on") || "On") : (t("simpleMode.off") || "Off")}
+                      </span>
                     </DropdownMenuItem>
                   )}
                   {isMobileView && (
