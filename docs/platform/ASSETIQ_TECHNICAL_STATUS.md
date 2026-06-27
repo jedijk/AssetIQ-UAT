@@ -4,9 +4,9 @@
 
 > This document stays active for operational gate commands and exit codes until archived after the next **successful** live UAT gate run.
 
-**Version:** 2026-06-27 (post-deploy gates verified)  
+**Version:** 2026-06-27 (audit refresh @ `0880424e`)  
 **Repository:** AssetIQ-Dev  
-**Branch / commit assessed:** `deploy-uat` @ `560ceb5c` (`uat/main`)  
+**Branch / commit assessed:** `deploy-uat` @ `0880424e` (`uat/main`)  
 **Environment assessed:** Local code gates + **live UAT Atlas** (`assetiq-UAT`, tenant `Tyromer`)
 
 **Purpose:** Operational gate status and reproducible verification commands. Product/platform truth lives in [`PLATFORM_TRUTH_AUDIT_2026-06-27.md`](./PLATFORM_TRUTH_AUDIT_2026-06-27.md); this file reconciles due diligence, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable scripts.
@@ -28,7 +28,7 @@
 
 ### What is verified as passing (code / CI gates)
 
-- **Tenant service filter heuristic audit** — 0 flagged services (151 scanned)
+- **Tenant service filter heuristic audit** — 0 flagged services (152 scanned @ 2026-06-27)
 - **Platform standards gate (WS8)** — 4/4 gates pass
 - **AI entry point report** — 0 new OpenAI import violations
 - **Canonical data models (WS3)** — 13 domains registered
@@ -48,14 +48,14 @@
 - **Production strict mode / prod tenant backfill** — **Deferred** (production not touched).
 - **48h UAT soak** — **Deferred**.
 - **SOC 2 / ISO 27001 / NIS2 certification** — **Not complete** (gap assessments only).
-- **Frontend unit test coverage** — **43 test suites**, **285 tests** (includes `maintenanceStrategyFilters.test.js`); CI gate via `npm run test:ci` + `verify_frontend_unit_tests.py`
+- **Frontend unit test coverage** — **43 test suites**, **286 tests**; CI gate via `npm run test:ci` + `verify_frontend_unit_tests.py`
 - **Scalability (Redis/K8s/multi-replica)** — infra workstream; not UAT-script addressable.
 
 ### Readiness statements (honest)
 
 | Question | Answer |
 |----------|--------|
-| **Safe for UAT pilot use (single tenant, Tyromer)?** | **Yes, with caveats** — pilot on `560ceb5c`; post-deploy gates exit 0 @ 2026-06-27. |
+| **Safe for UAT pilot use (single tenant, Tyromer)?** | **Yes, with caveats** — pilot on `0880424e`; post-deploy gates exit 0 @ 2026-06-27. |
 | **Production-ready?** | **No** — production tenant backfill, strict mode, soak, and prod ops checklist are explicitly deferred. |
 | **Enterprise-ready?** | **No** — SOC2/NIS2 not certified; multi-tenant proven only for one pilot tenant. |
 
