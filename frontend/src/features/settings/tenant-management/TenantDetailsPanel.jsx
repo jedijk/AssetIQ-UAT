@@ -9,7 +9,7 @@ import {
 } from "../../../components/ui/select";
 import { TenantStatusBadge, formatDate } from "./tenantManagementShared";
 
-export default function TenantDetailsPanel({ tenant, onUpdate, updating }) {
+export default function TenantDetailsPanel({ tenant, onUpdate, onRegister, updating, registering }) {
   const [status, setStatus] = useState("active");
 
   useEffect(() => {
@@ -42,9 +42,14 @@ export default function TenantDetailsPanel({ tenant, onUpdate, updating }) {
   return (
     <SettingsCard title="Tenant details" description={tenant.slug} key={tenant.tenant_id}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex items-center gap-2">
-          <TenantStatusBadge status={tenant.status} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <TenantStatusBadge status={tenant.status} registryStatus={tenant.registry_status} />
           <span className="text-xs text-muted-foreground font-mono">{tenant.tenant_id}</span>
+          {tenant.registry_status === "legacy" && onRegister && (
+            <Button type="button" size="sm" variant="secondary" onClick={onRegister} disabled={registering}>
+              {registering ? "Registering…" : "Register in registry"}
+            </Button>
+          )}
         </div>
         <div className="grid gap-2">
           <Label htmlFor="detail-name">Name</Label>

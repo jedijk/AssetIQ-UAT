@@ -5,7 +5,7 @@ import {
 } from "../../../components/ui/table";
 import { Switch } from "../../../components/ui/switch";
 import { Label } from "../../../components/ui/label";
-import { TenantStatusBadge, formatDate, enabledModuleCount } from "./tenantManagementShared";
+import { TenantStatusBadge, formatDate, formatTenantId, enabledModuleCount } from "./tenantManagementShared";
 
 export default function TenantList({
   tenants,
@@ -68,9 +68,11 @@ export default function TenantList({
               >
                 <TableCell className="font-medium">{tenant.name}</TableCell>
                 <TableCell className="font-mono text-xs max-w-[120px] truncate" title={tenant.tenant_id}>
-                  {tenant.tenant_id.slice(0, 8)}…
+                  {formatTenantId(tenant.tenant_id)}
                 </TableCell>
-                <TableCell><TenantStatusBadge status={tenant.status} /></TableCell>
+                <TableCell>
+                  <TenantStatusBadge status={tenant.status} registryStatus={tenant.registry_status} />
+                </TableCell>
                 <TableCell>{tenant.plan || "—"}</TableCell>
                 <TableCell>{tenant.user_count ?? 0}</TableCell>
                 <TableCell>{tenant.site_count ?? 0}</TableCell>

@@ -53,6 +53,8 @@ export default function TenantManagementPage() {
           <TenantDetailsPanel
             tenant={tm.selectedTenant}
             updating={tm.updating}
+            registering={tm.registering}
+            onRegister={() => tm.registerTenant(selectedTenantId)}
             onUpdate={(payload) => tm.updateTenant({ tenantId: selectedTenantId, payload })}
           />
           <TenantModulesCard

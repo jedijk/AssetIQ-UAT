@@ -61,11 +61,18 @@ def _serialize_tenant(doc: dict, counts: Optional[dict] = None) -> dict:
     out["site_count"] = counts.get("site_count", 0)
     out["equipment_count"] = counts.get("equipment_count", 0)
     out["ai_enabled"] = bool((doc.get("ai_settings") or {}).get("enabled", False))
+    if doc.get("registry_status"):
+        out["registry_status"] = doc["registry_status"]
     return out
 
 
+def _tenant_membership_filter(tenant_id: str) -> dict:
+    """Match users belonging to a tenant (legacy company_id or tenant_id)."""
+    return {"$or": [{"tenant_id": tenant_id}, {"company_id": tenant_id}]}
+
+
 async def _tenant_counts(db, tenant_id: str) -> dict:
-    user_count = await db.users.count_documents({"tenant_id": tenant_id})
+    user_count = await db.users.count_documents(_tenant_membership_filter(tenant_id))
     site_count = await db.equipment_nodes.count_documents(
         {"tenant_id": tenant_id, "level": ISOLevel.INSTALLATION.value}
     )
@@ -75,6 +82,108 @@ async def _tenant_counts(db, tenant_id: str) -> dict:
         "site_count": site_count,
         "equipment_count": equipment_count,
     }
+
+
+async def discover_legacy_tenant_ids(db) -> List[str]:
+    """Tenant IDs with live data but no row in the tenants registry."""
+    registered: set[str] = set()
+    async for doc in db.tenants.find({}, {"tenant_id": 1, "_id": 0}):
+        tid = doc.get("tenant_id")
+        if tid:
+            registered.add(str(tid))
+
+    discovered: set[str] = set()
+    for field in ("tenant_id", "company_id"):
+        async for doc in db.users.aggregate(
+            [
+                {"$match": {field: {"$exists": True, "$nin": [None, ""]}}},
+                {"$group": {"_id": f"${field}"}},
+            ]
+        ):
+            tid = doc.get("_id")
+            if tid:
+                discovered.add(str(tid))
+
+    return sorted(tid for tid in discovered if tid not in registered)
+
+
+async def build_legacy_tenant_snapshot(db, tenant_id: str) -> dict:
+    """Synthesize a tenant view from existing users/equipment (pre-registry tenants)."""
+    admin_user = await db.users.find_one(
+        {**_tenant_membership_filter(tenant_id), "role": "admin"},
+        sort=[("created_at", 1)],
+    )
+    if not admin_user:
+        admin_user = await db.users.find_one(
+            _tenant_membership_filter(tenant_id),
+            sort=[("created_at", 1)],
+        )
+
+    counts = await _tenant_counts(db, tenant_id)
+    if counts["user_count"] == 0 and counts["equipment_count"] == 0:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    slug = normalize_slug(tenant_id)
+    return {
+        "tenant_id": tenant_id,
+        "name": tenant_id,
+        "slug": slug,
+        "status": "active",
+        "plan": None,
+        "modules": dict(DEFAULT_MODULES),
+        "ai_settings": default_ai_settings(),
+        "default_language": "en",
+        "default_timezone": "UTC",
+        "primary_admin": {
+            "name": (admin_user or {}).get("name", ""),
+            "email": (admin_user or {}).get("email", ""),
+        },
+        "notes": "Legacy tenant discovered from existing data. Register to enable lifecycle controls.",
+        "created_at": (admin_user or {}).get("created_at"),
+        "updated_at": None,
+        "last_activity_at": None,
+        "created_by": None,
+        "registry_status": "legacy",
+    }
+
+
+async def _resolve_tenant_doc(db, tenant_id: str) -> dict:
+    doc = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
+    if doc:
+        return doc
+    return await build_legacy_tenant_snapshot(db, tenant_id)
+
+
+async def register_legacy_tenant(db, tenant_id: str, actor: dict) -> dict:
+    """Persist a discovered legacy tenant into the tenants registry."""
+    existing = await db.tenants.find_one({"tenant_id": tenant_id})
+    if existing:
+        return await get_tenant(db, tenant_id)
+
+    snapshot = await build_legacy_tenant_snapshot(db, tenant_id)
+    now = _now_iso()
+    tenant_doc = {
+        **{k: v for k, v in snapshot.items() if k not in ("registry_status",)},
+        "status": snapshot.get("status") or "active",
+        "created_at": snapshot.get("created_at") or now,
+        "updated_at": now,
+        "created_by": actor.get("id"),
+    }
+    tenant_doc.pop("registry_status", None)
+
+    slug = tenant_doc.get("slug")
+    if slug and await db.tenants.find_one({"slug": slug, "tenant_id": {"$ne": tenant_id}}):
+        tenant_doc["slug"] = f"{slug}-{tenant_id[:8].lower()}"
+
+    await db.tenants.insert_one(tenant_doc)
+    invalidate_tenant_status_cache(tenant_id)
+    await log_tenant_audit(
+        "tenant_registered",
+        tenant_id=tenant_id,
+        actor=actor,
+        details={"source": "legacy_discovery", "name": tenant_doc.get("name")},
+    )
+    return await get_tenant(db, tenant_id)
 
 
 async def list_tenants(
@@ -94,16 +203,27 @@ async def list_tenants(
     cursor = db.tenants.find(query, {"_id": 0}).sort("created_at", -1)
     tenants = await cursor.to_list(500)
     results = []
+    seen: set[str] = set()
     for doc in tenants:
+        seen.add(doc["tenant_id"])
         counts = await _tenant_counts(db, doc["tenant_id"])
         results.append(_serialize_tenant(doc, counts))
+
+    if not status:
+        for tenant_id in await discover_legacy_tenant_ids(db):
+            if tenant_id in seen:
+                continue
+            snapshot = await build_legacy_tenant_snapshot(db, tenant_id)
+            if not include_archived and snapshot.get("status") == "archived":
+                continue
+            counts = await _tenant_counts(db, tenant_id)
+            results.append(_serialize_tenant(snapshot, counts))
+
     return results
 
 
 async def get_tenant(db, tenant_id: str) -> dict:
-    doc = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Tenant not found")
+    doc = await _resolve_tenant_doc(db, tenant_id)
     counts = await _tenant_counts(db, tenant_id)
     return _serialize_tenant(doc, counts)
 
@@ -248,7 +368,8 @@ async def create_tenant(db, payload: dict, actor: dict) -> dict:
 async def update_tenant(db, tenant_id: str, payload: dict, actor: dict) -> dict:
     existing = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
     if not existing:
-        raise HTTPException(status_code=404, detail="Tenant not found")
+        await register_legacy_tenant(db, tenant_id, actor)
+        existing = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
 
     updates: Dict[str, Any] = {}
     allowed = {
@@ -285,7 +406,8 @@ async def set_tenant_status(db, tenant_id: str, status: str, actor: dict, event:
         raise HTTPException(status_code=400, detail="Invalid status")
     existing = await db.tenants.find_one({"tenant_id": tenant_id})
     if not existing:
-        raise HTTPException(status_code=404, detail="Tenant not found")
+        await register_legacy_tenant(db, tenant_id, actor)
+        existing = await db.tenants.find_one({"tenant_id": tenant_id})
 
     now = _now_iso()
     await db.tenants.update_one(
@@ -300,7 +422,8 @@ async def set_tenant_status(db, tenant_id: str, status: str, actor: dict, event:
 async def update_modules(db, tenant_id: str, modules: dict, actor: dict) -> dict:
     existing = await db.tenants.find_one({"tenant_id": tenant_id})
     if not existing:
-        raise HTTPException(status_code=404, detail="Tenant not found")
+        await register_legacy_tenant(db, tenant_id, actor)
+        existing = await db.tenants.find_one({"tenant_id": tenant_id})
 
     merged = {**DEFAULT_MODULES, **(existing.get("modules") or {}), **(modules or {})}
     for key in merged:
@@ -323,7 +446,8 @@ async def update_modules(db, tenant_id: str, modules: dict, actor: dict) -> dict
 async def update_ai_settings(db, tenant_id: str, ai_settings: dict, actor: dict) -> dict:
     existing = await db.tenants.find_one({"tenant_id": tenant_id})
     if not existing:
-        raise HTTPException(status_code=404, detail="Tenant not found")
+        await register_legacy_tenant(db, tenant_id, actor)
+        existing = await db.tenants.find_one({"tenant_id": tenant_id})
 
     merged = {**default_ai_settings(), **(existing.get("ai_settings") or {}), **(ai_settings or {})}
     await db.tenants.update_one(
@@ -340,13 +464,14 @@ async def update_ai_settings(db, tenant_id: str, ai_settings: dict, actor: dict)
 
 
 async def get_tenant_health(db, tenant_id: str) -> dict:
-    tenant = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
-    if not tenant:
-        raise HTTPException(status_code=404, detail="Tenant not found")
+    tenant = await _resolve_tenant_doc(db, tenant_id)
 
     counts = await _tenant_counts(db, tenant_id)
     admin_email = (tenant.get("primary_admin") or {}).get("email")
-    admin_user = await db.users.find_one({"email": admin_email, "tenant_id": tenant_id}, {"_id": 0, "id": 1})
+    admin_user = await db.users.find_one(
+        {**_tenant_membership_filter(tenant_id), "email": admin_email} if admin_email else _tenant_membership_filter(tenant_id),
+        {"_id": 0, "id": 1},
+    )
     sites = await db.equipment_nodes.count_documents(
         {"tenant_id": tenant_id, "level": ISOLevel.INSTALLATION.value}
     )
@@ -355,8 +480,10 @@ async def get_tenant_health(db, tenant_id: str) -> dict:
         {
             "id": "registry",
             "label": "Tenant registry record",
-            "status": "pass",
-            "message": "Tenant record exists",
+            "status": "pass" if tenant.get("registry_status") != "legacy" else "warn",
+            "message": "Registered in tenants collection"
+            if tenant.get("registry_status") != "legacy"
+            else "Legacy tenant — register to enable lifecycle controls",
         },
         {
             "id": "primary_admin",
@@ -409,9 +536,9 @@ async def validate_tenant(db, tenant_id: str, actor: dict) -> dict:
 
 async def run_validation_checks(db, tenant_id: str) -> dict:
     """Core validation used by API and CLI script."""
-    tenant = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
-    issues: List[dict] = []
-    if not tenant:
+    try:
+        tenant = await _resolve_tenant_doc(db, tenant_id)
+    except HTTPException:
         return {
             "tenant_id": tenant_id,
             "overall": "missing",
@@ -419,8 +546,18 @@ async def run_validation_checks(db, tenant_id: str) -> dict:
             "checked_at": _now_iso(),
         }
 
+    issues: List[dict] = []
+    if tenant.get("registry_status") == "legacy":
+        issues.append({
+            "code": "legacy_registry",
+            "severity": "warn",
+            "message": "Tenant exists in data but not in tenants registry — register to enable lifecycle controls",
+        })
+
     admin_email = (tenant.get("primary_admin") or {}).get("email")
-    admin_user = await db.users.find_one({"email": admin_email, "tenant_id": tenant_id})
+    admin_user = await db.users.find_one(
+        {**_tenant_membership_filter(tenant_id), "email": admin_email} if admin_email else _tenant_membership_filter(tenant_id),
+    )
     if not admin_user:
         issues.append({
             "code": "missing_primary_admin",
@@ -429,7 +566,7 @@ async def run_validation_checks(db, tenant_id: str) -> dict:
         })
 
     users_missing_tenant = await db.users.count_documents(
-        {"company_id": tenant_id, "tenant_id": {"$ne": tenant_id}}
+        {"company_id": tenant_id, "tenant_id": {"$nin": [tenant_id, None, ""]}}
     )
     if users_missing_tenant:
         issues.append({

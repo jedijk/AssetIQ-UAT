@@ -96,6 +96,15 @@ export function useTenantManagement(selectedTenantId) {
     onError: (err) => toast.error(err.response?.data?.detail || err.message),
   });
 
+  const registerMutation = useMutation({
+    mutationFn: tenantManagementAPI.registerTenant,
+    onSuccess: () => {
+      toast.success("Tenant registered in registry");
+      invalidate();
+    },
+    onError: (err) => toast.error(err.response?.data?.detail || err.message),
+  });
+
   return {
     tenants: tenantsQuery.data?.tenants || [],
     tenantsLoading: tenantsQuery.isLoading,
@@ -121,6 +130,8 @@ export function useTenantManagement(selectedTenantId) {
     validateTenant: validateMutation.mutateAsync,
     validating: validateMutation.isPending,
     validationResult: validateMutation.data,
+    registerTenant: registerMutation.mutateAsync,
+    registering: registerMutation.isPending,
     refetchHealth: healthQuery.refetch,
   };
 }

@@ -13,6 +13,7 @@ from services.tenant_management_service import (
     get_tenant,
     get_tenant_health,
     list_tenants,
+    register_legacy_tenant,
     set_tenant_status,
     update_ai_settings,
     update_modules,
@@ -101,6 +102,11 @@ async def patch_tenant(
 ):
     data = {k: v for k, v in payload.model_dump().items() if v is not None}
     return {"tenant": await update_tenant(db, tenant_id, data, current_user)}
+
+
+@router.post("/{tenant_id}/register")
+async def register_tenant_in_registry(tenant_id: str, current_user: dict = Depends(_admin_dep)):
+    return {"tenant": await register_legacy_tenant(db, tenant_id, current_user)}
 
 
 @router.post("/{tenant_id}/suspend")

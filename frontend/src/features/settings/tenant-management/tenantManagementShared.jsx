@@ -5,14 +5,27 @@ const STATUS_VARIANT = {
   trial: "secondary",
   suspended: "destructive",
   archived: "outline",
+  legacy: "secondary",
 };
 
-export function TenantStatusBadge({ status }) {
+export function TenantStatusBadge({ status, registryStatus }) {
+  if (registryStatus === "legacy") {
+    return (
+      <Badge variant={STATUS_VARIANT.legacy} className="capitalize">
+        legacy
+      </Badge>
+    );
+  }
   return (
     <Badge variant={STATUS_VARIANT[status] || "outline"} className="capitalize">
       {status || "unknown"}
     </Badge>
   );
+}
+
+export function formatTenantId(tenantId) {
+  if (!tenantId) return "—";
+  return tenantId.length <= 12 ? tenantId : `${tenantId.slice(0, 8)}…`;
 }
 
 export function formatDate(value) {

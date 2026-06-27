@@ -26,6 +26,11 @@ export const tenantManagementAPI = {
     return response.data;
   },
 
+  registerTenant: async (tenantId) => {
+    const response = await api.post(`/admin/tenants/${tenantId}/register`);
+    return response.data;
+  },
+
   suspendTenant: async (tenantId) => {
     const response = await api.post(`/admin/tenants/${tenantId}/suspend`);
     return response.data;
