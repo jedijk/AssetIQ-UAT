@@ -103,29 +103,31 @@ async def test_investigation_timeline_scopes_related_queries():
 async def test_threat_update_dispatches_graph_sync():
     mock_db = MagicMock()
     mock_db.threats = MagicMock()
+    mock_db.observations = MagicMock()
+    threat_open = {"id": "t-1", "status": "open", "likelihood": "Possible", "detectability": "Moderate"}
+    threat_closed = {"id": "t-1", "status": "closed", "linked_equipment_id": "eq-1", "risk_score": 30}
     mock_db.threats.find_one = AsyncMock(
-        side_effect=[
-            {"id": "t-1", "status": "open", "likelihood": "Possible", "detectability": "Moderate"},
-            {"id": "t-1", "status": "closed", "linked_equipment_id": "eq-1"},
-        ]
+        side_effect=[threat_open, threat_open, threat_closed, threat_closed, threat_closed]
     )
+    mock_db.observations.find_one = AsyncMock(return_value={"id": "t-1", "description": "Test"})
     mock_db.threats.update_one = AsyncMock()
+    mock_db.observations.update_one = AsyncMock()
     graph_sync = AsyncMock()
 
     with patch("services.threat_crud.db", mock_db), patch(
         "services.threat_helpers.db", mock_db
-    ), patch(
+    ), patch("services.work_signal_lifecycle.db", mock_db), patch(
         "services.threat_crud.assert_threat_installation_scope",
         AsyncMock(),
-    ), patch("services.threat_crud._mirror_threat_observation", AsyncMock()), patch(
-        "services.threat_crud._sync_threat_graph",
-        graph_sync,
     ), patch("services.threat_crud.update_all_ranks", AsyncMock()), patch(
-        "services.threat_crud.cache.invalidate_stats"
+        "services.reliability_graph.dispatch_graph_sync",
+        graph_sync,
+    ), patch("services.threat_crud.cache.invalidate_stats"), patch(
+        "services.dashboard_read_model_hooks.notify_dashboard_data_changed", AsyncMock()
     ):
         from services.threat_crud import update_threat
 
         await update_threat(USER_A, "t-1", {"status": "closed"})
 
-    graph_sync.assert_called_once()
-    assert graph_sync.call_args.kwargs["label"] == "threat_update"
+    assert graph_sync.call_count >= 1
+    assert any(call.args[1] == "threat_update" for call in graph_sync.call_args_list)

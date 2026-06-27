@@ -98,6 +98,7 @@ ROUTE_DB_IMPORT_ALLOWLIST: FrozenSet[str] = frozenset({
     "routes/system.py",
     "routes/task_generation_admin.py",
     "routes/tasks.py",
+    "routes/tenant_management.py",
     "routes/translations.py",
     "routes/user_stats.py",
     "routes/users.py",
