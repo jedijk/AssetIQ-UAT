@@ -1,6 +1,6 @@
 # ASSETIQ TECHNICAL STATUS
 
-**Current source of truth:** [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md)
+**Current source of truth:** [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md) (also at [`docs/PLATFORM_TRUTH_AUDIT_2026-06-26.md`](../PLATFORM_TRUTH_AUDIT_2026-06-26.md))
 
 > This document stays active for operational gate commands and exit codes until archived after the next live UAT gate run.
 
