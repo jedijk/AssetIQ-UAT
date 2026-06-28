@@ -23,7 +23,7 @@ AssetIQ is a **credible industrial reliability intelligence pilot platform** wit
 | **Reliability lifecycle (core path)** | Observation → investigation → central action → strategy/program → scheduled task → task instance → form execution is implemented with services, routes, and **UAT Phase 1 integrity exit 0** (Tyromer, 2026-06-27). |
 | **Work signal (observation/threat)** | Phases 1–6 landed: canonical writes via `create_work_signal` / `update_work_signal`; primary API `/observations/signals/*`; frontend `/observations/*`; deprecated `/threats/*` aliases; graph sync on new writes uses observation edges only. **UAT Tyromer 29/29 same-id verified**; sparse projection list serialization hardened @ `0880424e`. |
 | **FMEA / failure modes** | 643 failure modes on UAT Mongo (last gate run); static library sync gate pass; EFMs, RPN, recommended actions. |
-| **Multi-tenant code path** | `tenant_id` backfill on UAT; strict mode cutover pass; 0 flagged services in heuristic audit (152 clean @ local run); **one production tenant proven (Tyromer)**. |
+| **Multi-tenant code path** | `tenant_id` backfill on UAT; strict mode cutover pass; **two tenants proven on UAT** (Tyromer + UAT Proof Tenant B) @ 2026-06-28. |
 | **AI platform** | Central `ai_platform` + prompt registry + cost guard; grounded orchestrator + evidence pack exist; CI blocks direct OpenAI imports (0 new violations). |
 | **Executive intelligence** | Materialized read models (executive KPIs, dashboards, asset health) with registry gate (12/12). |
 | **Engineering gates** | Platform standards 4/4 pass; graph handler registry 10/10 entities; auth matrix + convergence tests pass locally; frontend `test:ci` 43 suites / 286 tests. |
@@ -44,9 +44,9 @@ AssetIQ differentiates on **reliability-native workflow + FMEA depth + grounded 
 
 ### Top five leverage moves (90-day CTO view)
 
-1. **Second tenant + cross-tenant penetration tests** — prove multi-customer isolation beyond Tyromer.  
+1. ~~**Second tenant + cross-tenant penetration tests**~~ — **Done @ 2026-06-28** (§18).  
 2. **Complete reactive graph sync chain** — every lifecycle transition writes/updates edges with verify gate (top-5 handlers from graph plan).  
-3. **48h UAT soak + weekly gate cadence** — `run_uat_post_deploy_gates.sh` on schedule; Tyromer Phase 1 bundle already exit 0 @ 2026-06-27.  
+3. **48h UAT soak + weekly gate cadence** — `run_uat_post_deploy_gates.sh` on schedule.  
 4. **Production cutover package** — Redis, external workers, prod backfill, pen test.  
 5. **Evidence-first AI contract** — every recommendation returns citations + deterministic score separation (enforce on all AI surfaces).
 
@@ -219,7 +219,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | Password reset | **I** | Auth routes (NOT VERIFIED full E2E) |
 | RBAC + permission matrix | **I** | `rbac_service`, `require_permission`, `test_auth_matrix.py` |
 | Installation scoping | **I** | `installation_filter_service` |
-| Tenant isolation | **P** | `tenant_schema.py`, strict mode UAT pass; **one tenant proven** |
+| Tenant isolation | **I** | Two UAT tenants; `run_cross_tenant_pen_test.py` exit 0 @ 2026-06-28 |
 | OIDC / SSO | **P** | `routes/auth_oidc.py` — spike; `OIDC_ENABLED` env |
 | Session management | **P** | Bearer default; cookie mode documented |
 
@@ -228,10 +228,10 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | Control | Status | Evidence |
 |---------|--------|----------|
 | Tenant filtering services | **I** | `tenant_service_filter_audit.py` → 0 flagged (152 clean @ local) |
-| Cross-tenant tests | **P** | `test_cross_tenant_regression.py`, `test_tenant_isolation.py` — limited |
-| Background jobs tenant scope | **I** | `background_jobs` backfill; job tenant_id |
+| Cross-tenant tests | **I** | Live pen test + unit tests (`run_cross_tenant_pen_test.py`, `test_multi_tenant_pen_test.py`) |
+| Background jobs tenant scope | **I** | `background_jobs` backfill; pen test verified job isolation |
 | Scheduler tenant scope | **I** (code + UAT) | `maintenance_scheduler_scope.py`; UAT task bridge after tenant_id stamp |
-| Graph tenant scope | **P** | Edges backfilled; 1936 edges missing `tenant_id` |
+| Graph tenant scope | **I** | 1936 edges backfilled → 0 missing `tenant_id`; graph sync gate exit 0 |
 | AI tenant scope | **P** | Cost guard keys; NOT VERIFIED all prompts |
 | CI validation | **I** | `phase2_tenancy_report.py`, strict mode check |
 
@@ -547,18 +547,20 @@ cd backend && \
 | UAT gate bundle | exit 0 on Tyromer after sprint |
 | `validate_tenant_onboarding.py --all` | both Tyromer + proof tenant valid |
 
-### Live run status
+### Live run status (@ 2026-06-28, `assetiq-UAT`)
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Second UAT tenant created | **Pending live run** | Script ready; requires `MONGO_URL` |
-| Cross-tenant pen test | **Pending live run** | `run_cross_tenant_pen_test.py` |
-| Edge tenant_id backfill (1936) | **Pending live run** | Enhanced resolver in `backfill_reliability_edge_tenant.py` |
-| Full UAT gate bundle | **Pending live run** | Re-run after backfill |
+| Item | Status | Evidence |
+|------|--------|----------|
+| Second UAT tenant created | **Done** | `226ed7fe-5b8f-49be-9de3-4c43223c3bd7` (`slug=uat-proof-b`) |
+| Lifecycle seed (11 types) | **Done** | `UAT_MULTI_TENANT_PROOF_MANIFEST.json` |
+| Cross-tenant pen test | **Pass** | `run_cross_tenant_pen_test.py` — 0 failures |
+| Edge `tenant_id` backfill | **Done** | 1936 → **0** missing (`backfill_reliability_edge_tenant.py`) |
+| Onboarding validation | **Pass** | Tyromer + proof tenant both `valid` |
+| Full UAT gate bundle | **Pass** | `run_uat_post_deploy_gates.sh` — 9 steps exit 0 |
 | 48h soak | Deferred | — |
 
-**Audit checklist update (§8.1 Identity):** Multi-tenant isolation moves from **Partial** → **Implemented** only after live pen test exit 0 and manifest archived in this section.
+**Audit checklist (§8.1):** Multi-tenant isolation **Implemented** on UAT (two tenants, strict mode, live pen test).
 
 ---
 
-*This document is the product + platform truth snapshot as of 2026-06-28. Tyromer UAT Phase 1 post-deploy bundle verified 2026-06-27; second tenant live proof pending Atlas execution of §18 sprint.*
+*This document is the product + platform truth snapshot as of 2026-06-28. Tyromer + UAT Proof Tenant B multi-tenant sprint verified on Atlas; production cutover remains open.*

@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-06-28T13:40:44.605929+00:00",
+  "database": "assetiq-UAT",
+  "primary_tenant_id": "Tyromer",
+  "proof_tenant": {
+    "tenant_id": "226ed7fe-5b8f-49be-9de3-4c43223c3bd7",
+    "slug": "uat-proof-b",
+    "admin_email": "uat-proof-b-admin@assetiq-uat.internal",
+    "admin_user_id": "32817d56-f130-45fa-bf6b-6080bf803fb1",
+    "created": true
+  },
+  "proof_tenant_ids": {
+    "site_id": "proof-b-site",
+    "installation_id": "proof-b-installation",
+    "equipment_id": "proof-b-equipment",
+    "observation_id": "proof-b-observation",
+    "threat_id": "proof-b-observation",
+    "action_id": "proof-b-action",
+    "scheduled_task_id": "proof-b-scheduled-task",
+    "task_instance_id": "proof-b-task-instance",
+    "form_template_id": "proof-b-form",
+    "spare_part_id": "proof-b-spare",
+    "background_job_id": "proof-b-background-job",
+    "graph_edge_id": "observation:proof-b-observation:monitors:equipment:proof-b-equipment"
+  },
+  "primary_tenant_sample_ids": {
+    "equipment_id": "5fb4f269-191f-47d1-b190-e865a6430c7e",
+    "observation_id": "551e0588-0a76-4ba1-9f5e-6fb1f5114c0b",
+    "action_id": "41fc8a3d-46d4-4943-9bf3-7c8a0ad38af0",
+    "scheduled_task_id": "cb03b204-cac9-4a95-aa76-5e7ae027ed62",
+    "task_instance_id": "1182c18f-2465-45ff-a82a-7da7f738e0ef",
+    "form_template_id": "f3913bee-f78b-4c4a-af28-b5ed3276f51c",
+    "spare_part_id": "dfd013d6-09a6-42b3-b24b-f7b991dcae4b",
+    "background_job_id": "938f3d03-ba12-4fff-9e8c-05eed7e9f2b2",
+    "graph_edge_id": "equipment:08382038-1cdf-4bc4-a8b6-697a603b3b96:has_strategy_type:equipment_type_strategy:bearing_radial",
+    "admin_user_id": "f0df21df-9bdc-41f6-ab44-e78dbc996965",
+    "admin_email": "frans.ghijsen@tyromer.com"
+  },
+  "dry_run": false
+}
