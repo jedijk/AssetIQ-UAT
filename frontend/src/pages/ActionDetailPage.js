@@ -9,7 +9,7 @@ import {
   Save, Trash2, ExternalLink, Calendar, User,
   FileText, Brain, Search, AlertTriangle, Loader2, Check,
   CalendarClock, CheckCircle, CheckCircle2, Paperclip, Upload,
-  X, Image, File, Download, Eye, Share2, Link2, Copy
+  X, Image, File, Download, Eye, Share2, Link2, Copy, ArrowLeft
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -48,6 +48,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { actionsAPI } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
+import { useBreadcrumb } from "../contexts/BreadcrumbContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { DocumentViewer } from "../components/DocumentViewer";
@@ -85,6 +86,7 @@ export default function ActionDetailPage() {
   const queryClient = useQueryClient();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const { goBack } = useBreadcrumb();
   const { disciplines, normalize: normalizeDiscipline } = useDisciplines();
   
   const [editForm, setEditForm] = useState({});
@@ -372,6 +374,16 @@ export default function ActionDetailPage() {
         <div className="container mx-auto px-3 sm:px-4 max-w-2xl">
           <div className="py-2.5 sm:py-3 space-y-2">
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="lg:hidden h-9 w-9 shrink-0 border-slate-200 bg-white"
+                onClick={goBack}
+                aria-label="Back to actions"
+                data-testid="action-detail-back-button"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
               <span className="shrink-0 px-2 py-0.5 bg-slate-100 rounded text-xs font-mono text-slate-600">
                 {action.action_number}
               </span>

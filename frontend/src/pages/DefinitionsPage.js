@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useBreadcrumb } from "../contexts/BreadcrumbContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X, Gauge, ArrowLeft, DollarSign } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -686,6 +687,7 @@ export default function DefinitionsPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   
   const isMobile = useIsMobile();
+  const { goBack } = useBreadcrumb();
   
   // Local state for editing
   const [localSeverity, setLocalSeverity] = useState([]);
@@ -850,12 +852,24 @@ export default function DefinitionsPage() {
         {/* Header */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-purple-100 rounded-lg">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              {isMobile && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 border-slate-200 bg-white"
+                  onClick={goBack}
+                  aria-label="Back"
+                  data-testid="definitions-back-button"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+              )}
+              <div className="p-1.5 sm:p-2 bg-purple-100 rounded-lg shrink-0">
                 <Sliders className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
               </div>
-              <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-slate-800">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold text-slate-800 truncate">
                   {t("settings.criticalityDefinitions") || "Definitions"}
                 </h1>
                 <p className="text-slate-500 text-xs sm:text-sm hidden sm:block">

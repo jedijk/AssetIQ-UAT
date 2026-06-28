@@ -109,14 +109,29 @@ export default function LayoutHeader({
               )}
             </Button>
 
-            {/* Logo */}
+            {/* Logo — in simple mode, also closes equipment overlay to return home */}
             <div
               className="flex items-center gap-2 flex-shrink-0 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
+                if (hierarchyOpen) {
+                  setHierarchyOpen(false);
+                }
                 navigate("/dashboard", { state: null });
               }}
               data-testid="app-logo-link"
+              role="button"
+              tabIndex={0}
+              aria-label={isOperatorActive ? t("simpleMode.home") || "Home" : "AssetIQ Dashboard"}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (hierarchyOpen) {
+                    setHierarchyOpen(false);
+                  }
+                  navigate("/dashboard", { state: null });
+                }
+              }}
             >
               <span className="brand-logo-plate inline-flex shrink-0 overflow-hidden rounded-lg ring-1 ring-black/15 dark:ring-white/20">
                 <img

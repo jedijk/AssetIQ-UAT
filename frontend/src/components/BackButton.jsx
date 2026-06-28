@@ -1,14 +1,19 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "./ui/button";
+import { useBreadcrumb } from "../contexts/BreadcrumbContext";
 
 /**
- * BackButton - A navigation back button that uses browser history
- * Falls back to dashboard if no history exists
+ * BackButton - navigates to the previous breadcrumb step when available.
  */
-const BackButton = ({ className = "", fallbackPath = "/dashboard" }) => {
+const BackButton = ({
+  className = "",
+  variant = "ghost",
+  size = "sm",
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { goBack } = useBreadcrumb();
   
   // Check if we have a referrer in the state (set when navigating from specific pages)
   const fromReliability = location.state?.from === "reliability";
@@ -17,14 +22,9 @@ const BackButton = ({ className = "", fallbackPath = "/dashboard" }) => {
   const handleBack = () => {
     if (fromReliability) {
       navigate("/dashboard");
-    } else if (window.history.length > 2) {
-      // Use browser history if we have previous pages
-      // window.history.length includes current page, so >2 means we have at least one previous page
-      navigate(-1);
-    } else {
-      // Fallback to dashboard if no history
-      navigate(fallbackPath);
+      return;
     }
+    goBack();
   };
   
   const getBackText = () => {
@@ -36,8 +36,8 @@ const BackButton = ({ className = "", fallbackPath = "/dashboard" }) => {
 
   return (
     <Button
-      variant="ghost"
-      size="sm"
+      variant={variant}
+      size={size}
       onClick={handleBack}
       className={`text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 ${className}`}
       data-testid="back-button"
