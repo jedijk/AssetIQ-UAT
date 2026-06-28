@@ -202,6 +202,11 @@ export function isObservationWorkspacePath(path) {
     || /^\/threats\/[^/]+\/workspace$/.test(normalized);
 }
 
+/** Ops dashboard renders its own page header — hide duplicate breadcrumb title. */
+export function isDashboardPath(path) {
+  return normalizeBreadcrumbPath(path) === '/dashboard';
+}
+
 /** Skip auto-inserting /actions when the user arrived from these routes. */
 export function shouldSkipDetailAnchorInjection(entries) {
   if (!entries || entries.length < 2) return false;

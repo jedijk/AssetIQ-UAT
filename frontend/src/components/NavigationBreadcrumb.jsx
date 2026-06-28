@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronRight, Home } from 'lucide-react';
 import { useBreadcrumb } from '../contexts/BreadcrumbContext';
-import { isActionDetailPath, isObservationWorkspacePath } from '../lib/routeLabels';
+import { isActionDetailPath, isDashboardPath, isObservationWorkspacePath } from '../lib/routeLabels';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -28,9 +28,11 @@ const NavigationBreadcrumb = ({ className = '' }) => {
   const currentEntry = breadcrumbs[breadcrumbs.length - 1];
   const currentLabel = currentEntry ? getDisplayLabel(currentEntry) : null;
   const hideMobileTitle =
-    isObservationWorkspacePath(currentPath) || isActionDetailPath(currentPath);
+    isObservationWorkspacePath(currentPath)
+    || isActionDetailPath(currentPath)
+    || isDashboardPath(currentPath);
 
-  if (!showTrail && !currentLabel) {
+  if (!showTrail && (!currentLabel || hideMobileTitle)) {
     return null;
   }
 
