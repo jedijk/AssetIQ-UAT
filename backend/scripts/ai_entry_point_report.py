@@ -43,7 +43,7 @@ ENFORCED_GROUNDED_SURFACES: dict[str, str] = {
     "ai_risk_engine.py": "Observation risk / RCA / fault tree engine",
     "services/ai_execute_grounded.py": "Universal AI pipeline",
     "services/ai_risk_dashboard.py": "Executive dashboard intent AI",
-    "services/ai_risk_analysis.py": "Chat analyze / risk surfaces",
+    "services/ai_risk_analysis_chat.py": "Chat analyze",
     "services/insights_service.py": "Executive AI recommendations",
     "services/image_analysis_service.py": "Image vision damage analysis",
     "ai_helpers.py": "Chat attachment vision",
