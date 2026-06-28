@@ -11,6 +11,7 @@ from bson import ObjectId
 
 from database import db
 from services.tenant_schema import merge_tenant_filter
+from services.tenant_scope import scoped
 from services.production_helpers import (
     EQUIPMENT_NAME,
     EXTRUDER_FORM,
@@ -466,9 +467,14 @@ async def build_production_dashboard_forms(scope: ProductionDashboardScope) -> D
 
     # Get production actions/insights from dedicated collection
     if scope.is_range:
-        event_date_query = {"date": {"$gte": range_start.strftime("%Y-%m-%d"), "$lte": range_end.strftime("%Y-%m-%d")}}
+        event_date_query = {
+            "date": {
+                "$gte": scope.range_start.strftime("%Y-%m-%d"),
+                "$lte": scope.range_end.strftime("%Y-%m-%d"),
+            }
+        }
     else:
-        event_date_query = {"date": target_date.strftime("%Y-%m-%d")}
+        event_date_query = {"date": scope.target_date.strftime("%Y-%m-%d")}
 
     actions_query = {**event_date_query, "type": "action"}
     actions = await db.production_events.find(
