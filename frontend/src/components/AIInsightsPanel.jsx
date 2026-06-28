@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import AIRecommendationCard from "./ai/AIRecommendationCard";
 
 const TrendIcon = ({ trend, t }) => {
   switch (trend) {
@@ -669,6 +670,19 @@ export default function AIInsightsPanel({
                   </div>
                 </div>
               )}
+              
+              {(() => {
+                const contract = analyzeMutation.data || insights;
+                if (!contract?.citations?.length && !contract?.evidence_not_available) return null;
+                return (
+                  <AIRecommendationCard
+                    payload={contract}
+                    summary={null}
+                    recommendations={[]}
+                    compact
+                  />
+                );
+              })()}
               
               {/* Last Updated */}
               <div className="text-xs text-slate-400 text-right">

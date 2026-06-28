@@ -241,6 +241,18 @@ async def submit_form(
 
     await after_form_submission_reliability_update(doc, submitted_by, notes=data.get("notes"))
 
+    try:
+        from services.lifecycle_dispatch import publish_form_submission_created
+
+        await publish_form_submission_created(
+            doc["id"],
+            task_instance_id=doc.get("task_instance_id"),
+            equipment_id=doc.get("equipment_id"),
+            user=user,
+        )
+    except Exception:
+        pass
+
     serialized = serialize_submission(doc)
     serialized["observations_created"] = len(observations_created)
 

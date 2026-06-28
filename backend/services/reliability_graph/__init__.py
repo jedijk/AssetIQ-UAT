@@ -37,6 +37,7 @@ from services.reliability_graph_entities import (
     sync_action_edges,
     sync_cause_edge,
     sync_finding_to_observation_edge,
+    sync_form_submission_edges,
     sync_investigation_edges,
     sync_observation_edges,
     sync_outcome_edges,
@@ -69,6 +70,7 @@ async def dispatch_graph_sync(sync_name: str, label: str, **kwargs: Any) -> None
             or kwargs.get("threat_id")
             or kwargs.get("investigation_id")
             or kwargs.get("action_id")
+            or kwargs.get("form_submission_id")
             or kwargs.get("task_instance_id")
             or kwargs.get("equipment_type_id")
             or (kwargs.get("scheduled_task") or {}).get("id")
@@ -133,6 +135,7 @@ __all__ = [
     "sync_edges_for_apply_strategy",
     "sync_edges_for_scheduled_task",
     "sync_finding_to_observation_edge",
+    "sync_form_submission_edges",
     "sync_instantiated_as_edge",
     "sync_investigation_edges",
     "sync_observation_edges",

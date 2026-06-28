@@ -411,20 +411,30 @@ async def create_action(current_user: dict, data: Dict[str, Any]) -> dict:
             threat_id = data["source_id"]
 
     linked_equipment_id = None
+    failure_mode_id = data.get("failure_mode_id")
     if data.get("source_type") == "threat" and threat_id:
         threat = await _threat_repo.find_one(
             {"id": threat_id},
             user=current_user,
-            projection={"linked_equipment_id": 1},
+            projection={"linked_equipment_id": 1, "failure_mode_id": 1},
         )
         linked_equipment_id = (threat or {}).get("linked_equipment_id")
+        failure_mode_id = failure_mode_id or (threat or {}).get("failure_mode_id")
     elif data.get("source_type") == "investigation":
         inv = await inv_repo.find_one(
             {"id": data["source_id"]},
             user=current_user,
-            projection={"asset_id": 1},
+            projection={"asset_id": 1, "threat_id": 1},
         )
         linked_equipment_id = (inv or {}).get("asset_id")
+        inv_threat_id = (inv or {}).get("threat_id") or threat_id
+        if inv_threat_id and not failure_mode_id:
+            threat = await _threat_repo.find_one(
+                {"id": inv_threat_id},
+                user=current_user,
+                projection={"failure_mode_id": 1},
+            )
+            failure_mode_id = (threat or {}).get("failure_mode_id")
 
     now = datetime.now(timezone.utc).isoformat()
     action_doc = {
@@ -465,6 +475,7 @@ async def create_action(current_user: dict, data: Dict[str, Any]) -> dict:
         source_type=data["source_type"],
         source_id=data["source_id"],
         equipment_id=linked_equipment_id,
+        failure_mode_id=str(failure_mode_id) if failure_mode_id else None,
     )
     return action_doc
 

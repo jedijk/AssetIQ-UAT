@@ -472,7 +472,7 @@ class ReliabilityCopilotService:
         evidence_pack: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Generate AI response based on gathered data"""
-        from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
+        from services.ai_citation import format_citations_for_prompt
         from services.ai_gateway import user_context
 
         uid, cid = user_context(current_user)
@@ -533,9 +533,11 @@ Available Data:
         viz_type = self._get_visualization_type(intent)
         
         response = {
+            "summary": answer,
             "answer": answer,
             "data": data,
             "intent": intent,
+            "recommendations": actions,
             "actions": actions,
             "visualization_type": viz_type,
             "cited_paths": [
@@ -550,9 +552,11 @@ Available Data:
             ],
             "processed_at": datetime.utcnow().isoformat()
         }
-        return attach_citations_to_response(
+        from services.ai_platform import finalize_recommendation_response
+
+        return finalize_recommendation_response(
             response,
-            citations,
+            citations=citations,
             evidence=evidence_pack,
         )
     

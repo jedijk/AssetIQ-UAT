@@ -80,13 +80,11 @@ def test_registry_summary_counts():
     summary = registry_summary()
     assert summary["handlers_registered"] == 11
     assert summary["event_types_mapped"] == 11
-    assert summary["spec_edges_implemented"] >= 10
-    assert summary["spec_edges_gap"] >= 1
+    assert summary["spec_edges_implemented"] >= 12
+    assert summary["spec_edges_gap"] == 0
 
 
 def test_backfill_covers_major_handlers():
     gaps = validate_backfill_coverage()
-    assert any("sync_prediction_edges" in msg for msg in gaps)
-    assert not any("sync_edges_for_apply_strategy" in msg for msg in gaps)
-    assert not any("sync_observation_edges" in msg for msg in gaps)
-    assert len(BACKFILL_SYNC_HANDLERS) == 10
+    assert gaps == []
+    assert len(BACKFILL_SYNC_HANDLERS) == 11

@@ -103,6 +103,59 @@ def get_cache_key(equipment_ids: List[str], fm_ids: List[str]) -> str:
     return hashlib.md5(key_str.encode()).hexdigest()
 
 
+def finalize_fm_suggestions_contract(
+    payload: Dict[str, Any],
+    *,
+    failure_modes: List[Dict[str, Any]],
+    equipment_types: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Apply universal AI contract to failure-mode suggestion responses."""
+    from services.ai_citation import make_citation
+    from services.ai_platform import finalize_recommendation_response
+
+    citations = []
+    for fm in failure_modes[:20]:
+        fm_id = fm.get("id")
+        if fm_id:
+            citations.append(
+                make_citation(
+                    id=str(fm_id),
+                    type="failure_mode",
+                    label=fm.get("failure_mode") or str(fm_id),
+                    url_path=f"/failure-modes/{fm_id}",
+                )
+            )
+    for eq in (equipment_types or [])[:10]:
+        eq_id = eq.get("id")
+        if eq_id:
+            citations.append(
+                make_citation(
+                    id=str(eq_id),
+                    type="equipment_type",
+                    label=eq.get("name") or str(eq_id),
+                    url_path=f"/library/equipment-types/{eq_id}",
+                )
+            )
+
+    recs = payload.get("suggestions") or payload.get("recommendations") or []
+    contract_payload = dict(payload)
+    contract_payload.setdefault("recommendations", recs)
+    contract_payload.setdefault(
+        "summary",
+        f"Failure mode mapping suggestions ({payload.get('total_suggestions', len(recs))} total)",
+    )
+    return finalize_recommendation_response(
+        contract_payload,
+        citations=citations,
+        evidence={
+            "deterministic": {
+                "failure_mode_count": len(failure_modes),
+                "equipment_type_count": len(equipment_types or []),
+            }
+        },
+    )
+
+
 async def get_ai_suggestions(
     equipment_types: List[Dict[str, Any]],
     failure_modes: List[Dict[str, Any]],
@@ -230,7 +283,7 @@ Return JSON:
 
 # ============= API Endpoints =============
 
-@router.post("/failure-modes", response_model=SuggestFailureModesResponse)
+@router.post("/failure-modes")
 async def suggest_failure_modes(
     request: SuggestFailureModesRequest,
     current_user: dict = Depends(get_current_user),
@@ -274,9 +327,14 @@ async def suggest_failure_modes(
     suggestions = await get_ai_suggestions(equipment_types, failure_modes, current_user)
     total = sum(len(s.suggested_failure_modes) for s in suggestions)
 
-    return SuggestFailureModesResponse(
+    response = SuggestFailureModesResponse(
         suggestions=suggestions,
         total_suggestions=total
+    )
+    return finalize_fm_suggestions_contract(
+        response.model_dump(),
+        failure_modes=failure_modes,
+        equipment_types=equipment_types,
     )
 
 

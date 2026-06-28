@@ -24,6 +24,7 @@ __all__ = [
     "execute_multimodal_json_prompt",
     "execute_prompt",
     "execute_vision_json_prompt",
+    "finalize_recommendation_response",
     "get_prompt",
     "list_prompts",
     "parse_json_from_llm",
@@ -315,3 +316,36 @@ async def execute_grounded_prompt(
     result["prompt_id"] = prompt_id
     result["prompt_version"] = get_prompt(prompt_id).version
     return result
+
+
+def finalize_recommendation_response(
+    response_dict: Dict[str, Any],
+    *,
+    citations: Optional[List[Dict[str, Any]]] = None,
+    evidence: Optional[Dict[str, Any]] = None,
+    recommendations_key: str = "recommendations",
+    validate: bool = True,
+) -> Dict[str, Any]:
+    """
+    Gateway-boundary wrapper for user-facing AI recommendation payloads.
+
+    Attaches citations, sets evidence_not_available, and optionally validates
+    against the shared AIRecommendationResponse contract.
+    """
+    from services.ai_recommendation_contract import finalize_ai_recommendation_response
+    from services.ai_recommendation_schema import validate_ai_recommendation_schema
+
+    out = finalize_ai_recommendation_response(
+        response_dict,
+        citations=citations,
+        evidence=evidence,
+        recommendations_key=recommendations_key,
+    )
+    if validate:
+        violations = validate_ai_recommendation_schema(out)
+        if violations:
+            logger.warning(
+                "AI recommendation contract violations: %s",
+                "; ".join(violations),
+            )
+    return out

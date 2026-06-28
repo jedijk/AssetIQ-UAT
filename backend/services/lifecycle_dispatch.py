@@ -86,3 +86,23 @@ async def publish_observation_created(observation_id: str, *, user: Optional[dic
         aggregate_id=observation_id,
         user=user,
     )
+
+
+async def publish_form_submission_created(
+    submission_id: str,
+    *,
+    task_instance_id: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    user: Optional[dict] = None,
+) -> str:
+    return await publish_lifecycle_event(
+        DomainEventType.FORM_SUBMISSION_CREATED,
+        aggregate_type="form_submission",
+        aggregate_id=submission_id,
+        payload={
+            "form_submission_id": submission_id,
+            "task_instance_id": task_instance_id,
+            "equipment_id": equipment_id,
+        },
+        user=user,
+    )

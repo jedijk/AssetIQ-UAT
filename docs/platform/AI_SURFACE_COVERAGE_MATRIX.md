@@ -1,81 +1,86 @@
 # AI Surface Coverage Matrix
 
-**Sprint 3 prep — Universal AI Contract inventory**  
+**Sprint 3–4 — Universal AI Contract inventory**  
 **Last updated:** 2026-06-28  
-**Contract:** `services/ai_recommendation_contract.py` (`finalize_ai_recommendation_response`, `validate_ai_recommendation_response`)  
-**Platform entry:** `services/ai_platform.py` (required for all LLM calls)  
-**Gate:** `scripts/ai_entry_point_report.py` (OpenAI import allowlist)
+**Contract:** `models/ai_recommendation.py` (`AIRecommendationResponse`), `services/ai_recommendation_contract.py`, `services/ai_recommendation_schema.py`  
+**Platform entry:** `services/ai_platform.py` (`finalize_recommendation_response`)  
+**Gate:** `scripts/ai_entry_point_report.py` (OpenAI imports + enforced contract surfaces)
 
-## Contract requirements (target)
+## Contract requirements
 
 | Requirement | Implementation |
 |-------------|----------------|
-| Citations array | `attach_citations_to_response` via `finalize_ai_recommendation_response` |
+| Citations array | `finalize_recommendation_response` → `attach_citations_to_response` |
 | `evidence_not_available` flag | Set when no citations |
 | Critical recs need `confidence` + `source_refs` | `enrich_recommendations_with_evidence` |
-| Grounded orchestration | `ai_orchestrator` + `execute_grounded_prompt` |
-| Cost / usage tracking | `ai_platform` usage hooks |
+| Shared response schema | `AIRecommendationResponse` (Pydantic) |
+| Schema validation | `validate_ai_recommendation_schema` |
 | No direct OpenAI imports | CI gate via `ai_entry_point_report` |
+| Enforced surfaces | Static scan in `ai_entry_point_report` (8 surfaces) |
 
-**Status legend:** **Compliant** · **Partial** (ai_platform but no contract) · **Missing** (no citations contract / bypass)
+**Status legend:** **Compliant** · **Partial** (ai_platform but no contract) · **Missing**
 
-## User-facing API routes
+## Enforced user-facing surfaces (Sprint 4)
 
-| Route | Service | ai_platform | Contract | Status | Notes |
-|-------|---------|-------------|----------|--------|-------|
-| `POST /ai/analyze-risk/{threat_id}` | `ai_risk_analysis` | Yes | `finalize_ai_recommendation_response` | **Compliant** | Reference implementation |
-| `POST /ai/chat-analyze` | `ai_risk_service` | Yes | No | **Partial** | Chat threat creation path |
-| `POST /ai/dashboard-intent` | `ai_risk_service` | Yes | No | **Partial** | Intent routing only |
-| `GET /ai/risk-insights/{threat_id}` | `ai_risk_service` | Cached | No | **Partial** | Read cached insight |
-| `GET /ai/top-risks` | `ai_risk_service` | Yes | No | **Partial** | Fleet ranking |
-| `POST /ai/generate-causes/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** | RCA suggestions |
-| `GET /ai/causal-analysis/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** | |
-| `POST /ai/explain/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** | |
-| `POST/GET /ai/fault-tree/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** | |
-| `POST/GET /ai/bow-tie/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** | |
-| `POST/GET /ai/optimize-actions/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** | Action optimization |
-| `POST /ai/recommendations` | `insights_service` | Yes | `finalize_ai_recommendation_response` | **Compliant** | Fleet insights |
-| `POST /{equipment_id}/ai-recommendations` | `maintenance_program_ai_recommendations` | Yes | No | **Partial** | Program suggestions |
-| `POST /investigations/{id}/ai-problem-check` | investigation facade | Yes | No | **Partial** | Problem statement check |
-| `GET /investigations/{id}/ai-summary` | `reports` route | Yes | No | **Partial** | Narrative summary |
-| `POST /scheduler/ai-plan` | `maintenance_scheduler_ai_service` | Yes | No | **Partial** | Schedule planner |
-| `POST /production/ai-insights` | `production_dashboard_ops` | Yes | No | **Partial** | Production dashboard |
-| `POST /production-logs/ai-parse` | `production_logs_service` | Yes | No | **Partial** | Log parsing |
-| `POST /pm-import/session/{id}/ai-review` | `pm_import_recommendation` | Yes | `attach_citations_to_response` | **Partial** | Citations on some paths |
-| `POST /copilot/query` | `ril_copilot_service` | Yes | No | **Partial** | Grounded prompt in registry; uneven citation surfacing |
-| `POST /ai/failure-modes/*` (fm suggestions) | `ai_fm_suggestions` routes | Yes | No | **Partial** | Large FM suggestion surface |
-| `POST /ai/extract` | `ai_extract` routes | Yes | No | **Partial** | Vision extraction |
-| `POST /forms/templates/{id}/document-search` | `forms` route | Yes | No | **Partial** | Template doc Q&A |
-| `POST /maintenance-strategies/generate` | `maintenance_strategy_generator` | Yes (allowlisted) | No | **Partial** | Legacy allowlisted OpenAI path |
-| `POST /observations/suggest-failure-modes` | observation workspace | Indirect | No | **Partial** | FM matching |
-| `POST /image-analysis/*` | `image_analysis_service` | Gateway/vision | No | **Partial** | Damage detection |
-| `POST /chat/*` | `chat` routes | Via risk engine | No | **Partial** | May trigger analyze-risk |
-| `POST /feedback/*` (AI prompt gen) | `feedback` route | Yes | No | **Missing** | Internal admin helper |
+| Route | Service | Contract | Status |
+|-------|---------|----------|--------|
+| `POST /ai/analyze-risk/{threat_id}` | `ai_risk_analysis` | `finalize_ai_recommendation_response` | **Compliant** |
+| `POST /copilot/query` | `ril_copilot_service` | `finalize_recommendation_response` | **Compliant** |
+| `POST /pm-import/session/{id}/ai-review` | `pm_import_recommendation` | `finalize_recommendation_response` | **Compliant** |
+| `POST /{equipment_id}/ai-recommendations` | `maintenance_program_routes_operations` | `finalize_recommendation_response` | **Compliant** |
+| `POST /investigations/{id}/ai-problem-check` | `investigation_files` | `finalize_recommendation_response` | **Compliant** |
+| `GET /investigations/{id}/ai-summary` | `reports.generate_ai_summary` | `finalize_recommendation_response` | **Compliant** |
+| `POST /ai-suggestions/failure-modes` | `ai_fm_suggestions` | `finalize_fm_suggestions_contract` | **Compliant** |
+| `POST /maintenance-strategies/generate` | `maintenance_routes_service` | `finalize_recommendation_response` | **Compliant** |
+| `POST /ai/recommendations` | `insights_service` | `finalize_ai_recommendation_response` | **Compliant** |
 
-## Service-layer AI (no dedicated route)
+## Other user-facing API routes
 
-| Service | ai_platform | Contract | Status |
-|---------|-------------|----------|--------|
-| `ai_orchestrator` | Yes | Citations in orchestrator | **Compliant** (internal) |
-| `ai_evidence_pack` | N/A | Citation builder | **Compliant** (internal) |
-| `translation_service` | Yes | No | **Partial** |
-| `process_import_vision` | Yes | No | **Partial** |
-| `failure_modes/*` (consolidate, duplicate scan, etc.) | Yes | No | **Partial** |
-| `threat_links` | Yes | No | **Partial** |
-| `chat_central_action_service` | Indirect | No | **Partial** |
+| Route | Service | ai_platform | Contract | Status |
+|-------|---------|-------------|----------|--------|
+| `POST /ai/chat-analyze` | `ai_risk_service` | Yes | No | **Partial** |
+| `POST /ai/dashboard-intent` | `ai_risk_service` | Yes | No | **Partial** |
+| `GET /ai/risk-insights/{threat_id}` | `ai_risk_service` | Cached | No | **Partial** |
+| `GET /ai/top-risks` | `ai_risk_service` | Yes | No | **Partial** |
+| `POST /ai/generate-causes/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
+| `GET /ai/causal-analysis/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
+| `POST /ai/explain/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
+| `POST/GET /ai/fault-tree/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
+| `POST/GET /ai/bow-tie/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
+| `POST/GET /ai/optimize-actions/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
+| `POST /scheduler/ai-plan` | `maintenance_scheduler_ai_service` | Yes | No | **Partial** |
+| `POST /production/ai-insights` | `production_dashboard_ops` | Yes | No | **Partial** |
+| `POST /production-logs/ai-parse` | `production_logs_service` | Yes | No | **Partial** |
+| `POST /ai/extract` | `ai_extract` routes | Yes | No | **Partial** |
+| `POST /forms/templates/{id}/document-search` | `forms` route | Yes | No | **Partial** |
+| `POST /observations/suggest-failure-modes` | observation workspace | Indirect | No | **Partial** |
+| `POST /image-analysis/*` | `image_analysis_service` | Gateway/vision | No | **Partial** |
+| `POST /chat/*` | `chat` routes | Via risk engine | No | **Partial** |
+| `POST /feedback/*` (AI prompt gen) | `feedback` route | Yes | No | **Missing** |
 
 ## Coverage summary
 
-| Status | Count (routes + notable services) |
+| Status | Count (enforced + notable routes) |
 |--------|-----------------------------------|
-| Compliant | 3 |
-| Partial | 28+ |
+| Compliant (enforced) | 9 |
+| Partial | 18+ |
 | Missing | 1 |
 
-## Sprint 3 enforcement plan
+## Frontend evidence display (Sprint 5)
 
-1. Add `finalize_ai_recommendation_response` wrapper in `ai_platform` for all JSON recommendation endpoints.
-2. Extend `verify_uat_gates` / new `verify_ai_contract_coverage.py` to fail on user-facing routes without contract or explicit `evidence_not_available`.
-3. Migrate `ai_risk_engine` endpoints to `execute_grounded_prompt` + evidence pack.
-4. Surface citations in RIL copilot API response schema.
-5. Document exempt routes (translation, internal admin) in allowlist.
+| Surface | Component | Contract fields shown |
+|---------|-----------|----------------------|
+| Observation AI panel | `AIInsightsPanel` + `AIRecommendationCard` | citations, evidence_not_available |
+| Investigation AI summary | `CausalEnginePageMain` dialog | citations, deterministic inputs |
+| PM Import AI review | `AIReviewModal` | citations per suggestion |
+| RIL Copilot | `RILCopilot` | citations, evidence_not_available |
+| Strategy / program AI | *pending UI wiring* | API returns contract fields |
+
+Reusable component: `frontend/src/components/ai/AIRecommendationCard.jsx`
+
+## Sprint 6 (UAT) remaining
+
+1. Wire `AIRecommendationCard` to maintenance program AI accept flow and strategy generator UI.
+2. Extend contract enforcement to `ai_risk_engine` RCA/fault-tree endpoints.
+3. Run `backfill_reliability_graph_history.py` against UAT Mongo with `--phase all`.
+4. Executive dashboard KPI partial edge — validate read-model projection in UAT.

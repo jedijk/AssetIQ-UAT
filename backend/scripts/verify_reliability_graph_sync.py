@@ -168,8 +168,18 @@ def _static_path_checks() -> list[str]:
         ),
         (
             BACKEND_ROOT / "services" / "form_service_reliability.py",
-            ["dispatch_graph_sync", "after_form_submission_reliability_update"],
+            ["dispatch_graph_sync", "after_form_submission_reliability_update", "sync_form_submission_edges"],
             "form_service_reliability",
+        ),
+        (
+            BACKEND_ROOT / "workers" / "lifecycle_graph_handler.py",
+            ["lifecycle_graph_event_handlers", "handle_action_completed"],
+            "lifecycle_graph_handler",
+        ),
+        (
+            BACKEND_ROOT / "workers" / "event_outbox_processor.py",
+            ["lifecycle_graph_event_handlers"],
+            "event_outbox_processor lifecycle wiring",
         ),
         (
             BACKEND_ROOT / "services" / "reliability_snapshot_service.py",

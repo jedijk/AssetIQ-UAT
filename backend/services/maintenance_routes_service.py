@@ -171,8 +171,44 @@ async def generate_maintenance_strategy(
         # Remove MongoDB _id before returning
         if "_id" in strategy_dict:
             del strategy_dict["_id"]
-        
-        return strategy_dict
+
+        from services.ai_citation import make_citation
+        from services.ai_platform import finalize_recommendation_response
+
+        citations = []
+        for fm in failure_modes[:15]:
+            fm_id = fm.get("id") or fm.get("failure_mode_id")
+            if fm_id:
+                citations.append(
+                    make_citation(
+                        id=str(fm_id),
+                        type="failure_mode",
+                        label=fm.get("failure_mode") or fm.get("name") or str(fm_id),
+                        url_path=f"/failure-modes/{fm_id}",
+                    )
+                )
+        citations.append(
+            make_citation(
+                id=request.equipment_type_id,
+                type="equipment_type",
+                label=request.equipment_type_name,
+                url_path=f"/library/equipment-types/{request.equipment_type_id}",
+            )
+        )
+        return finalize_recommendation_response(
+            {
+                **strategy_dict,
+                "summary": strategy_dict.get("description"),
+                "recommendations": strategy_dict.get("failure_mode_mappings", []),
+            },
+            citations=citations,
+            evidence={
+                "deterministic": {
+                    "equipment_type_id": request.equipment_type_id,
+                    "failure_mode_count": len(failure_modes),
+                }
+            },
+        )
         
     except HTTPException:
         raise

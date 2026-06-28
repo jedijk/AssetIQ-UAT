@@ -24,7 +24,7 @@ sys.path.insert(0, str(BACKEND_ROOT))
 
 logger = logging.getLogger(__name__)
 
-PHASE_CHOICES = ("maintenance", "reactive", "all")
+PHASE_CHOICES = ("maintenance", "reactive", "forms", "spare", "predictions", "all")
 COMPLETED_SCHEDULED_STATUSES = frozenset({"completed"})
 CANCELLED_SCHEDULED_STATUSES = frozenset({"cancelled"})
 TERMINAL_ACTION_STATUSES = frozenset({"completed", "closed"})
@@ -179,6 +179,20 @@ async def _action_equipment_id(db, action: Dict[str, Any]) -> Optional[str]:
     if threat_id:
         threat = await db.threats.find_one({"id": threat_id}, {"linked_equipment_id": 1})
         return (threat or {}).get("linked_equipment_id")
+    return None
+
+
+async def _action_failure_mode_id(db, action: Dict[str, Any]) -> Optional[str]:
+    fm_id = action.get("failure_mode_id")
+    if fm_id:
+        return str(fm_id)
+    threat_id = action.get("threat_id") or (
+        action.get("source_id") if action.get("source_type") == "threat" else None
+    )
+    if threat_id:
+        threat = await db.threats.find_one({"id": threat_id}, {"failure_mode_id": 1})
+        fm = (threat or {}).get("failure_mode_id")
+        return str(fm) if fm else None
     return None
 
 
@@ -713,6 +727,7 @@ async def backfill_actions(db, config: BackfillConfig) -> PhaseStats:
             continue
 
         equipment_id = await _action_equipment_id(db, action)
+        failure_mode_id = await _action_failure_mode_id(db, action)
         tenant_id = _tenant_id(action)
         label = "sync_action_edges"
 
@@ -721,6 +736,7 @@ async def backfill_actions(db, config: BackfillConfig) -> PhaseStats:
             src_type=source_type,
             src_id=source_id,
             eq_id=equipment_id,
+            fm_id=failure_mode_id,
             tid=tenant_id,
         ) -> None:
             await sync_action_edges(
@@ -728,6 +744,7 @@ async def backfill_actions(db, config: BackfillConfig) -> PhaseStats:
                 source_type=src_type,
                 source_id=src_id,
                 equipment_id=eq_id,
+                failure_mode_id=fm_id,
                 tenant_id=tid,
             )
 
@@ -772,6 +789,232 @@ async def backfill_actions(db, config: BackfillConfig) -> PhaseStats:
             entity_id=action_id,
             label=outcome_label,
             coro_factory=_sync_outcome,
+        )
+
+    return stats
+
+
+async def backfill_form_submissions(db, config: BackfillConfig) -> PhaseStats:
+    from services.reliability_graph_entities import sync_form_submission_edges
+
+    stats = PhaseStats()
+    query: Dict[str, Any] = {
+        "task_instance_id": {"$exists": True, "$ne": None},
+        **_equipment_filter(config),
+    }
+    cursor = db.form_submissions.find(query, {"_id": 0}).batch_size(config.batch_size)
+    if config.limit:
+        cursor = cursor.limit(config.limit)
+
+    async for submission in cursor:
+        submission_id = submission.get("id") or str(submission.get("_id", ""))
+        task_instance_id = submission.get("task_instance_id")
+        if not submission_id or not task_instance_id:
+            stats.skipped += 1
+            continue
+        tenant_id = _tenant_id(submission)
+        label = "sync_form_submission_edges"
+
+        async def _sync(
+            sub_id=submission_id,
+            ti_id=task_instance_id,
+            eq_id=submission.get("equipment_id"),
+            tid=tenant_id,
+        ) -> None:
+            await sync_form_submission_edges(
+                form_submission_id=str(sub_id),
+                task_instance_id=str(ti_id),
+                equipment_id=eq_id,
+                tenant_id=tid,
+            )
+
+        await _run_sync(
+            config=config,
+            stats=stats,
+            entity_id=submission_id,
+            label=label,
+            coro_factory=_sync,
+        )
+
+    return stats
+
+
+async def backfill_spare_parts(db, config: BackfillConfig) -> PhaseStats:
+    from services.spare_parts_graph_sync import (
+        sync_entity_requires_spare_parts,
+        sync_spare_part_equipment_links,
+    )
+
+    stats = PhaseStats()
+    query: Dict[str, Any] = {}
+    if config.equipment_id:
+        query["equipment_links.equipment_id"] = config.equipment_id
+    cursor = db.spare_parts.find(query, {"_id": 0}).batch_size(config.batch_size)
+    if config.limit:
+        cursor = cursor.limit(config.limit)
+
+    async for part in cursor:
+        part_id = part.get("id")
+        if not part_id:
+            stats.skipped += 1
+            continue
+        tenant_id = _tenant_id(part)
+        links = part.get("equipment_links") or []
+        if config.equipment_id:
+            links = [
+                link for link in links
+                if link.get("equipment_id") == config.equipment_id
+            ]
+        if not links:
+            stats.skipped += 1
+            continue
+        label = "sync_spare_part_equipment_links"
+
+        async def _sync(sp_id=part_id, part_links=links, tid=tenant_id) -> None:
+            await sync_spare_part_equipment_links(
+                spare_part_id=str(sp_id),
+                equipment_links=part_links,
+                tenant_id=tid,
+            )
+
+        await _run_sync(
+            config=config,
+            stats=stats,
+            entity_id=part_id,
+            label=label,
+            coro_factory=_sync,
+        )
+
+    program_query = _equipment_filter(config)
+    program_cursor = db.maintenance_programs_v2.find(
+        program_query, {"_id": 0}
+    ).batch_size(config.batch_size)
+    if config.limit:
+        program_cursor = program_cursor.limit(config.limit)
+
+    async for program in program_cursor:
+        equipment_id = program.get("equipment_id")
+        if not equipment_id:
+            continue
+        tenant_id = _tenant_id(program)
+        for task in program.get("tasks") or []:
+            task_id = task.get("id")
+            requirements = task.get("spare_part_requirements") or []
+            if not task_id or not requirements:
+                continue
+            label = "sync_entity_requires_spare_parts program_task"
+
+            async def _sync_req(
+                src_type="program_task",
+                src_id=task_id,
+                reqs=requirements,
+                eq_id=equipment_id,
+                tid=tenant_id,
+            ) -> None:
+                await sync_entity_requires_spare_parts(
+                    source_type=src_type,
+                    source_id=str(src_id),
+                    requirements=reqs,
+                    equipment_id=str(eq_id),
+                    tenant_id=tid,
+                )
+
+            await _run_sync(
+                config=config,
+                stats=stats,
+                entity_id=f"{task_id}:requires",
+                label=label,
+                coro_factory=_sync_req,
+            )
+
+    action_query: Dict[str, Any] = {"spare_part_requirements.0": {"$exists": True}}
+    if config.equipment_id:
+        action_query["linked_equipment_id"] = config.equipment_id
+    action_cursor = db.central_actions.find(action_query, {"_id": 0}).batch_size(
+        config.batch_size
+    )
+    if config.limit:
+        action_cursor = action_cursor.limit(config.limit)
+
+    async for action in action_cursor:
+        action_id = action.get("id")
+        requirements = action.get("spare_part_requirements") or []
+        equipment_id = await _action_equipment_id(db, action)
+        if not action_id or not requirements or not equipment_id:
+            stats.skipped += 1
+            continue
+        tenant_id = _tenant_id(action)
+        label = "sync_entity_requires_spare_parts action"
+
+        async def _sync_action_req(
+            a_id=action_id,
+            reqs=requirements,
+            eq_id=equipment_id,
+            tid=tenant_id,
+        ) -> None:
+            await sync_entity_requires_spare_parts(
+                source_type="action",
+                source_id=str(a_id),
+                requirements=reqs,
+                equipment_id=str(eq_id),
+                tenant_id=tid,
+            )
+
+        await _run_sync(
+            config=config,
+            stats=stats,
+            entity_id=f"{action_id}:requires",
+            label=label,
+            coro_factory=_sync_action_req,
+        )
+
+    return stats
+
+
+async def backfill_predictions(db, config: BackfillConfig) -> PhaseStats:
+    from services.reliability_graph import sync_prediction_edges
+
+    stats = PhaseStats()
+    query: Dict[str, Any] = {"graph_edge_hint.active_edge_count": {"$gt": 0}}
+    if config.equipment_id:
+        query["equipment_id"] = config.equipment_id
+    cursor = db.ril_predictions.find(query, {"_id": 0}).batch_size(config.batch_size)
+    if config.limit:
+        cursor = cursor.limit(config.limit)
+
+    async for prediction in cursor:
+        equipment_id = prediction.get("equipment_id")
+        if not equipment_id:
+            stats.skipped += 1
+            continue
+        graph_edge_hint = prediction.get("graph_edge_hint") or {}
+        if int(graph_edge_hint.get("active_edge_count") or 0) <= 0:
+            stats.skipped += 1
+            continue
+        tenant_id = _tenant_id(prediction)
+        label = "sync_prediction_edges"
+
+        async def _sync(
+            eq_id=equipment_id,
+            hint=graph_edge_hint,
+            owner=prediction.get("owner_id"),
+            version=prediction.get("version"),
+            tid=tenant_id,
+        ) -> None:
+            await sync_prediction_edges(
+                equipment_id=str(eq_id),
+                graph_edge_hint=hint,
+                tenant_id=tid,
+                owner_id=owner,
+                prediction_version=version,
+            )
+
+        await _run_sync(
+            config=config,
+            stats=stats,
+            entity_id=str(equipment_id),
+            label=label,
+            coro_factory=_sync,
         )
 
     return stats
@@ -829,6 +1072,21 @@ async def run_backfill(db, config: BackfillConfig) -> Dict[str, PhaseStats]:
 
         summaries["central_actions"] = await backfill_actions(db, config)
         _print_phase_summary("central_actions", summaries["central_actions"])
+
+    if should_run_phase(config, "forms"):
+        print("Phase: forms")
+        summaries["form_submissions"] = await backfill_form_submissions(db, config)
+        _print_phase_summary("form_submissions", summaries["form_submissions"])
+
+    if should_run_phase(config, "spare"):
+        print("Phase: spare")
+        summaries["spare_parts"] = await backfill_spare_parts(db, config)
+        _print_phase_summary("spare_parts", summaries["spare_parts"])
+
+    if should_run_phase(config, "predictions"):
+        print("Phase: predictions")
+        summaries["ril_predictions"] = await backfill_predictions(db, config)
+        _print_phase_summary("ril_predictions", summaries["ril_predictions"])
 
     return summaries
 

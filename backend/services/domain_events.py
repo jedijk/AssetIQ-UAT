@@ -30,6 +30,7 @@ class DomainEventType(str, Enum):
     TASK_COMPLETED = "task.completed"
     INVESTIGATION_CLOSED = "investigation.closed"
     STRATEGY_APPLIED = "strategy.applied"
+    FORM_SUBMISSION_CREATED = "form_submission.created"
 
     # Read model refresh
     PROJECTION_EXECUTIVE_KPI = "projection.executive_kpi"

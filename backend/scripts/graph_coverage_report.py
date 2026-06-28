@@ -13,7 +13,10 @@ os.environ.setdefault("DB_NAME", "test")
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
 
-from services.reliability_graph.graph_sync_registry import GRAPH_SYNC_HANDLERS  # noqa: E402
+from services.reliability_graph.graph_sync_registry import (  # noqa: E402
+    DIRECT_UPSERT_HANDLERS,
+    GRAPH_SYNC_HANDLERS,
+)
 
 # Entity write paths expected to dispatch graph sync (handler must exist in registry).
 ENTITY_COVERAGE = [
@@ -72,11 +75,16 @@ ENTITY_COVERAGE = [
         "handler": "sync_prediction_edges",
         "write_paths": ("ril_predictions",),
     },
+    {
+        "entity": "form_submission",
+        "handler": "sync_form_submission_edges",
+        "write_paths": ("form_service_reliability",),
+    },
 ]
 
 
 def build_report() -> dict:
-    registered = set(GRAPH_SYNC_HANDLERS.keys())
+    registered = set(GRAPH_SYNC_HANDLERS.keys()) | set(DIRECT_UPSERT_HANDLERS)
     missing_handlers: list[str] = []
     covered_entities: list[str] = []
 

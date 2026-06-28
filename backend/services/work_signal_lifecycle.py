@@ -160,8 +160,15 @@ async def create_work_signal(
             payload={"observation_id": signal_id, "equipment_id": observation.get("equipment_id")},
             tenant_id=observation.get("tenant_id"),
         )
+        await publish_event(
+            event_type=DomainEventType.THREAT_CREATED.value,
+            aggregate_type="threat",
+            aggregate_id=signal_id,
+            payload={"threat_id": signal_id, "equipment_id": observation.get("equipment_id")},
+            tenant_id=observation.get("tenant_id"),
+        )
     except Exception as exc:
-        logger.debug("OBSERVATION_CREATED event skipped: %s", exc)
+        logger.debug("OBSERVATION_CREATED/THREAT_CREATED event skipped: %s", exc)
 
     return {
         "id": signal_id,

@@ -114,7 +114,6 @@ async def download_file(user: dict, path: str) -> Tuple[bytes, str, str]:
 
 async def ai_problem_check(user: dict, inv_id: str, description: str) -> dict:
     """Analyze investigation description for defensive reasoning patterns."""
-    from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
     from services.ai_evidence_pack import build_evidence_pack
 
     inv = await db.investigations.find_one(investigation_query(user, inv_id=inv_id))
@@ -142,6 +141,8 @@ async def ai_problem_check(user: dict, inv_id: str, description: str) -> dict:
 
         user_content = f"Analyze this problem statement for defensive reasoning:\n\n{description}"
         if evidence_pack and evidence_pack.get("prompt_summary"):
+            from services.ai_citation import format_citations_for_prompt
+
             user_content += (
                 f"\n\nLinked equipment evidence:\n{evidence_pack['prompt_summary']}\n"
                 f"{format_citations_for_prompt(evidence_pack.get('citations') or [])}"
@@ -162,10 +163,13 @@ async def ai_problem_check(user: dict, inv_id: str, description: str) -> dict:
             "refined_description": parsed.get("refined_description", description),
             "guidance": parsed.get("guidance", []),
             "changes_made": parsed.get("changes_made", []),
+            "recommendations": parsed.get("guidance", []),
         }
-        return attach_citations_to_response(
+        from services.ai_platform import finalize_recommendation_response
+
+        return finalize_recommendation_response(
             payload,
-            (evidence_pack or {}).get("citations") or [],
+            citations=(evidence_pack or {}).get("citations") or [],
             evidence=evidence_pack,
         )
     except json.JSONDecodeError as exc:

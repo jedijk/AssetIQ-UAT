@@ -1,6 +1,6 @@
 # Reactive Graph Ownership Matrix
 
-**Sprint 1 — Functional Spec §1.2**  
+**Sprint 2 — Functional Spec §1.2**  
 **Last updated:** 2026-06-28  
 **Registry:** `backend/services/reliability_graph/graph_sync_registry.py`  
 **Gate:** `backend/scripts/verify_reliability_graph_sync.py`
@@ -21,82 +21,75 @@ This matrix maps **functional-spec edge names** to **canonical Mongo `reliabilit
 
 | Spec edge | Canonical relation(s) | Source → Target | Owner handler | Trigger | tenant_id source | Backfill script | Verification |
 |-----------|----------------------|-----------------|---------------|---------|------------------|-----------------|--------------|
-| `equipment_has_observation` | `observed_on` | observation → equipment | `sync_observation_edges` | observation create/update | `observations.tenant_id` / work signal | `backfill_reliability_graph_history.py --phase reactive` | `audit_observation_edges`, `test_reliability_graph_platform` |
+| `equipment_has_observation` | `observed_on` | observation → equipment | `sync_observation_edges` | observation create/update | `observations.tenant_id` | `backfill --phase reactive` | `audit_observation_edges` |
 | `observation_has_investigation` | `triggered_investigation` | threat → investigation | `sync_investigation_edges` | investigation open | `investigations.tenant_id` | reactive phase | `audit_investigation_chain` |
-| `investigation_has_action` | `generated_action` | investigation/cause/threat → action | `sync_action_edges` | action create | `central_actions.tenant_id` | reactive phase | `action_service` graph dispatch tests |
+| `investigation_has_action` | `generated_action` | investigation/cause/threat → action | `sync_action_edges` | action create | `central_actions.tenant_id` | reactive phase | action graph dispatch tests |
 | `observation_matches_failure_mode` | `indicates_failure_mode` | observation → failure_mode | `sync_observation_edges` | observation FM link | observation doc | reactive phase | `audit_observation_edges` |
-| `action_addresses_failure_mode` | `mitigates_failure_mode` | program_task / scheduled_task / task_instance → failure_mode | `sync_edges_for_apply_strategy`, `sync_edges_for_scheduled_task`, `sync_task_instance_completion_edges` | strategy apply, schedule, complete | entity `tenant_id` | maintenance phase | **PARTIAL** — no direct action→FM edge |
+| `action_addresses_failure_mode` | `mitigates_failure_mode` | action → failure_mode (+ task paths) | `sync_action_edges`, strategy handlers | action create w/ FM, strategy apply | entity `tenant_id` | reactive + maintenance | action create + backfill FM resolution |
 | `failure_mode_has_strategy` | `has_failure_mode`, `has_strategy_type` | equipment → failure_mode / strategy | `sync_edges_for_apply_strategy` | apply strategy | equipment type tenant | maintenance phase | `audit_program_task_edges` |
 | `strategy_applied_to_equipment` | `has_strategy_type`, `has_program` | equipment → strategy / program | `sync_edges_for_apply_strategy` | apply strategy | user `company_id` | maintenance phase | apply strategy tests |
-| `strategy_generates_program` | `has_program`, `governed_by`, `contains_task` | equipment → program; program → strategy/task | `sync_edges_for_apply_strategy` | apply strategy | program tenant | maintenance phase | `audit_program_task_edges` |
-| `program_generates_scheduled_task` | `derived_from`, `scheduled_for` | scheduled_task → program_task / equipment | `sync_edges_for_scheduled_task` | scheduled task create | `scheduled_tasks.tenant_id` | maintenance phase | `audit_scheduled_task_created` |
-| `scheduled_task_creates_task_instance` | `instantiated_as` | scheduled_task → task_instance | `sync_task_instance_completion_edges` | task instance complete | task instance tenant | maintenance phase | scheduled task tests |
-| `task_instance_generates_evidence` | `yielded_finding`, `found_on` | task_completion → finding → equipment | `_sync_finding_from_completion` | task complete w/ findings | completion tenant | maintenance phase | task completion graph tests |
-| `evidence_supports_observation` | `raised_observation` | finding → observation | `sync_finding_to_observation_edge` | observation triage / FM link | observation tenant | reactive phase (via observation sync) | finding→observation unit tests |
-| `action_reduces_risk` | `impacted_reliability`, `affects_equipment` | outcome → reliability_impact → equipment | `sync_outcome_edges` | action verify/close | action tenant | reactive phase (outcome) | **PARTIAL** — indirect via outcome chain |
+| `strategy_generates_program` | `has_program`, `governed_by`, `contains_task` | equipment → program | `sync_edges_for_apply_strategy` | apply strategy | program tenant | maintenance phase | `audit_program_task_edges` |
+| `program_generates_scheduled_task` | `derived_from`, `scheduled_for` | scheduled_task → program_task | `sync_edges_for_scheduled_task` | scheduled task create | `scheduled_tasks.tenant_id` | maintenance phase | scheduled task tests |
+| `scheduled_task_creates_task_instance` | `instantiated_as` | scheduled_task → task_instance | `sync_task_instance_completion_edges` | task instance complete | task instance tenant | maintenance phase | task completion tests |
+| `task_instance_generates_evidence` | `yielded_finding`, `found_on` | task_completion → finding | `_sync_finding_from_completion` | task complete w/ findings | completion tenant | maintenance phase | task completion graph tests |
+| `evidence_supports_observation` | `raised_observation` | finding → observation | `sync_finding_to_observation_edge` | observation triage | observation tenant | reactive phase | finding→observation tests |
+| `action_reduces_risk` | `impacted_reliability`, `affects_equipment` | outcome → reliability_impact | `sync_outcome_edges` | action verify/close | action tenant | reactive phase | **PARTIAL** — indirect chain |
 | `outcome_validates_action` | `resulted_in` | action → outcome | `sync_outcome_edges` | action completed | action tenant | reactive phase | outcome sync tests |
-| `equipment_has_spare_requirement` | `requires` | program_task / action → spare_part | `sync_entity_requires_spare_parts` | spare requirement save | entity tenant | **GAP** — not in history backfill | spare parts graph sync tests |
-| `spare_part_used_by_task` | `requires`, `used_on` | program_task/action → spare_part; spare_part → equipment | `sync_entity_requires_spare_parts`, `sync_spare_part_equipment_links` | spare link / requirement | spare_parts tenant | **GAP** — not in history backfill | `spare_parts_graph_sync` |
-| `form_submission_supports_task` | *(none)* | form_submission → task_instance | `after_form_submission_reliability_update` | form submit w/ task_instance_id | submission tenant | **GAP** | **GAP** — dispatches task completion sync only; no `form_submission` edge |
-| `executive_kpi_derived_from_graph` | *(read model)* | graph → executive KPI snapshot | `graph_kpi_aggregator` / `executive_kpi_materializer` | projection job / invalidation | user `company_id` | N/A (not an edge) | **PARTIAL** — KPI materialization, not `reliability_edges` |
+| `equipment_has_spare_requirement` | `requires` | program_task / action → spare_part | `sync_entity_requires_spare_parts` | spare requirement save | entity tenant | `--phase spare` | spare parts graph sync tests |
+| `spare_part_used_by_task` | `requires`, `used_on` | spare_part → equipment | `sync_spare_part_equipment_links` | spare link | spare_parts tenant | `--phase spare` | `spare_parts_graph_sync` |
+| `form_submission_supports_task` | `supports` | form_submission → task_instance | `sync_form_submission_edges` | form submit w/ task_instance_id | submission tenant | `--phase forms` | form submission reliability tests |
+| `executive_kpi_derived_from_graph` | *(read model)* | graph → executive KPI | `graph_kpi_aggregator` | projection job | user `company_id` | N/A | **PARTIAL** — read model |
 
-**Status summary:** 13 implemented · 3 partial · 2 gap (form submission edge, spare backfill)
+**Status summary:** 16 implemented · 2 partial · 0 gap
 
 ## Dispatch handler registry
 
 | Handler | Domain event (`DomainEventType`) | Primary write-path callers |
 |---------|----------------------------------|----------------------------|
-| `sync_observation_edges` | `graph.sync_observation_edges` | `observation_service` |
-| `sync_threat_edges` | `graph.sync_threat_edges` | `threat_helpers`, chat/task paths |
+| `sync_observation_edges` | `graph.sync_observation_edges` | `observation_service`, `lifecycle_graph_handler` |
+| `sync_threat_edges` | `graph.sync_threat_edges` | `threat_helpers`, `lifecycle_graph_handler` |
 | `sync_investigation_edges` | `graph.sync_investigation_edges` | `investigation_crud` |
 | `sync_cause_edge` | `graph.sync_cause_edge` | `investigation_subresources` |
 | `sync_action_edges` | `graph.sync_action_edges` | `action_service`, `investigation_service` |
-| `sync_outcome_edges` | `graph.sync_outcome_edges` | `action_service` |
-| `sync_edges_for_scheduled_task` | `graph.sync_edges_for_scheduled_task` | `maintenance_scheduling`, `maintenance_scheduler_service` |
+| `sync_outcome_edges` | `graph.sync_outcome_edges` | `action_service`, `lifecycle_graph_handler` |
+| `sync_edges_for_scheduled_task` | `graph.sync_edges_for_scheduled_task` | `maintenance_scheduling` |
 | `sync_task_instance_completion_edges` | `graph.sync_task_instance_completion_edges` | `task_service_completion`, `form_service_reliability` |
 | `sync_edges_for_apply_strategy` | `graph.sync_edges_for_apply_strategy` | `apply_strategy_service` |
-| `sync_edge_for_pm_import_task` | `graph.sync_edge_for_pm_import_task` | `pm_import_graph_sync`, `failure_mode_apply` |
+| `sync_edge_for_pm_import_task` | `graph.sync_edge_for_pm_import_task` | `pm_import_graph_sync` |
 | `sync_prediction_edges` | `graph.sync_prediction_edges` | `ril_predictions` |
 
 ## Direct upsert paths (approved submodules)
-
-These bypass `dispatch_graph_sync` but are listed in `reliability_graph_ownership.EDGE_OWNERS`:
 
 | Function | Module | Relations |
 |----------|--------|-----------|
 | `sync_spare_part_equipment_links` | `spare_parts_graph_sync.py` | `used_on` |
 | `sync_entity_requires_spare_parts` | `spare_parts_graph_sync.py` | `requires` |
 | `sync_finding_to_observation_edge` | `reliability_graph_entities.py` | `raised_observation` |
+| `sync_form_submission_edges` | `reliability_graph_entities.py` | `supports` |
 | `_sync_finding_from_completion` | `reliability_graph_strategy.py` | `yielded_finding`, `found_on` |
 | `sync_instantiated_as_edge` | `reliability_graph_strategy.py` | `instantiated_as` |
 | `sync_pm_import_program_task_links` | `reliability_graph_strategy.py` | `imported_as` |
-| `annotate_equipment_failure_mode_risk` | `reliability_graph_core.py` | twin metadata on `has_failure_mode` |
+| `annotate_equipment_failure_mode_risk` | `reliability_graph_core.py` | twin metadata |
 
-Approved `upsert_edge` modules: `reliability_graph_core`, `reliability_graph_entities`, `reliability_graph_strategy`, `spare_parts_graph_sync` (see `APPROVED_UPSERT_MODULES`).
+## Lifecycle event wiring (Sprint 2)
 
-## Outbox / async wiring
+| Domain event | Handler | Graph action |
+|--------------|---------|--------------|
+| `threat.created` | `lifecycle_graph_handler.handle_threat_created` | `sync_threat_edges` |
+| `observation.created` | `lifecycle_graph_handler.handle_observation_created` | `sync_observation_edges` |
+| `action.completed` | `lifecycle_graph_handler.handle_action_completed` | `sync_outcome_edges` |
+| `form_submission.created` | `lifecycle_graph_handler.handle_form_submission_created` | `sync_form_submission_edges` |
 
-| Component | Status |
-|-----------|--------|
-| `dispatch_graph_sync` → `publish_event` | **Implemented** when `GRAPH_SYNC_ASYNC=true` |
-| `DomainEventType.GRAPH_SYNC_*` | **11 types** in `domain_events.py` |
-| `workers/graph_projection_handler.py` | **Implemented** — resolves handler from `GRAPH_SYNC_HANDLERS` |
-| Domain lifecycle events (`threat.created`, etc.) | **Registered** in enum; graph handlers not auto-chained yet |
+Wired via `workers/event_outbox_processor.py` → `lifecycle_graph_event_handlers()`.
 
 ## Backfill coverage
 
-| Script | Handlers covered |
-|--------|------------------|
-| `backfill_reliability_graph_history.py` | apply_strategy, scheduled_task, task_instance, pm_import, observation, threat, investigation, cause, action, outcome |
-| `backfill_reliability_edge_tenant.py` | tenant_id stamp on legacy edges |
-| `backfill_graph_threat_to_observation_edges.py` | observation↔threat alias edges |
+| Phase | Collections / handlers |
+|-------|------------------------|
+| `maintenance` | apply_strategy, scheduled_task, task_instance, pm_import |
+| `reactive` | observation, threat, investigation, cause, action (+ outcomes) |
+| `forms` | `form_submissions` → `sync_form_submission_edges` |
+| `spare` | `spare_parts`, program_task/action `requires`, `used_on` |
+| `predictions` | `ril_predictions` → `sync_prediction_edges` |
 
-**Not in history backfill (Sprint 2):** `sync_prediction_edges`, spare parts `requires`/`used_on`, dedicated form_submission edges.
-
-## Sprint 2 priorities
-
-1. Add `form_submission → supports → task_instance` edge (or document as intentional omission).
-2. Direct `action → mitigates_failure_mode` when action targets a failure mode.
-3. Backfill spare-part and prediction graph edges.
-4. Wire domain lifecycle events to graph dispatch (reduce inline-only paths).
-5. Align edge document id with tenant-scoped idempotency key if multi-tenant edge collision observed.
+Script: `backend/scripts/backfill_reliability_graph_history.py --phase all`

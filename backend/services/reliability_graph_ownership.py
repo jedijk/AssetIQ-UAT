@@ -88,6 +88,7 @@ EDGE_OWNERS: Tuple[EdgeOwner, ...] = (
     EdgeOwner("identified_cause", "investigation", "cause", "sync_cause_edge", "investigation_rca", "sync_cause_edge"),
     EdgeOwner("generated_action", "investigation", "action", "sync_action_edges", "action_create", "sync_action_edges", "source_type may be cause/threat"),
     EdgeOwner("assigned_to_equipment", "action", "equipment", "sync_action_edges", "action_create", "sync_action_edges"),
+    EdgeOwner("mitigates_failure_mode", "action", "failure_mode", "sync_action_edges", "action_create", "sync_action_edges"),
     EdgeOwner("resulted_in", "action", "outcome", "sync_outcome_edges", "action_verify", "sync_outcome_edges"),
     EdgeOwner("impacted_reliability", "outcome", "reliability_impact", "sync_outcome_edges", "action_verify", "sync_outcome_edges"),
     EdgeOwner("affects_equipment", "reliability_impact", "equipment", "sync_outcome_edges", "action_verify", "sync_outcome_edges"),
@@ -95,6 +96,7 @@ EDGE_OWNERS: Tuple[EdgeOwner, ...] = (
     EdgeOwner("used_on", "spare_part", "equipment", "sync_spare_part_equipment_links", "spare_part_link", notes="spare_parts_graph_sync.py"),
     EdgeOwner("requires", "program_task", "spare_part", "sync_entity_requires_spare_parts", "program_task_requirements", notes="spare_parts_graph_sync.py"),
     EdgeOwner("requires", "action", "spare_part", "sync_entity_requires_spare_parts", "action_requirements", notes="spare_parts_graph_sync.py"),
+    EdgeOwner("supports", "form_submission", "task_instance", "sync_form_submission_edges", "form_submit", notes="reliability_graph_entities.py"),
     # RIL / predictions
     EdgeOwner("has_prediction", "equipment", "prediction", "sync_prediction_edges", "ril_prediction", "sync_prediction_edges"),
 )

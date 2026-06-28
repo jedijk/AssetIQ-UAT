@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""AI entry point inventory — Convergence Program Phase 4."""
+"""AI entry point inventory — Convergence Program Phase 4 + Sprint 3/4 contract gates."""
 from __future__ import annotations
 
+import os
 import re
+import sys
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BACKEND_DIR))
+
+os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017/ai-entry-point-report")
+os.environ.setdefault("DB_NAME", "ai-entry-point-report")
+os.environ.setdefault("JWT_SECRET_KEY", "ai-entry-point-report")
+os.environ.setdefault("ENVIRONMENT", "test")
 
 # Direct OpenAI imports allowed outside ai_gateway transport layer.
 OPENAI_IMPORT_ALLOWLIST = {
@@ -18,6 +26,26 @@ OPENAI_IMPORT_ALLOWLIST = {
 # Grandfathered legacy bypass paths (tracked, not blocking CI growth).
 OPENAI_IMPORT_BASELINE: set[str] = set()
 
+# Sprint 4 — enforced surfaces must call contract finalization before return.
+ENFORCED_CONTRACT_SURFACES: dict[str, str] = {
+    "services/ai_risk_analysis.py": "AI Risk Analysis",
+    "services/ril_copilot_service.py": "RIL Copilot",
+    "services/pm_import/pm_import_recommendation.py": "PM Import AI Review",
+    "services/maintenance_program_routes_operations.py": "Maintenance Program AI",
+    "services/investigation_files.py": "Investigation Recommendations",
+    "routes/ai_fm_suggestions.py": "Failure Mode Suggestions",
+    "routes/reports.py": "Investigation AI Summary",
+    "services/maintenance_routes_service.py": "Maintenance Strategy AI",
+}
+
+CONTRACT_MARKERS = (
+    "finalize_recommendation_response",
+    "finalize_ai_recommendation_response",
+)
+
+PROMPT_CALL_RE = re.compile(
+    r'execute_(?:json_prompt|prompt|grounded_prompt)\(\s*["\']([^"\']+)["\']'
+)
 OPENAI_IMPORT_RE = re.compile(r"^\s*from\s+openai\s+import\b", re.MULTILINE)
 AI_GATEWAY_RE = re.compile(r"\b(?:from\s+services\.ai_gateway\s+import|services\.ai_gateway\.)")
 OPENAI_CLIENT_RE = re.compile(r"\bOpenAI\s*\(")
@@ -78,12 +106,68 @@ def scan_ai_gateway_usage() -> dict:
     }
 
 
+def scan_enforced_contract_surfaces() -> dict:
+    """Sprint 4 — enforced AI surfaces must use contract finalization."""
+    violations: list[str] = []
+    compliant: list[str] = []
+    missing_files: list[str] = []
+
+    for rel, label in sorted(ENFORCED_CONTRACT_SURFACES.items()):
+        path = BACKEND_DIR / rel
+        if not path.is_file():
+            missing_files.append(f"{rel} ({label})")
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if any(marker in text for marker in CONTRACT_MARKERS):
+            compliant.append(rel)
+        else:
+            violations.append(f"{rel} ({label})")
+
+    return {
+        "enforced_surface_count": len(ENFORCED_CONTRACT_SURFACES),
+        "contract_compliant": compliant,
+        "contract_violations": violations,
+        "missing_enforced_files": missing_files,
+    }
+
+
+def scan_unregistered_prompts() -> dict:
+    """Flag execute_prompt calls with prompt IDs missing from the registry."""
+    from services.ai_prompt_registry import list_prompts
+
+    registered = set(list_prompts().keys())
+    unregistered: list[str] = []
+    seen: set[str] = set()
+
+    for path in sorted(BACKEND_DIR.rglob("*.py")):
+        if "/tests/" in path.as_posix():
+            continue
+        rel = _rel(path)
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for match in PROMPT_CALL_RE.finditer(text):
+            prompt_id = match.group(1)
+            key = f"{rel}:{prompt_id}"
+            if prompt_id in registered or key in seen:
+                continue
+            seen.add(key)
+            unregistered.append(key)
+
+    return {
+        "registered_prompt_count": len(registered),
+        "unregistered_prompt_calls": sorted(unregistered),
+    }
+
+
 def build_report() -> dict:
     imports = scan_openai_imports()
     usage = scan_ai_gateway_usage()
+    contract = scan_enforced_contract_surfaces()
+    prompts = scan_unregistered_prompts()
     return {
         **imports,
         **usage,
+        **contract,
+        **prompts,
         "gateway_user_count": len(usage["ai_gateway_users"]),
         "openai_bypass_count": len(imports["baseline_bypasses"]) + len(imports["violations"]),
     }
@@ -97,16 +181,40 @@ def main() -> int:
     print(f"Legacy OpenAI bypasses (baseline): {len(report['baseline_bypasses'])}")
     for rel in report["baseline_bypasses"]:
         print(f"  - {rel}")
+
+    print(f"\nEnforced contract surfaces: {report['enforced_surface_count']}")
+    print(f"  compliant: {len(report['contract_compliant'])}")
+    if report["contract_violations"]:
+        print("\nCONTRACT violations (enforced surfaces):")
+        for rel in report["contract_violations"]:
+            print(f"  - {rel}")
+    if report["missing_enforced_files"]:
+        print("\nMissing enforced surface files:")
+        for rel in report["missing_enforced_files"]:
+            print(f"  - {rel}")
+
+    if report["unregistered_prompt_calls"]:
+        print(f"\nUnregistered prompt calls ({len(report['unregistered_prompt_calls'])}):")
+        for item in report["unregistered_prompt_calls"][:20]:
+            print(f"  - {item}")
+        if len(report["unregistered_prompt_calls"]) > 20:
+            print(f"  ... and {len(report['unregistered_prompt_calls']) - 20} more")
+
     if report["violations"]:
         print("\nNEW OpenAI import violations:")
         for rel in report["violations"]:
             print(f"  - {rel}")
         return 1
+
+    if report["contract_violations"] or report["missing_enforced_files"]:
+        return 1
+
     if report["direct_openai_client"]:
         print("\nDirect OpenAI() client usage (review):")
         for rel in report["direct_openai_client"][:15]:
             print(f"  - {rel}")
-    print("\nNo new OpenAI import violations.")
+
+    print("\nNo new OpenAI import or contract enforcement violations.")
     return 0
 
 

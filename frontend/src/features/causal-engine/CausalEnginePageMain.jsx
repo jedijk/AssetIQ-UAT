@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { getBackendUrl } from "../../lib/apiConfig";
 import AIProblemCheckModal from "../../components/causal-engine/AIProblemCheckModal";
+import AIRecommendationCard from "../../components/ai/AIRecommendationCard";
 import {
   Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Lock, ShieldCheck, UserCheck, CheckCircle, ExternalLink, Sparkles, Brain,
@@ -1326,6 +1327,14 @@ export default function CausalEnginePageMain() {
                     ))}
                   </ul>
                 </div>
+              )}
+
+              {(aiSummary.citations?.length > 0 || aiSummary.evidence_not_available) && (
+                <AIRecommendationCard
+                  payload={aiSummary}
+                  summary={null}
+                  compact
+                />
               )}
             </div>
           ) : null}

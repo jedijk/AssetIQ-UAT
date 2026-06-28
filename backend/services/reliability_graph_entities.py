@@ -180,6 +180,7 @@ async def sync_action_edges(
     source_type: str,
     source_id: str,
     equipment_id: Optional[str] = None,
+    failure_mode_id: Optional[str] = None,
     tenant_id: Optional[str] = None,
 ) -> None:
     """Materialize investigation/cause/threat → action and action → equipment."""
@@ -202,6 +203,35 @@ async def sync_action_edges(
             equipment_id=equipment_id,
             tenant_id=tenant_id,
         )
+    if failure_mode_id:
+        await upsert_edge(
+            source_type="action",
+            source_id=action_id,
+            relation="mitigates_failure_mode",
+            target_type="failure_mode",
+            target_id=str(failure_mode_id),
+            equipment_id=equipment_id,
+            tenant_id=tenant_id,
+        )
+
+
+async def sync_form_submission_edges(
+    *,
+    form_submission_id: str,
+    task_instance_id: str,
+    equipment_id: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+) -> None:
+    """Materialize form_submission → supports → task_instance (inspection evidence)."""
+    await upsert_edge(
+        source_type="form_submission",
+        source_id=form_submission_id,
+        relation="supports",
+        target_type="task_instance",
+        target_id=str(task_instance_id),
+        equipment_id=equipment_id,
+        tenant_id=tenant_id,
+    )
 
 
 async def sync_outcome_edges(

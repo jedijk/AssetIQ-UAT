@@ -43,6 +43,7 @@ BACKFILL_SYNC_HANDLERS: FrozenSet[str] = frozenset({
     "sync_cause_edge",
     "sync_action_edges",
     "sync_outcome_edges",
+    "sync_prediction_edges",
 })
 
 # Direct upsert paths outside dispatch_graph_sync (documented in ownership matrix).
@@ -54,6 +55,7 @@ DIRECT_UPSERT_HANDLERS: FrozenSet[str] = frozenset({
     "sync_pm_import_program_task_links",
     "_sync_finding_from_completion",
     "annotate_equipment_failure_mode_risk",
+    "sync_form_submission_edges",
 })
 
 _HANDLERS_CACHE: Optional[Dict[str, Handler]] = None
@@ -184,11 +186,11 @@ SPEC_EDGE_MAPPINGS: Tuple[SpecEdgeMapping, ...] = (
     SpecEdgeMapping(
         "action_addresses_failure_mode",
         ("mitigates_failure_mode",),
-        "task_instance",
+        "action",
         "failure_mode",
-        "sync_task_instance_completion_edges",
-        "partial",
-        "Mitigation edges on scheduled/task_instance/program_task — not action→failure_mode.",
+        "sync_action_edges",
+        "implemented",
+        "Direct action→failure_mode when action targets FM; also task/schedule paths.",
     ),
     SpecEdgeMapping(
         "failure_mode_has_strategy",
@@ -283,12 +285,11 @@ SPEC_EDGE_MAPPINGS: Tuple[SpecEdgeMapping, ...] = (
     ),
     SpecEdgeMapping(
         "form_submission_supports_task",
-        (),
+        ("supports",),
         "form_submission",
         "task_instance",
-        "after_form_submission_reliability_update",
-        "gap",
-        "Form submit dispatches sync_task_instance_completion_edges; no form_submission edge type.",
+        "sync_form_submission_edges",
+        "implemented",
     ),
     SpecEdgeMapping(
         "executive_kpi_derived_from_graph",

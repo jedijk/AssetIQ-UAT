@@ -85,6 +85,7 @@ NODE_TYPES: List[Dict[str, Any]] = [
     {"id": "outcome", "label": "Outcome", "domain": "reactive", "color": "#059669"},
     {"id": "reliability_impact", "label": "Reliability Impact", "domain": "reactive", "color": "#10B981"},
     {"id": "spare_part", "label": "Spare Part", "domain": "maintenance", "color": "#F59E0B"},
+    {"id": "form_submission", "label": "Form Submission", "domain": "maintenance", "color": "#06B6D4"},
 ]
 
 RELATIONS: List[Dict[str, Any]] = [
@@ -118,6 +119,8 @@ RELATIONS: List[Dict[str, Any]] = [
     {"id": "used_on", "label": "used on", "source": "spare_part", "target": "equipment", "domain": "maintenance"},
     {"id": "requires", "label": "requires spare part", "source": "program_task", "target": "spare_part", "domain": "maintenance"},
     {"id": "requires", "label": "requires spare part", "source": "action", "target": "spare_part", "domain": "maintenance"},
+    {"id": "mitigates_failure_mode", "label": "mitigates", "source": "action", "target": "failure_mode", "domain": "reactive"},
+    {"id": "supports", "label": "supports", "source": "form_submission", "target": "task_instance", "domain": "maintenance"},
 ]
 
 RELATION_LABELS: Dict[str, str] = {rel["id"]: rel["label"] for rel in RELATIONS}

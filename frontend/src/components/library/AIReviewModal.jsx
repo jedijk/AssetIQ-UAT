@@ -29,6 +29,7 @@ import {
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import AIRecommendationCard from "../ai/AIRecommendationCard";
 
 // Action type icons and colors
 const ACTION_CONFIG = {
@@ -276,6 +277,15 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
                   </p>
                 </div>
               </div>
+
+              {(recommendation.citations?.length > 0 || recommendation.evidence_not_available) && (
+                <AIRecommendationCard
+                  payload={recommendation}
+                  summary={null}
+                  recommendations={[]}
+                  compact
+                />
+              )}
               
               {/* Target Failure Mode (if merge/new_task) */}
               {(action === "merge" || action === "new_task") && recommendation.target_failure_mode && (

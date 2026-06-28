@@ -60,6 +60,17 @@ async def after_form_submission_reliability_update(
                 equipment_id = equipment_id or inst.get("equipment_id")
                 tenant_id = tenant_id or inst.get("tenant_id")
 
+            submission_id = submission.get("id") or str(submission.get("_id", ""))
+            if submission_id and task_instance_id:
+                from services.reliability_graph_entities import sync_form_submission_edges
+
+                await sync_form_submission_edges(
+                    form_submission_id=str(submission_id),
+                    task_instance_id=str(task_instance_id),
+                    equipment_id=equipment_id,
+                    tenant_id=tenant_id,
+                )
+
             await dispatch_graph_sync(
                 "sync_task_instance_completion_edges",
                 "form_submission",

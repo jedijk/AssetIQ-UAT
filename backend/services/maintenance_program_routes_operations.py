@@ -111,10 +111,57 @@ async def generate_ai_recommendations(
             user=current_user,
         )
 
-        return {
-            "message": f"Generated {len(recommendations)} recommendations",
-            "recommendations": [r.model_dump() for r in recommendations]
-        }
+        from services.ai_citation import make_citation
+        from services.ai_platform import finalize_recommendation_response
+        from database import db
+        from services.maintenance_tenant_scope import maintenance_scoped
+
+        citations = []
+        observations = await db.observations.find(
+            maintenance_scoped(current_user, {"equipment_id": equipment_id}),
+            {"id": 1, "title": 1, "_id": 0},
+        ).sort("created_at", -1).limit(10).to_list(10)
+        for obs in observations:
+            obs_id = obs.get("id")
+            if obs_id:
+                citations.append(
+                    make_citation(
+                        id=str(obs_id),
+                        type="observation",
+                        label=obs.get("title") or str(obs_id),
+                        url_path=f"/threats/{obs_id}",
+                    )
+                )
+        equipment = await db.equipment_nodes.find_one(
+            maintenance_scoped(current_user, {"id": equipment_id}),
+            {"name": 1, "_id": 0},
+        )
+        if equipment:
+            citations.append(
+                make_citation(
+                    id=equipment_id,
+                    type="equipment",
+                    label=equipment.get("name") or equipment_id,
+                    url_path=f"/equipment/{equipment_id}",
+                )
+            )
+
+        rec_dicts = [r.model_dump() for r in recommendations]
+        payload = finalize_recommendation_response(
+            {
+                "message": f"Generated {len(recommendations)} recommendations",
+                "recommendations": rec_dicts,
+                "summary": f"Generated {len(recommendations)} maintenance task recommendations",
+            },
+            citations=citations,
+            evidence={
+                "deterministic": {
+                    "equipment_id": equipment_id,
+                    "observation_count": len(observations),
+                }
+            },
+        )
+        return payload
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

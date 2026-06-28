@@ -60,13 +60,17 @@ def test_should_run_phase():
     all_config = BackfillConfig(phase="all")
     maint_config = BackfillConfig(phase="maintenance")
     reactive_config = BackfillConfig(phase="reactive")
+    forms_config = BackfillConfig(phase="forms")
 
     assert should_run_phase(all_config, "maintenance")
     assert should_run_phase(all_config, "reactive")
+    assert should_run_phase(all_config, "forms")
     assert should_run_phase(maint_config, "maintenance")
     assert not should_run_phase(maint_config, "reactive")
     assert should_run_phase(reactive_config, "reactive")
     assert not should_run_phase(reactive_config, "maintenance")
+    assert should_run_phase(forms_config, "forms")
+    assert not should_run_phase(forms_config, "maintenance")
 
 
 @pytest.mark.parametrize(

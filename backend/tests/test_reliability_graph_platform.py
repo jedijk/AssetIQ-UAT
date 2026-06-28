@@ -185,6 +185,48 @@ async def test_sync_threat_and_investigation_chain():
 
 
 @pytest.mark.asyncio
+async def test_sync_action_mitigates_failure_mode_when_target_present():
+    mock_upsert = AsyncMock()
+    with patch("services.reliability_graph_entities.upsert_edge", mock_upsert):
+        await sync_action_edges(
+            action_id="act-1",
+            source_type="threat",
+            source_id="th-1",
+            equipment_id="eq-1",
+            failure_mode_id="fm-1",
+        )
+
+    relations = [c.kwargs.get("relation") for c in mock_upsert.await_args_list]
+    assert "mitigates_failure_mode" in relations
+    mitigates_call = next(
+        c for c in mock_upsert.await_args_list
+        if c.kwargs.get("relation") == "mitigates_failure_mode"
+    )
+    assert mitigates_call.kwargs["source_type"] == "action"
+    assert mitigates_call.kwargs["target_type"] == "failure_mode"
+
+
+@pytest.mark.asyncio
+async def test_sync_form_submission_supports_task_instance():
+    from services.reliability_graph_entities import sync_form_submission_edges
+
+    mock_upsert = AsyncMock()
+    with patch("services.reliability_graph_entities.upsert_edge", mock_upsert):
+        await sync_form_submission_edges(
+            form_submission_id="sub-1",
+            task_instance_id="ti-1",
+            equipment_id="eq-1",
+            tenant_id="co-1",
+        )
+
+    mock_upsert.assert_awaited_once()
+    call = mock_upsert.await_args.kwargs
+    assert call["relation"] == "supports"
+    assert call["source_type"] == "form_submission"
+    assert call["target_type"] == "task_instance"
+
+
+@pytest.mark.asyncio
 async def test_sync_action_and_outcome_edges():
     mock_db = MagicMock()
     mock_coll = MagicMock()

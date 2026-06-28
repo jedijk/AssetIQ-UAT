@@ -32,6 +32,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import ReactMarkdown from "react-markdown";
+import AIRecommendationCard from "../ai/AIRecommendationCard";
 
 // Intent icons
 const intentIcons = {
@@ -68,9 +69,10 @@ export default function RILCopilot({ open, onClose, equipmentId = null }) {
         ...prev,
         {
           type: "assistant",
-          content: data.answer,
+          content: data.answer || data.summary,
           intent: data.intent,
           actions: data.actions,
+          contract: data,
           timestamp: new Date(),
         },
       ]);
@@ -255,6 +257,16 @@ export default function RILCopilot({ open, onClose, equipmentId = null }) {
                               </div>
                             ))}
                           </div>
+                        </div>
+                      )}
+                      {message.contract && (message.contract.citations?.length > 0 || message.contract.evidence_not_available) && (
+                        <div className="mt-3">
+                          <AIRecommendationCard
+                            citations={message.contract.citations}
+                            evidenceNotAvailable={message.contract.evidence_not_available}
+                            deterministicInputs={message.contract.evidence?.deterministic}
+                            compact
+                          />
                         </div>
                       )}
                       <p className="text-xs opacity-50 mt-2">

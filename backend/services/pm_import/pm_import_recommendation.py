@@ -220,9 +220,13 @@ Respond with a JSON object:
                     )
                 )
 
-            out = attach_citations_to_response(
-                recommendation,
-                citations,
+            from services.ai_platform import finalize_recommendation_response
+
+            payload = dict(recommendation)
+            payload["recommendations"] = [recommendation]
+            finalized = finalize_recommendation_response(
+                payload,
+                citations=citations,
                 evidence={
                     "deterministic": {
                         "equipment_match": equipment_match,
@@ -230,10 +234,14 @@ Respond with a JSON object:
                     }
                 },
             )
-            out["evidence_not_available"] = not bool(citations)
-            if citations:
-                out.setdefault("source_refs", [c["id"] for c in citations[:5]])
-            return out
+            recommendation.update(
+                {
+                    k: v
+                    for k, v in finalized.items()
+                    if k in ("citations", "evidence_not_available", "evidence", "source_refs")
+                }
+            )
+            return recommendation
             
         except Exception as e:
             logger.error(f"AI recommendation error: {e}")

@@ -97,6 +97,7 @@ async def create_chat_central_action(
         source_type="threat",
         source_id=threat_id,
         equipment_id=linked_equipment_id,
+        failure_mode_id=str(failure_mode_id) if failure_mode_id else None,
     )
 
     return action_doc

@@ -702,6 +702,8 @@ class AISummaryResponse(BaseModel):
 
 async def generate_ai_summary(data: dict, current_user: dict | None = None) -> dict:
     """Generate AI-powered summary of investigation with next steps."""
+    from services.ai_platform import finalize_recommendation_response
+
     inv = data["investigation"]
     events = data["events"]
     failures = data["failures"]
@@ -863,7 +865,57 @@ Detailed Action Items:
         parsed = result["parsed"]
         if not isinstance(parsed, dict) or not parsed:
             raise ValueError("empty JSON from investigation summary")
-        return parsed
+
+        from services.ai_citation import make_citation
+
+        citations = []
+        inv_id = inv.get("id")
+        if inv_id:
+            citations.append(
+                make_citation(
+                    id=str(inv_id),
+                    type="investigation",
+                    label=inv.get("title") or str(inv_id),
+                    url_path=f"/causal-engine/{inv_id}",
+                )
+            )
+        asset_id = inv.get("asset_id")
+        if asset_id:
+            citations.append(
+                make_citation(
+                    id=str(asset_id),
+                    type="equipment",
+                    label=inv.get("asset_name") or str(asset_id),
+                    url_path=f"/equipment/{asset_id}",
+                )
+            )
+        for cause in root_causes[:3]:
+            cause_id = cause.get("id")
+            if cause_id:
+                citations.append(
+                    make_citation(
+                        id=str(cause_id),
+                        type="cause",
+                        label=(cause.get("description") or str(cause_id))[:120],
+                        url_path=f"/causal-engine/{inv_id}",
+                    )
+                )
+
+        payload = dict(parsed)
+        payload.setdefault("summary", parsed.get("summary"))
+        payload.setdefault("recommendations", parsed.get("recommendations", []))
+        return finalize_recommendation_response(
+            payload,
+            citations=citations,
+            evidence={
+                "deterministic": {
+                    "event_count": len(events),
+                    "failure_count": len(failures),
+                    "action_count": len(actions),
+                    "root_cause_count": len(root_causes),
+                }
+            },
+        )
     except Exception as e:
         logger.error(f"Error generating AI summary: {e}")
         # Return a detailed fallback that still references specific data
@@ -871,15 +923,16 @@ Detailed Action Items:
         failure_list = [f"{f.get('asset_name', 'Asset')}: {f.get('failure_mode', 'Unknown failure')}" for f in failures[:3]]
         pending_owners = list(set([a.get('owner', 'Unassigned') for a in open_actions[:5]]))
         
-        return {
-            "summary": f"""Investigation '{inv.get('title', 'N/A')}' (Case #{inv.get('case_number', 'N/A')}) was initiated following an incident at {inv.get('asset_name', 'the asset')} located in {inv.get('location', 'the facility')}. The investigation timeline captured {len(events)} events leading to the incident.
+        return finalize_recommendation_response(
+            {
+                "summary": f"""Investigation '{inv.get('title', 'N/A')}' (Case #{inv.get('case_number', 'N/A')}) was initiated following an incident at {inv.get('asset_name', 'the asset')} located in {inv.get('location', 'the facility')}. The investigation timeline captured {len(events)} events leading to the incident.
 
 The root cause analysis identified {len(root_causes)} primary root cause(s) and {len(contributing_factors)} contributing factors. {f"Key root causes include: {'; '.join(root_cause_list)}." if root_cause_list else "Root cause identification is still in progress."} Failure analysis revealed {len(failures)} failure mode(s) affecting the asset.
 
 The corrective action plan contains {len(actions)} total actions, of which {len(completed_actions)} are completed, {len(open_actions)} remain open, and {len(validated_actions)} have been validated. {f"High priority actions ({len(high_priority_actions)}) require immediate attention." if high_priority_actions else ""}
 
 Overall investigation status: {inv.get('status', 'In Progress').replace('_', ' ').title()}. {"Immediate action required to address open high-priority items." if high_priority_actions else "Continue systematic closure of remaining action items."}""",
-            "key_findings": [
+                "key_findings": [
                 f"Timeline Analysis: {len(events)} events documented, establishing the incident sequence",
                 f"Failure Modes: {len(failures)} failure(s) identified - {', '.join(failure_list) if failure_list else 'Analysis in progress'}",
                 f"Root Causes: {len(root_causes)} primary root cause(s) confirmed through investigation",
@@ -900,8 +953,18 @@ Overall investigation status: {inv.get('status', 'In Progress').replace('_', ' '
                 f"Update inspection protocols for {inv.get('asset_name', 'affected equipment')} based on failure mode analysis",
                 "Establish leading indicators to detect similar failure patterns earlier",
                 "Share investigation findings with maintenance and operations teams during toolbox talks"
-            ]
-        }
+            ],
+            },
+            citations=[],
+            evidence={
+                "deterministic": {
+                    "event_count": len(events),
+                    "failure_count": len(failures),
+                    "action_count": len(actions),
+                    "fallback": True,
+                }
+            },
+        )
 
 
 @router.get("/investigations/{investigation_id}/ai-summary")
