@@ -50,7 +50,7 @@ def process_upload_content(
     if ext == "xlsx" and FILE_UPLOAD_CONFIG.get("enable_excel_macro_detection", True):
         return _validate_xlsx(content_type, data)
 
-    if ext == "csv":
+    if ext == "csv" and FILE_UPLOAD_CONFIG.get("enable_csv_validation", True):
         return _validate_csv(content_type, data)
 
     return ContentProcessResult(ok=True, data=data, content_type=content_type, sanitized=False)

@@ -22,6 +22,14 @@ class InitiateUploadRequest(BaseModel):
     linked_entity_id: Optional[str] = None
 
 
+@router.get("/config")
+async def get_upload_config(
+    current_user: dict = Depends(get_current_user),
+):
+    """Effective secure-upload flags for this environment (read-only)."""
+    return svc.get_upload_config()
+
+
 @router.post("/initiate-upload")
 async def initiate_upload(
     body: InitiateUploadRequest,

@@ -15,6 +15,13 @@ def require_admin(current_user: dict = Depends(require_roles("owner", "admin")))
     return current_user
 
 
+@router.get("/admin/files/config")
+async def get_admin_upload_config(
+    current_user: dict = Depends(require_admin),
+):
+    return svc.get_upload_config()
+
+
 @router.get("/admin/files/quarantine")
 async def list_quarantined_files(
     page: int = Query(1, ge=1),

@@ -3,6 +3,7 @@ Secure file upload orchestration service.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -10,10 +11,18 @@ from typing import Any, Dict, Optional
 
 from fastapi import BackgroundTasks, HTTPException
 
-from config.file_upload_config import UploadStatus, USER_REJECTION_MESSAGE, SIGNED_URL_EXPIRY_SECONDS
+from config.file_upload_config import (
+    UploadStatus,
+    USER_REJECTION_MESSAGE,
+    SIGNED_URL_EXPIRY_SECONDS,
+    is_secure_upload_enabled,
+    is_secure_upload_fast_path,
+    get_public_upload_config,
+)
 from database import db
 from services.secure_upload_access import assert_entity_access, assert_file_access
 from services.secure_upload_audit import (
+    EVENT_AVAILABLE,
     EVENT_DOWNLOAD_REQUESTED,
     EVENT_PREVIEW_REQUESTED,
     EVENT_RESCAN_REQUESTED,
@@ -55,6 +64,116 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def assert_secure_upload_enabled() -> None:
+    if not is_secure_upload_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Secure file upload pipeline is disabled on this environment",
+        )
+
+
+def get_upload_config() -> dict:
+    """Public effective configuration (no secrets)."""
+    assert_secure_upload_enabled()
+    return get_public_upload_config()
+
+
+async def _promote_to_available(
+    doc: dict,
+    data: bytes,
+    *,
+    content_type: str,
+    fast_path: bool = False,
+) -> dict:
+    """Move validated bytes to safe storage and mark file available."""
+    tenant_id = doc.get("tenant_id") or "default"
+    file_id = doc["id"]
+    ext = doc.get("extension", "bin")
+    dest = safe_key(tenant_id, file_id, ext)
+    source_key = doc.get("storage_key")
+
+    await store_bytes(dest, data, content_type)
+    if source_key and source_key != dest:
+        try:
+            await remove_object(source_key)
+        except Exception as exc:
+            logger.warning("Failed to remove temp key %s: %s", source_key, exc)
+
+    now = _now_iso()
+    file_hash = hashlib.sha256(data).hexdigest()
+    await _collection().update_one(
+        {"id": file_id},
+        {"$set": {
+            "status": UploadStatus.AVAILABLE.value,
+            "safe_storage_key": dest,
+            "storage_key": dest,
+            "detected_mime_type": content_type,
+            "actual_size": len(data),
+            "sha256_hash": file_hash,
+            "sanitized": False,
+            "content_validation_result": {"stage": "fast_path" if fast_path else "inline"},
+            "scan_completed_at": now,
+            "available_at": now,
+            "updated_at": now,
+            "preview_available": False,
+            "preview_storage_key": None,
+            "preview_content_type": None,
+        }},
+    )
+
+    await log_upload_audit_event(
+        EVENT_AVAILABLE,
+        tenant_id=tenant_id,
+        user_id=doc.get("uploaded_by"),
+        file_id=file_id,
+        linked_entity_type=doc.get("linked_entity_type"),
+        linked_entity_id=doc.get("linked_entity_id"),
+        file_size_bytes=len(data),
+        detected_mime_type=content_type,
+        sha256_hash=file_hash,
+        details={"fast_path": fast_path},
+    )
+
+    return {
+        "upload_id": file_id,
+        "file_id": file_id,
+        "status": UploadStatus.AVAILABLE.value,
+    }
+
+
+async def _complete_upload_fast_path(doc: dict) -> dict:
+    """UAT/dev: skip async scan; inline magic-byte check then promote to available."""
+    source_key = doc.get("storage_key")
+    if not source_key:
+        raise HTTPException(status_code=400, detail="File bytes not yet uploaded")
+
+    try:
+        data, _ = await fetch_bytes(source_key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=400, detail="File bytes not yet uploaded")
+
+    validation = validate_file_content(
+        doc.get("original_filename", "file.bin"),
+        doc.get("content_type"),
+        data,
+    )
+    if not validation.ok:
+        now = _now_iso()
+        await _collection().update_one(
+            {"id": doc["id"]},
+            {"$set": {
+                "status": UploadStatus.REJECTED.value,
+                "rejection_reason": validation.reason,
+                "user_message": USER_REJECTION_MESSAGE,
+                "updated_at": now,
+            }},
+        )
+        raise HTTPException(status_code=400, detail=validation.reason)
+
+    content_type = validation.detected_mime or doc.get("content_type") or "application/octet-stream"
+    return await _promote_to_available(doc, data, content_type=content_type, fast_path=True)
+
+
 def _collection():
     return db[COLLECTION]
 
@@ -78,6 +197,7 @@ async def initiate_upload(
     linked_entity_type: str,
     linked_entity_id: Optional[str] = None,
 ) -> dict:
+    assert_secure_upload_enabled()
     await assert_entity_access(
         user,
         linked_entity_type,
@@ -151,6 +271,7 @@ async def initiate_upload(
 
 
 async def upload_bytes(user: dict, upload_id: str, data: bytes) -> dict:
+    assert_secure_upload_enabled()
     doc = await _get_file_doc(upload_id, user)
     await assert_file_access(user, doc, require_write=True)
 
@@ -206,6 +327,7 @@ async def complete_upload(
     upload_id: str,
     background_tasks: BackgroundTasks,
 ) -> dict:
+    assert_secure_upload_enabled()
     doc = await _get_file_doc(upload_id, user)
     await assert_file_access(user, doc, require_write=True)
 
@@ -240,11 +362,26 @@ async def complete_upload(
     now = _now_iso()
     await _collection().update_one(
         {"id": upload_id},
-        {"$set": {
-            "status": UploadStatus.PENDING_SCAN.value,
-            "completed_at": now,
-            "updated_at": now,
-        }},
+        {"$set": {"completed_at": now, "updated_at": now}},
+    )
+
+    await log_upload_audit_event(
+        EVENT_UPLOAD_COMPLETED,
+        tenant_id=doc.get("tenant_id"),
+        user_id=user.get("id"),
+        file_id=upload_id,
+        linked_entity_type=doc.get("linked_entity_type"),
+        linked_entity_id=doc.get("linked_entity_id"),
+        file_size_bytes=doc.get("actual_size"),
+    )
+
+    if is_secure_upload_fast_path():
+        logger.info("SECURE_UPLOAD_FAST_PATH: promoting %s without async scan", upload_id)
+        return await _complete_upload_fast_path(doc)
+
+    await _collection().update_one(
+        {"id": upload_id},
+        {"$set": {"status": UploadStatus.PENDING_SCAN.value, "updated_at": _now_iso()}},
     )
 
     from services.background_jobs import schedule_tracked_job, tenant_id_from_user as tid_from_user
@@ -260,16 +397,6 @@ async def complete_upload(
         payload={"file_id": upload_id},
     )
 
-    await log_upload_audit_event(
-        EVENT_UPLOAD_COMPLETED,
-        tenant_id=doc.get("tenant_id"),
-        user_id=user.get("id"),
-        file_id=upload_id,
-        linked_entity_type=doc.get("linked_entity_type"),
-        linked_entity_id=doc.get("linked_entity_id"),
-        file_size_bytes=doc.get("actual_size"),
-    )
-
     return {
         "upload_id": upload_id,
         "file_id": upload_id,
@@ -278,6 +405,7 @@ async def complete_upload(
 
 
 async def get_file_status(user: dict, file_id: str) -> dict:
+    assert_secure_upload_enabled()
     doc = await _get_file_doc(file_id, user)
     await assert_file_access(user, doc)
 
@@ -285,6 +413,7 @@ async def get_file_status(user: dict, file_id: str) -> dict:
 
 
 async def get_download_url(user: dict, file_id: str) -> dict:
+    assert_secure_upload_enabled()
     doc = await _get_file_doc(file_id, user)
     await assert_file_access(user, doc)
 
@@ -321,6 +450,7 @@ async def get_download_url(user: dict, file_id: str) -> dict:
 
 
 async def get_preview_url(user: dict, file_id: str) -> dict:
+    assert_secure_upload_enabled()
     doc = await _get_file_doc(file_id, user)
     await assert_file_access(user, doc)
 
@@ -364,6 +494,7 @@ async def list_quarantined_files(
     page: int = 1,
     page_size: int = 20,
 ) -> dict:
+    assert_secure_upload_enabled()
     _require_admin(user)
     page = max(1, page)
     page_size = min(max(1, page_size), 100)
@@ -384,6 +515,7 @@ async def list_quarantined_files(
 
 
 async def get_security_dashboard_stats(user: dict) -> dict:
+    assert_secure_upload_enabled()
     _require_admin(user)
     tenant_filter = merge_tenant_filter({}, user)
     coll = _collection()
@@ -445,10 +577,12 @@ async def get_security_dashboard_stats(user: dict) -> dict:
             "quarantine_rate": quarantine_rate,
         },
         "recent_events": recent_events,
+        "config": get_public_upload_config(),
     }
 
 
 async def request_rescan(user: dict, file_id: str, background_tasks: BackgroundTasks) -> dict:
+    assert_secure_upload_enabled()
     _require_admin(user)
     doc = await _get_file_doc(file_id, user)
 
@@ -512,6 +646,7 @@ async def request_rescan(user: dict, file_id: str, background_tasks: BackgroundT
 
 
 async def delete_file(user: dict, file_id: str) -> dict:
+    assert_secure_upload_enabled()
     doc = await _get_file_doc(file_id, user)
     await assert_file_access(user, doc, require_write=True)
 
