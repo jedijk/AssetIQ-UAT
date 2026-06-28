@@ -1,5 +1,7 @@
 # AssetIQ Platform & Product Truth Audit
 
+> **Superseded by [`PLATFORM_TRUTH_AUDIT_2026-06-28.md`](./PLATFORM_TRUTH_AUDIT_2026-06-28.md)** — retained for history.
+
 **Date:** 2026-06-27  
 **Repository:** AssetIQ-Dev / AssetIQ-UAT  
 **Commit assessed:** `0880424e` (`uat/main`, pushed 2026-06-27)  

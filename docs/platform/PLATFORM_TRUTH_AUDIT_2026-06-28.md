@@ -1,22 +1,20 @@
 # AssetIQ Platform & Product Truth Audit
 
-> **Superseded by [`PLATFORM_TRUTH_AUDIT_2026-06-28.md`](./PLATFORM_TRUTH_AUDIT_2026-06-28.md)** — retained for history.
-
-**Date:** 2026-06-27  
+**Date:** 2026-06-28  
 **Repository:** AssetIQ-Dev / AssetIQ-UAT  
-**Commit assessed:** `e5a828e7` (`deploy-uat`, 2026-06-28) — Functional Spec Sprint 6 verification  
-**Assessment method:** Code inspection, executable verification scripts, CI gates, live UAT Atlas evidence (`assetiq-UAT`, tenant `Tyromer`, post-deploy gate run 2026-06-27; multi-tenant sprint §18 @ 2026-06-28). Local Sprint 6 gate bundle @ `e5a828e7` on 2026-06-28; **UAT Atlas not re-run at this commit** (`MONGO_URL` unset in runner shell — prior §16/§18 evidence still valid).  
-**Companion docs:** [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md), [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_PLAN.md), [`SOC2_GAP_ASSESSMENT.md`](../compliance/SOC2_GAP_ASSESSMENT.md)
+**Commit assessed:** `f1f44607` (`uat/main`, pushed 2026-06-28)  
+**Assessment method:** Full platform truth audit rerun — local gates executed 2026-06-28; live UAT Atlas **not re-run** (credentials rotated again — prior §21 live evidence @ `1e5e6659` remains authoritative).  
+**Companion docs:** [`ASSETIQ_TECHNICAL_STATUS.md`](./ASSETIQ_TECHNICAL_STATUS.md), [`REACTIVE_GRAPH_OWNERSHIP_MATRIX.md`](./REACTIVE_GRAPH_OWNERSHIP_MATRIX.md), [`AI_SURFACE_COVERAGE_MATRIX.md`](./AI_SURFACE_COVERAGE_MATRIX.md), [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_PLAN.md), [`SOC2_GAP_ASSESSMENT.md`](../compliance/SOC2_GAP_ASSESSMENT.md)
 
 **Rule:** Nothing is marked **Implemented** without file, script, or test evidence. Unverified items are marked **NOT VERIFIED**.
 
-**Supersedes:** [`PLATFORM_TRUTH_AUDIT_2026-06-26.md`](./PLATFORM_TRUTH_AUDIT_2026-06-26.md)
+**Supersedes:** [`PLATFORM_TRUTH_AUDIT_2026-06-27.md`](./PLATFORM_TRUTH_AUDIT_2026-06-27.md)
 
 ---
 
 ## 1. Executive Summary (one page)
 
-AssetIQ is a **credible industrial reliability intelligence pilot platform** with **deep domain features** (FMEA library, observation-to-action lifecycle, maintenance strategies/programs, executive read models, visual boards, RIL copilot) and **strong engineering governance** (18 registered domains, 12 read models, 10+ verify scripts, **1680** backend tests collected, **286** frontend unit tests, frontend lib test gate). It is **not yet a world-class enterprise multi-tenant SaaS** or a **fully authoritative reliability knowledge graph**.
+AssetIQ is a **credible industrial reliability intelligence pilot platform** with **deep domain features** (FMEA library, observation-to-action lifecycle, maintenance strategies/programs, executive read models, visual boards, RIL copilot) and **strong engineering governance** (18 registered domains, 12 read models, 10+ verify scripts, **1705** backend tests collected, **286** frontend unit tests, frontend lib test gate). Reactive graph lifecycle sync and universal AI contract (8 enforced surfaces) landed @ `e5a828e7`; live UAT verified same day (§21). It is **not yet production-ready enterprise SaaS** — strict mode cutover, Redis/workers, and 48h soak remain open.
 
 ### What is truly implemented (verified)
 
@@ -28,14 +26,14 @@ AssetIQ is a **credible industrial reliability intelligence pilot platform** wit
 | **Multi-tenant code path** | `tenant_id` backfill on UAT; strict mode cutover pass; **two tenants proven on UAT** (Tyromer + UAT Proof Tenant B) @ 2026-06-28. |
 | **AI platform** | Central `ai_platform` + prompt registry + cost guard; grounded orchestrator + evidence pack exist; CI blocks direct OpenAI imports (0 new violations). |
 | **Executive intelligence** | Materialized read models (executive KPIs, dashboards, asset health) with registry gate (12/12). |
-| **Engineering gates** | Platform standards 4/4 pass; graph handler registry **19 handlers / 11/11 entities**; universal AI contract **8/8 enforced surfaces compliant**; Sprint 6 pytest **24/24**; platform truth audit **12/12** @ `e5a828e7`; frontend `test:ci` 43 suites / 286 tests. |
+| **Engineering gates** | Platform standards 4/4 pass; graph **19 handlers / 11/11 entities**; AI contract **8/8 enforced surfaces**; platform truth audit **12/12** @ `f1f44607`; frontend `test:ci` 43 suites / 286 tests; backend **1705** tests collected. |
 
 ### What is partial or overstated in marketing docs
 
 | Area | Truth |
 |------|--------|
-| **Work signal residual debt** | `threats` collection retained as read projection; 18 pre-convergence chat observations required manual threat projection on UAT; `1936` graph edges still missing `tenant_id` (informational — DB sample gate still 0 gaps). |
-| **Knowledge graph** | Mongo `reliability_edges`; static sync gate pass; UAT DB sample 0 gaps after backfill; **16/18 spec edges implemented, 2 partial** (`action_reduces_risk`, `executive_kpi_derived_from_graph` — advisory only). Lifecycle dispatch wired via `lifecycle_graph_handler` + outbox. Graph is **operationally useful but not yet authoritative enterprise intelligence layer**. |
+| **Work signal residual debt** | `threats` collection retained as read projection; 18 pre-convergence chat observations required manual threat projection on UAT; eventual projection retirement after soak. |
+| **Knowledge graph** | Mongo `reliability_edges`; **16/18 spec edges implemented**, 2 advisory partial; **19 handlers**, lifecycle outbox wired; UAT **2968-entity backfill** + 0 DB sample gaps (§21). Graph is **operationally useful** — not yet Neo4j-scale enterprise graph product. |
 | **Decision Engine** | Deterministic rules + human approve/reject/execute; **not autonomous AI decisions**. |
 | **Enterprise SaaS** | OIDC spike only; no SOC2/ISO27001 certification; Redis optional; single-instance workers. |
 | **Integrations** | RIL reading types model SCADA/historian sources; **no verified production ERP/CMMS connectors**. |
@@ -46,11 +44,11 @@ AssetIQ differentiates on **reliability-native workflow + FMEA depth + grounded 
 
 ### Top five leverage moves (90-day CTO view)
 
-1. ~~**Second tenant + cross-tenant penetration tests**~~ — **Done @ 2026-06-28** (§18).  
-2. ~~**Complete reactive graph sync chain**~~ — **Sprint 2–6 done @ `e5a828e7`** (16/18 edges; 2 advisory partial). Remaining: UAT `--phase all` backfill re-run + prod cutover.  
+1. ~~**Second tenant + cross-tenant penetration tests**~~ — **Done @ 2026-06-28** (§18, §21).  
+2. ~~**Complete reactive graph sync chain**~~ — **Done @ `e5a828e7`** (16/18 edges; UAT backfill 2968 synced §21).  
 3. **48h UAT soak + weekly gate cadence** — `run_uat_post_deploy_gates.sh` on schedule.  
-4. **Production cutover package** — Redis, external workers, prod backfill, pen test.  
-5. **Evidence-first AI contract** — **8/8 enforced surfaces compliant** @ `e5a828e7`; extend contract to `ai_risk_engine` RCA/fault-tree routes (18+ partial).
+4. **Production cutover package** — Redis, external workers, prod backfill, strict mode cutover, pen test.  
+5. **Extend AI contract** — **8/8 enforced surfaces done**; extend to `ai_risk_engine` RCA/fault-tree routes (18+ partial).
 
 ---
 
@@ -65,7 +63,7 @@ Maturity based on code + tests + UAT gates, not slide decks.
 | **Equipment Types** | Type registry, strategy linkage | `equipment_types` | `equipment_types` | `equipment_type_registry.py` | **I** | Domain registry; type-strategy routes | NOT VERIFIED: full UI coverage |
 | **Failure Modes (FMEA)** | Library, RPN, recommended actions | `failure_modes` | `failure_modes`, `equipment_failure_modes` | `services/failure_modes/`, `efm_service` | **I** | UAT 643 docs; `seed_failure_modes.py`; FM tests | Static + Mongo dual source; sync gate required |
 | **Observations** | Operational risk signals from field | **`observations`** (canonical); `threats` = projection | `observations`, `threats` | `work_signal_lifecycle`, `/observations/signals/*` | **I** | `create_work_signal`; UAT 29/29 convergence; `test_observation_threat_convergence_phases.py`; `normalize_threat_list_items` @ `0880424e` | Projection collection + deprecated `/threats` aliases |
-| **AI Risk Analysis** | Interpret observation, suggest risk | AI output + work signal fields | `ai_risk_insights`, `threats` projection | `ai_risk_analysis.py`, `ai_platform` | **P** | `ai_platform.py`, prompt registry, cost guard; `observation_id` alias | OpenAI-only; not all paths use grounded orchestrator |
+| **AI Risk Analysis** | Interpret observation, suggest risk | AI output + work signal fields | `ai_risk_insights`, `threats` projection | `ai_risk_analysis.py`, `ai_platform` | **I (enforced)** | Contract-compliant analyze-risk; `AIRecommendationCard` on insights panel | RCA/fault-tree endpoints still partial |
 | **Investigations** | Structured RCA, evidence, causes | `investigations` | `investigations`, `cause_nodes`, `evidence_items`, `timeline_events` | `investigation_crud`, `investigation_subresources` | **I** | Domain registry; graph sync hooks in crud | Legacy `action_items` mirror path |
 | **Actions** | Track mitigation work | `central_actions` | `central_actions` | `action_service`, `routes/actions.py` | **I** | Phase 1 action mirror gate pass (0 missing) | Was dual with investigation `action_items` |
 | **Maintenance Strategies** | Equipment-type strategy templates | `equipment_type_strategies` | `equipment_type_strategies` | `apply_strategy_service`, strategy v2 routes | **I** | Domain registry; apply strategy tests | NOT VERIFIED: all strategy types in UI |
@@ -74,7 +72,7 @@ Maturity based on code + tests + UAT gates, not slide decks.
 | **Scheduling** | Calendar, assignment, instances | `task_instances` | `task_instances`, `task_templates` | `maintenance_scheduler_*`, `task_service` | **I** | Scheduler routes; async `maintenance_scheduler_run.py`; `test_scheduler_scope.py` | In-process scheduler scaling NOT VERIFIED |
 | **Digital Forms** | Operator rounds, submissions | `form_templates`, `form_submissions` | `form_templates`, `form_submissions` | `form_service`, `routes/forms.py` | **I** | Domain registry; form tests | Form designer complexity NOT VERIFIED E2E |
 | **Spares** (SpareIQ) | Spare parts, requirements | `spare_parts` | `spare_parts`, `spare_categories` | `spare_parts_service`, graph sync | **P** | `routes/spare_parts.py`; `SparePartRequirementsEditor` uses `useLanguage` | Route `/spareiq`; NOT VERIFIED: customer usage depth |
-| **Reliability Knowledge Graph** | Traceability, impact, learning | `reliability_edges` | `reliability_edges`, `findings`, `outcomes` | `reliability_graph*.py` | **P** | Static + UAT DB sample gate pass; handler registry 10/10 | Reactive chain ~22%; legacy `threat` node edges; 1936 edges missing `tenant_id` |
+| **Reliability Knowledge Graph** | Traceability, impact, learning | `reliability_edges` | `reliability_edges`, `findings`, `outcomes` | `reliability_graph*.py`, `lifecycle_graph_handler` | **P→I (UAT)** | 19 handlers; UAT 2968 backfill; 0 DB gaps §21 | 2 advisory partial spec edges; prod cutover open |
 | **Executive Dashboards** | Leadership KPIs, exposure | read models | `executive_*_snapshots` | `executive_*_materializer.py` | **I** | Read models registry 12/12; refresh jobs | Snapshot staleness depends on jobs |
 | **Visual Management Boards** | Gemba / TV boards | `visual_boards` | `visual_boards`, tokens, pairings | `visual_board_service` | **I** | `test_visual_board_data_service.py` (13 pass) | NOT VERIFIED: kiosk soak after `0880424e` |
 | **RIL Copilot** | NL reliability queries | RIL context + AI | `ril_*`, snapshots | `ril_copilot_service`, `ai_orchestrator` | **P** | Grounded prompt in registry; auth matrix | Tool coverage NOT VERIFIED exhaustive |
@@ -116,7 +114,7 @@ Source: `backend/architecture/domain_registry.py` (18 domains) + code search.
 | **Graph nodes** | **I** (UAT sample) | 105 threat→obs edges backfilled; reactive sync; **0 DB sample gaps** @ 2026-06-27 |
 | **List API robustness** | **I** (code) | `normalize_threat_list_items` fills sparse projections @ `0880424e`; `test_threat_helpers.py` |
 
-**Remaining operational work:** `reliability_edges` tenant_id backfill (1936 edges informational); eventual `threats` collection retirement after soak.
+**Remaining operational work:** eventual `threats` collection retirement after soak; extend AI contract to 18+ partial routes.
 
 See [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_PLAN.md).
 
@@ -137,7 +135,7 @@ See [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_
 | Planned work → Task instance | Deterministic + job | `backfill_scheduled_task_instances.py`; bridge gate | UAT 769 bridged after tenant_id stamp |
 | Task instance → Digital execution | Manual | Forms, task completion | Offline partial |
 | Execution → Evidence | Manual | Form submissions, attachments | R2 UAT gaps NOT VERIFIED fixed |
-| Evidence → Graph | Event-driven | `sync_observation_edges` on converged writes | **~22% reactive maturity**; legacy threat edges |
+| Evidence → Graph | Event-driven | `lifecycle_graph_handler`, `dispatch_graph_sync`, form/action/outcome handlers | Legacy threat node edges being retired |
 | Graph → Executive insight | Deterministic materialization | Executive materializers, graph KPI aggregator | Snapshot lag |
 | Insight → Continuous improvement | Manual + Decision Engine | Decision suggestions | Not closed-loop autonomous |
 
@@ -185,8 +183,8 @@ See [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_
 | Images / attachments | **P** | Attachment routes; R2 UAT issues NOT VERIFIED fixed |
 | Maintenance history | **I** | Equipment history, task instances |
 | Failure modes | **I** | EFM links, graph edges when synced |
-| Graph relationships | **P** | Query services; incomplete reactive sync chain |
-| AI reasoning / citations | **P** | Citation builder exists; coverage uneven |
+| Graph relationships | **I (UAT sample)** | 19 handlers; 2968-entity backfill; 0 DB gaps §21 |
+| AI reasoning / citations | **I (enforced surfaces)** | 8/8 contract compliant; `AIRecommendationCard` on 4 UI surfaces | 18+ partial routes remain |
 | User decisions | **I** | Audit log, decision engine execution log |
 | Supporting documents | **P** | Document fetch; investigation files |
 
@@ -269,7 +267,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | Background workers | **P** | `background_jobs.py`; in-process + external worker doc |
 | Scheduler | **I** | Maintenance scheduler services; async run job |
 | Outbox | **I** | `event_outbox.py`, `domain_events.py` |
-| Graph sync | **P** | UAT DB sample pass; reactive chain incomplete |
+| Graph sync | **I (UAT)** | UAT DB sample pass; lifecycle outbox; 2968 backfill §21 |
 | Retry strategies | **P** | Job handlers; NOT VERIFIED uniform |
 | Monitoring / alerting | **P** | Health endpoints; NOT VERIFIED prod alerting |
 | DR / backup | **NOT VERIFIED** | Atlas backups assumed ops |
@@ -340,10 +338,10 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 
 | # | Problem | Evidence | Business impact | Tech impact | Effort | Outcome |
 |---|---------|----------|-----------------|-------------|--------|---------|
-| 1 | Single tenant proven | Tyromer only | Blocks enterprise sales | Isolation bugs latent | 2–4 wk | Second tenant + pen test |
-| 2 | ~~UAT convergence soak (Tyromer)~~ | **Done @ 2026-06-27** — 8-step bundle exit 0 | — | — | — | Maintain weekly gate cadence |
+| 1 | ~~Single tenant proven~~ | **Done** — two tenants §18/§21 | — | — | — | Maintain pen test cadence |
+| 2 | ~~UAT convergence soak (Tyromer)~~ | **Done @ 2026-06-27** — 9-step bundle exit 0 | — | — | — | Maintain weekly gate cadence |
 | 3 | Production cutover blocked | Status doc deferred | No prod revenue at scale | Data integrity risk | 4–8 wk | Prod backfill + strict mode |
-| 4 | Graph reactive chain incomplete | ~22% maturity (graph plan) | Weak "knowledge graph" claim | Traceability gaps | 6–10 wk | All lifecycle edges synced |
+| 4 | ~~Graph reactive chain incomplete~~ | **Done @ `e5a828e7`** — 16/18 edges; UAT backfill §21 | — | — | — | Extend 2 advisory partial edges |
 | 5 | JWT secret fallback | **Mitigated** — startup fails without `JWT_SECRET_KEY` on uat/staging/production | Local dev only risk | Security | Done | `tests/test_jwt_secret_config.py` |
 
 ### P1 — High
@@ -352,12 +350,12 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 |---|---------|----------|--------|---------|
 | 6 | Redis not required | `redis_store` optional | 1 wk | Global limits + shared cache |
 | 7 | External job workers | In-process workers | 2–3 wk | Durable worker fleet |
-| 8 | AI citation enforcement | `ai_citation.py` not universal | 3–4 wk | 100% grounded user AI |
+| 8 | ~~AI citation enforcement (core surfaces)~~ | **Done** — 8/8 enforced @ `e5a828e7` | — | — | — | Extend to 18+ partial routes |
 | 9 | OIDC production | `auth_oidc.py` spike | 2–3 wk | SSO for pilot #2 |
 | 10 | 48h UAT soak | Deferred | 2 d | Signed pilot stability |
 | 11 | Pen test + upload validation | SOC2 open items | 2–4 wk | Pre-prod gate |
 | 12 | Frontend god components | WS4 partial | 8–12 wk | Routes/pages ≤800 LOC |
-| 13 | Graph edge tenant_id gap | 1936 edges on UAT | 1 wk | Full strict-mode graph reads |
+| 13 | ~~Graph edge tenant_id gap~~ | **Done** — 0 missing @ UAT §21 | — | — | — | Maintain on new writes |
 
 ### P2 — Medium
 
@@ -395,11 +393,11 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 
 | Criterion | Current | Phase to meet |
 |-----------|---------|---------------|
-| Multi-tenancy verified | One tenant | Phase 1 |
-| One canonical model per domain | Work signal **converged**; UAT Tyromer verified | Phase 1 (second tenant) |
-| End-to-end traceable workflow | Core path yes; graph reactive partial | Phase 2 |
-| Grounded auditable AI | Partial | Phase 2 |
-| Graph authoritative | Partial | Phase 2 |
+| Multi-tenancy verified | **Two tenants @ UAT** | Phase 3 (prod) |
+| One canonical model per domain | Work signal **converged**; UAT Tyromer verified | Maintained |
+| End-to-end traceable workflow | Core path yes; graph reactive **16/18** | Phase 2 (2 advisory partial) |
+| Grounded auditable AI | **8 enforced surfaces I**; 18+ partial | Phase 2 |
+| Graph authoritative | **UAT operational**; 2 advisory partial edges | Phase 2 |
 | CI-enforced platform standards | **Yes** | Maintained |
 | Honest security/compliance docs | **Yes** | Phase 3 evidence |
 | Business-outcome driven | NOT VERIFIED | Phase 4 metrics |
@@ -436,11 +434,11 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 
 ## 13. Verification Evidence Index
 
-| Script / test | Purpose | Last known @ 2026-06-28 (`e5a828e7`) |
+| Script / test | Purpose | Last known @ 2026-06-28 (`f1f44607`) |
 |---------------|---------|--------------------------------------|
-| `run_platform_truth_audit.sh --local` | **Ultimate truth audit (local bundle)** | **12/12 PASS** |
+| `run_platform_truth_audit.sh --local` | **Ultimate truth audit (local bundle)** | **12/12 PASS** (audit rerun) |
 | Sprint 6 pytest bundle | Graph registry + lifecycle handler + AI schema + platform | **24/24 PASS** |
-| `pytest --collect-only` | Backend test inventory | **1680+** collected (local) |
+| `pytest --collect-only` | Backend test inventory | **1705** collected (local) |
 | `verify_platform_standards.py` | WS8 | **4/4 PASS** (local) |
 | `ai_entry_point_report.py` | AI gateway + contract enforcement | **8/8 enforced surfaces compliant** (local) |
 | `tenant_service_filter_audit.py` | Tenant heuristic | **0** flagged, 153 clean (local) |
@@ -448,15 +446,15 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | `verify_canonical_models.py` | WS3 domain registry | **13 domains PASS** (local) |
 | `verify_read_models_registry.py` | WS6 read models | **12 models PASS** (local) |
 | `verify_graph_performance_benchmarks.py` | WS7 harness | Static **PASS** (local, micro skipped without `MONGO_URL`) |
-| `verify_reliability_graph_sync.py` | Graph static + DB | Static **PASS** (local, 2 advisory partial edges); DB **PASS** @ UAT 2026-06-27 |
+| `verify_reliability_graph_sync.py` | Graph static + DB | Static **PASS** (local); DB **PASS** @ UAT §21 (not re-run today — auth blocked) |
 | `route_auth_inventory.py` | Route auth matrix | **758** handlers scanned (local) |
 | `check_frontend_imports.sh` | Frontend import hygiene | **PASS** (local) |
 | `test_auth_matrix.py` + convergence + tenant suite | Routes / lifecycle / isolation | **163 passed** (local, via truth audit) |
 | `verify_frontend_unit_tests.py` | Frontend unit gate | **43 suites, 286 passed** (local) |
-| `backfill_reliability_graph_history.py --phase all` | Graph history backfill | **PASS** — 2968 synced @ UAT 2026-06-28 |
-| `run_cross_tenant_pen_test.py` | Multi-tenant isolation | **PASS** @ UAT 2026-06-28 |
-| `run_uat_post_deploy_gates.sh` | Nine-step post-deploy bundle | **PASS** @ UAT 2026-06-28 |
-| `audit_maturity_scorecard.py` | Composite gate | **9.5/10** avg @ UAT 2026-06-28 |
+| `backfill_reliability_graph_history.py --phase all` | Graph history backfill | **PASS** §21 (prior); **BLOCKED** today (auth) |
+| `run_cross_tenant_pen_test.py` | Multi-tenant isolation | **PASS** §21 (prior); **BLOCKED** today (auth) |
+| `run_uat_post_deploy_gates.sh` | Nine-step post-deploy bundle | **PASS** §21 (prior); **BLOCKED** today (auth) |
+| `audit_maturity_scorecard.py` | Composite gate | **9.5/10** avg §21 (prior); **BLOCKED** today (auth) |
 | `verify_threat_observation_convergence.py` | Same-id gate | **PASS** — 29/29 Tyromer (prior UAT) |
 | `phase1_data_integrity_report.py` | Phase 1 bundle | **PASS** — 0 unbridged tasks (prior UAT) |
 | `verify_uat_gates.py` | UAT wrapper | **PASS** (prior UAT) |
@@ -480,8 +478,8 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | Field | Value |
 |-------|-------|
 | Author | Platform audit (evidence-based) |
-| Supersedes | `PLATFORM_TRUTH_AUDIT_2026-06-26.md` |
-| Next review | After second tenant proof or major deploy to `uat/main` |
+| Supersedes | `PLATFORM_TRUTH_AUDIT_2026-06-27.md` |
+| Next review | After production cutover milestone or major deploy to `uat/main` |
 | Related | `ASSETIQ_TECHNICAL_STATUS.md`, `OBSERVATION_THREAT_CONVERGENCE_PLAN.md`, `SOC2_GAP_ASSESSMENT.md` |
 
 ---
@@ -691,4 +689,46 @@ Atlas credentials restored. Full UAT verification bundle executed against `asset
 
 ---
 
-*This document is the product + platform truth snapshot as of 2026-06-28 @ `1e5e6659`. Live UAT gates pass; production cutover remains open.*
+## 22. Full platform truth audit rerun (@ `f1f44607`, 2026-06-28)
+
+Scheduled refresh of platform & product truth audit. Runner: `run_platform_truth_audit.sh --local` + targeted gate scripts.
+
+### Local gates — **12/12 PASS**
+
+| Gate | Result |
+|------|--------|
+| `run_platform_truth_audit.sh --local` | **12/12 PASS** |
+| `verify_reliability_graph_sync.py` (static) | **PASS** — 2 advisory partial edges |
+| `graph_coverage_report.py` | **19 handlers**, **11/11 entities** |
+| `ai_entry_point_report.py` | **8/8** enforced surfaces compliant |
+| `pytest --collect-only` | **1705** tests collected |
+| Sprint 6 pytest bundle | **24/24 PASS** (15 in focused rerun) |
+| `verify_frontend_unit_tests.py` | **43 suites**, **286 tests** |
+
+### Live UAT gates — **BLOCKED** (credentials rotated)
+
+Atlas auth failed (`bad auth`, AtlasError 8000). **Prior §21 live evidence remains authoritative** (same-day run before credential rotation):
+
+| Gate | Today | Prior §21 |
+|------|-------|-----------|
+| Graph backfill `--phase all` | BLOCKED | 2968 synced, 0 errors |
+| Cross-tenant pen test | BLOCKED | PASS |
+| Post-deploy gates (9 steps) | BLOCKED | PASS |
+| Maturity scorecard | BLOCKED | 9.5/10 avg |
+| Graph sync verify (live DB) | BLOCKED | 0 gaps, 0 missing `tenant_id` |
+
+### Audit conclusion (@ 2026-06-28)
+
+| Dimension | Verdict |
+|-----------|---------|
+| **Product maturity** | Credible UAT pilot — full reliability lifecycle + FMEA + executive read models |
+| **Platform engineering** | Strong CI gates; 1705 backend tests; reactive graph + AI contract landed |
+| **Multi-tenant** | Proven on UAT (two tenants, pen test §21) |
+| **Production readiness** | **Not ready** — strict mode cutover 4/10, Redis/workers, 48h soak, prod backfill |
+| **Strategic position** | Reliability-native wedge intact; gap is enterprise hardening not domain depth |
+
+**Next actions:** restore Atlas credentials for weekly UAT gate cadence; extend AI contract to partial routes; production cutover checklist.
+
+---
+
+*This document is the product + platform truth snapshot as of 2026-06-28 @ `f1f44607`. Local audit gates pass; live UAT evidence from §21 (same day); production cutover remains open.*

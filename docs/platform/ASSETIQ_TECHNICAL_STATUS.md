@@ -1,15 +1,15 @@
 # ASSETIQ TECHNICAL STATUS
 
-**Current source of truth:** [`PLATFORM_TRUTH_AUDIT_2026-06-27.md`](./PLATFORM_TRUTH_AUDIT_2026-06-27.md) (also at [`docs/PLATFORM_TRUTH_AUDIT_2026-06-27.md`](../PLATFORM_TRUTH_AUDIT_2026-06-27.md))
+**Current source of truth:** [`PLATFORM_TRUTH_AUDIT_2026-06-28.md`](./PLATFORM_TRUTH_AUDIT_2026-06-28.md) (also at [`docs/PLATFORM_TRUTH_AUDIT_2026-06-28.md`](../PLATFORM_TRUTH_AUDIT_2026-06-28.md))
 
 > This document stays active for operational gate commands and exit codes until archived after the next **successful** live UAT gate run.
 
-**Version:** 2026-06-28 (Sprint 6 verification @ `e5a828e7`)  
+**Version:** 2026-06-28 (full platform truth audit @ `f1f44607`)  
 **Repository:** AssetIQ-Dev  
-**Branch / commit assessed:** `deploy-uat` @ `e5a828e7`  
-**Environment assessed:** Local code gates (**12/12 PASS**); live UAT Atlas re-run **blocked** (`MONGO_URL` unset — prior §16/§18 evidence still valid)
+**Branch / commit assessed:** `deploy-uat` @ `f1f44607` (`uat/main`)  
+**Environment assessed:** Local code gates (**12/12 PASS**); live UAT Atlas re-run **blocked** (auth rotated — prior §21 evidence valid)
 
-**Purpose:** Operational gate status and reproducible verification commands. Product/platform truth lives in [`PLATFORM_TRUTH_AUDIT_2026-06-27.md`](./PLATFORM_TRUTH_AUDIT_2026-06-27.md); this file reconciles due diligence, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable scripts.
+**Purpose:** Operational gate status and reproducible verification commands. Product/platform truth lives in [`PLATFORM_TRUTH_AUDIT_2026-06-28.md`](./PLATFORM_TRUTH_AUDIT_2026-06-28.md); this file reconciles due diligence, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable scripts.
 
 **Assessment method:** Run or inspect verification scripts listed below. Do not treat narrative “Done” checkboxes in older docs as proof unless backed by a script exit code or test run on the target environment.
 
@@ -21,8 +21,8 @@
 
 | Category | Status |
 |----------|--------|
-| **Code / CI gates** | **Pass** — `run_platform_truth_audit.sh --local` **12/12** @ `e5a828e7`; Sprint 6 pytest **24/24** |
-| **UAT live data gates** | **PASS** @ 2026-06-28 — post-deploy 9/9, pen test, graph backfill 2968 synced, maturity 9.5/10 |
+| **Code / CI gates** | **Pass** — `run_platform_truth_audit.sh --local` **12/12** @ `f1f44607`; **1705** backend tests collected |
+| **UAT live data gates** | **Prior PASS** §21 (same day); **re-run blocked** today (Atlas auth rotated) |
 | **Production readiness** | **Deferred** — prod backfill, 48h soak explicitly out of scope |
 | **Platform 1.0 completion** | **Partial** — Phase 1 UAT bundle exit 0; prod rollout pending |
 
@@ -403,7 +403,7 @@ Recommended order:
 
 | Document | Status |
 |----------|--------|
-| **`PLATFORM_TRUTH_AUDIT_2026-06-27.md`** | **Current** — product + platform truth (evidence-based) |
+| **`PLATFORM_TRUTH_AUDIT_2026-06-28.md`** | **Current** — product + platform truth (evidence-based) |
 | **`ASSETIQ_TECHNICAL_STATUS.md`** | **Active** — operational gate commands; archive after successful post-deploy gate run |
 | **`PHASE1_EXECUTION.md`** | **Active** — archive after next UAT gate run |
 | **`PLATFORM_1_0_EXECUTION.md`** | **Active** — archive after next UAT gate run |
