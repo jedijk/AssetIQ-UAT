@@ -1,9 +1,9 @@
 # Reactive Graph Ownership Matrix
 
-**Sprint 2 — Functional Spec §1.2**  
-**Last updated:** 2026-06-28  
+**Sprint 2–6 — Functional Spec §1.2**  
+**Last updated:** 2026-06-28 (@ `e5a828e7`, Sprint 6 verification)  
 **Registry:** `backend/services/reliability_graph/graph_sync_registry.py`  
-**Gate:** `backend/scripts/verify_reliability_graph_sync.py`
+**Gate:** `backend/scripts/verify_reliability_graph_sync.py`, `backend/scripts/graph_coverage_report.py`
 
 This matrix maps **functional-spec edge names** to **canonical Mongo `reliability_edges.relation` values** already used in `reliability_ontology.py`. Do not introduce duplicate relation names.
 
@@ -41,6 +41,15 @@ This matrix maps **functional-spec edge names** to **canonical Mongo `reliabilit
 | `executive_kpi_derived_from_graph` | *(read model)* | graph → executive KPI | `graph_kpi_aggregator` | projection job | user `company_id` | N/A | **PARTIAL** — read model |
 
 **Status summary:** 16 implemented · 2 partial · 0 gap
+
+**Sprint 6 verification (@ `e5a828e7`):**
+
+| Gate | Result |
+|------|--------|
+| `graph_coverage_report.py` | **PASS** — 19 handlers registered, 11/11 entities (100%) |
+| `verify_reliability_graph_sync.py` | **PASS** — static OK; 2 advisory partial edges only |
+| Sprint 6 pytest | **PASS** — `test_graph_sync_registry`, `test_lifecycle_graph_handler`, `test_reliability_graph_platform` |
+| UAT `--phase all` backfill dry-run | **BLOCKED** — `MONGO_URL` unset (prior §16 reactive backfill valid) |
 
 ## Dispatch handler registry
 

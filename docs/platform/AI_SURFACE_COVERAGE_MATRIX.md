@@ -1,10 +1,10 @@
 # AI Surface Coverage Matrix
 
-**Sprint 3–4 — Universal AI Contract inventory**  
-**Last updated:** 2026-06-28  
+**Sprint 3–6 — Universal AI Contract inventory**  
+**Last updated:** 2026-06-28 (@ `e5a828e7`, Sprint 6 verification)  
 **Contract:** `models/ai_recommendation.py` (`AIRecommendationResponse`), `services/ai_recommendation_contract.py`, `services/ai_recommendation_schema.py`  
 **Platform entry:** `services/ai_platform.py` (`finalize_recommendation_response`)  
-**Gate:** `scripts/ai_entry_point_report.py` (OpenAI imports + enforced contract surfaces)
+**Gate:** `scripts/ai_entry_point_report.py` — **8/8 enforced surfaces compliant** (verified Sprint 6)
 
 ## Contract requirements
 
@@ -20,7 +20,9 @@
 
 **Status legend:** **Compliant** · **Partial** (ai_platform but no contract) · **Missing**
 
-## Enforced user-facing surfaces (Sprint 4)
+## Enforced user-facing surfaces (Sprint 4 — verified Sprint 6)
+
+Gate scan: **8 enforced surfaces · 8 compliant** (`ai_entry_point_report.py` @ `e5a828e7`).
 
 | Route | Service | Contract | Status |
 |-------|---------|----------|--------|
@@ -32,7 +34,9 @@
 | `GET /investigations/{id}/ai-summary` | `reports.generate_ai_summary` | `finalize_recommendation_response` | **Compliant** |
 | `POST /ai-suggestions/failure-modes` | `ai_fm_suggestions` | `finalize_fm_suggestions_contract` | **Compliant** |
 | `POST /maintenance-strategies/generate` | `maintenance_routes_service` | `finalize_recommendation_response` | **Compliant** |
-| `POST /ai/recommendations` | `insights_service` | `finalize_ai_recommendation_response` | **Compliant** |
+| `POST /ai/recommendations` | `insights_service` | `finalize_ai_recommendation_response` | **Compliant** ✓ |
+
+*Note: table lists 9 routes mapped to contract helpers; static gate counts **8 enforced surfaces** (authoritative for Sprint 6 DoD).*
 
 ## Other user-facing API routes
 
@@ -60,11 +64,13 @@
 
 ## Coverage summary
 
-| Status | Count (enforced + notable routes) |
-|--------|-----------------------------------|
-| Compliant (enforced) | 9 |
-| Partial | 18+ |
+| Status | Count |
+|--------|-------|
+| Compliant (enforced gate) | **8** |
+| Partial (ai_platform, no contract) | 18+ |
 | Missing | 1 |
+
+**Sprint 6 gate:** `ai_entry_point_report.py` → enforced **8/8 compliant**; legacy OpenAI bypasses **0**.
 
 ## Frontend evidence display (Sprint 5)
 
@@ -78,9 +84,17 @@
 
 Reusable component: `frontend/src/components/ai/AIRecommendationCard.jsx`
 
-## Sprint 6 (UAT) remaining
+## Sprint 6 verification (@ `e5a828e7`)
+
+| Check | Result |
+|-------|--------|
+| `ai_entry_point_report.py` | **PASS** — 8/8 enforced surfaces compliant |
+| `test_ai_recommendation_schema.py` | **PASS** (in Sprint 6 pytest bundle) |
+| Frontend `AIRecommendationCard` | Wired on observation panel, investigation summary, PM import, RIL copilot |
+
+## Post-Sprint 6 remaining
 
 1. Wire `AIRecommendationCard` to maintenance program AI accept flow and strategy generator UI.
-2. Extend contract enforcement to `ai_risk_engine` RCA/fault-tree endpoints.
-3. Run `backfill_reliability_graph_history.py` against UAT Mongo with `--phase all`.
+2. Extend contract enforcement to `ai_risk_engine` RCA/fault-tree endpoints (18+ partial routes).
+3. Re-run `backfill_reliability_graph_history.py --phase all` on UAT when Atlas creds restored.
 4. Executive dashboard KPI partial edge — validate read-model projection in UAT.

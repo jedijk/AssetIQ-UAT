@@ -4,10 +4,10 @@
 
 > This document stays active for operational gate commands and exit codes until archived after the next **successful** live UAT gate run.
 
-**Version:** 2026-06-28 (ultimate truth audit @ `42d0cffe`)  
+**Version:** 2026-06-28 (Sprint 6 verification @ `e5a828e7`)  
 **Repository:** AssetIQ-Dev  
-**Branch / commit assessed:** `deploy-uat` @ `42d0cffe`  
-**Environment assessed:** Local code gates (**12/12 PASS**); live UAT Atlas re-run **blocked** (credential rotation — prior §16/§18 evidence still valid)
+**Branch / commit assessed:** `deploy-uat` @ `e5a828e7`  
+**Environment assessed:** Local code gates (**12/12 PASS**); live UAT Atlas re-run **blocked** (`MONGO_URL` unset — prior §16/§18 evidence still valid)
 
 **Purpose:** Operational gate status and reproducible verification commands. Product/platform truth lives in [`PLATFORM_TRUTH_AUDIT_2026-06-27.md`](./PLATFORM_TRUTH_AUDIT_2026-06-27.md); this file reconciles due diligence, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable scripts.
 
@@ -21,8 +21,8 @@
 
 | Category | Status |
 |----------|--------|
-| **Code / CI gates** | **Pass** — `run_platform_truth_audit.sh --local` **12/12** @ `42d0cffe` |
-| **UAT live data gates** | **Prior PASS** @ 2026-06-27/28 (§16 + §18); **re-run blocked** on Atlas auth @ 2026-06-28 |
+| **Code / CI gates** | **Pass** — `run_platform_truth_audit.sh --local` **12/12** @ `e5a828e7`; Sprint 6 pytest **24/24** |
+| **UAT live data gates** | **Prior PASS** @ 2026-06-27/28 (§16 + §18); **re-run blocked** (`MONGO_URL` unset @ Sprint 6) |
 | **Production readiness** | **Deferred** — prod backfill, 48h soak explicitly out of scope |
 | **Platform 1.0 completion** | **Partial** — Phase 1 UAT bundle exit 0; prod rollout pending |
 
@@ -30,11 +30,13 @@
 
 - **Tenant service filter heuristic audit** — 0 flagged services (152 scanned @ 2026-06-27)
 - **Platform standards gate (WS8)** — 4/4 gates pass
-- **AI entry point report** — 0 new OpenAI import violations
+- **AI entry point report** — **8/8 enforced contract surfaces compliant**; 0 legacy OpenAI bypasses
+- **Graph coverage report** — **19 handlers**, **11/11 entities (100%)**
 - **Canonical data models (WS3)** — 13 domains registered
 - **Executive read models registry (WS6)** — 12 read models, gate pass
 - **Graph performance benchmark gate (WS7)** — harness/module checks pass (micro-benchmark skipped without Mongo)
-- **Reliability graph sync gate (static)** — `verify_reliability_graph_sync.py` static checks pass; upsert allowlist updated for WS4 graph split modules; reactive sync hooks verified in `threat_helpers.py`, `investigation_crud.py`, `investigation_subresources.py`
+- **Reliability graph sync gate (static)** — `verify_reliability_graph_sync.py` static checks pass; 2 advisory partial spec edges; lifecycle handlers in `lifecycle_graph_handler.py` + outbox processor
+- **Sprint 6 pytest bundle** — 24/24 pass (`test_graph_sync_registry`, `test_lifecycle_graph_handler`, `test_ai_recommendation_schema`, `test_reliability_graph_platform`)
 - **Auth matrix tests** — 65/65 pass (`tests/test_auth_matrix.py` + `tests/test_verify_reliability_graph_sync.py`) after WS5 `ai_platform` migration alignment
 - **Architecture convergence tests** — 74/74 pass when `MONGO_URL` is set
 - **Platform standards tests** — 5/5 pass
@@ -71,11 +73,13 @@ Legend: **PASS** / **FAIL** / **PARTIAL** / **NOT TESTED** / **DEFERRED**
 |------|--------|----------|-------|
 | Tenant service filter audit | **PASS** | `tenant_service_filter_audit.py` → 0 flagged, 151 clean | Heuristic; not cross-tenant penetration test |
 | Platform standards (WS8) | **PASS** | `verify_platform_standards.py` → 4/4 OK | CI in `backend-tests.yml` |
-| AI entry point report | **PASS** | `ai_entry_point_report.py` → 0 new violations | |
+| AI entry point report | **PASS** | `ai_entry_point_report.py` → **8/8 enforced surfaces compliant** | |
+| Graph coverage report | **PASS** | `graph_coverage_report.py` → 19 handlers, 11/11 entities | |
 | Canonical data models (WS3) | **PASS** | `verify_canonical_models.py` → 13 domains | |
 | Read models registry (WS6) | **PASS** | `verify_read_models_registry.py` → 12 models | |
 | Graph performance gate (WS7) | **PARTIAL** | Harness OK; micro benchmark needs Mongo | |
-| Reliability graph sync (static) | **PASS** | `verify_reliability_graph_sync.py` static section → OK | Script sets default `MONGO_URL` for imports; use `ENVIRONMENT=test` locally to skip DB sample |
+| Reliability graph sync (static) | **PASS** | `verify_reliability_graph_sync.py` static section → OK | 2 advisory partial edges; use `ENVIRONMENT=test` locally to skip DB sample |
+| Sprint 6 graph + AI pytest | **PASS** | 4 test modules → **24 passed** | |
 | Auth matrix tests | **PASS** | `pytest tests/test_auth_matrix.py` → 61 passed | AI/RIL/copilot routes still enforced via `require_permission` + `ai_platform` |
 | Graph sync unit tests | **PASS** | `pytest tests/test_verify_reliability_graph_sync.py` → 4 passed | |
 | Architecture convergence tests | **PASS** | `pytest tests/test_architecture_convergence.py` → 74 passed | |
@@ -113,8 +117,16 @@ Legend: **PASS** / **FAIL** / **PARTIAL** / **NOT TESTED** / **DEFERRED**
 ### Commands used for this assessment (reproducible)
 
 ```bash
-# Branch
-git rev-parse HEAD   # c43c2b6a (+ uncommitted blocker fixes)
+# Sprint 6 gate bundle (@ e5a828e7)
+cd backend && MONGO_URL=mongodb://localhost:27017/test DB_NAME=test JWT_SECRET_KEY=test-secret ENVIRONMENT=test \
+  python3 scripts/verify_reliability_graph_sync.py
+cd backend && python3 scripts/graph_coverage_report.py
+cd backend && python3 scripts/ai_entry_point_report.py
+cd backend && MONGO_URL=mongodb://localhost:27017/test DB_NAME=test JWT_SECRET_KEY=test-secret ENVIRONMENT=test \
+  python3 -m pytest tests/test_graph_sync_registry.py tests/test_lifecycle_graph_handler.py \
+  tests/test_ai_recommendation_schema.py tests/test_reliability_graph_platform.py -q
+cd backend && python3 scripts/verify_frontend_unit_tests.py
+cd backend && ./scripts/run_platform_truth_audit.sh --local
 
 # Code gates — no live Mongo required (except MONGO_URL for Python imports)
 cd backend && MONGO_URL=mongodb://localhost:27017/test DB_NAME=test JWT_SECRET_KEY=test-secret \
@@ -194,7 +206,7 @@ cd backend && MONGO_URL=<uat-atlas-uri> JWT_SECRET_KEY=<secret> \
   ./scripts/run_platform_truth_audit.sh
 ```
 
-Last local run @ `42d0cffe`: **12/12 PASS**. Live UAT phase blocked @ 2026-06-28 (Atlas auth failure — rotate `assetiq_user` password and retry).
+Last local run @ `e5a828e7`: **12/12 PASS** (Sprint 6 bundle). Live UAT phase blocked @ 2026-06-28 (`MONGO_URL` unset — rotate Atlas creds and retry).
 
 ### UAT live data gates — reproducible commands
 
@@ -338,11 +350,11 @@ Platform 1.0 is **not fully complete** per unchecked success criteria in `PLATFO
 | Workstream | Status | Notes |
 |------------|--------|-------|
 | **Phase 1 UAT data convergence** | **COMPLETE** (UAT) | All eight post-deploy steps + phase1 report exit 0 @ 2026-06-27 |
-| **WS1 — Tenant convergence** | **PARTIAL** | UAT backfill 100%; multi-tenant proof (tenant #2) **pending** |
-| **WS2 — Reliability graph foundation** | **PARTIAL** | UAT DB sample **PASS**; reactive chain ~22% mature (code) |
+| **WS1 — Tenant convergence** | **COMPLETE** (UAT) | Two tenants + cross-tenant pen test §18 |
+| **WS2 — Reliability graph foundation** | **PARTIAL** | Code gates **PASS** (19 handlers, 16/18 spec edges); UAT DB sample **PASS** (prior); 2 advisory partial edges |
 | **WS3 — Canonical data models** | **COMPLETE** (code gate) | |
 | **WS4 — Large-file modularization** | **PARTIAL** | Services ≤800 LOC; routes/frontend god files remain. |
-| **WS5 — AI platform** | **PARTIAL** | `ai_platform` + CI gate **done**; OpenAI-only; some orchestrator paths unused. |
+| **WS5 — AI platform** | **PARTIAL** | `ai_platform` + **8/8 enforced contract surfaces**; 18+ routes still partial |
 | **WS6 — Executive read models** | **COMPLETE** (code gate) | |
 | **WS7 — Graph performance** | **COMPLETE** (harness) | Production fleet not validated. |
 | **WS8 — Platform standards** | **COMPLETE** | |
