@@ -47,6 +47,12 @@ ENFORCED_GROUNDED_SURFACES: dict[str, str] = {
     "services/insights_service.py": "Executive AI recommendations",
     "services/image_analysis_service.py": "Image vision damage analysis",
     "ai_helpers.py": "Chat attachment vision",
+    "services/maintenance_scheduler_ai_service.py": "Scheduler AI plan",
+    "services/production_dashboard_ops.py": "Production AI insights / machine analysis",
+    "services/production_logs_service.py": "Production log AI parse",
+    "routes/ai_extract.py": "Photo field extraction vision",
+    "routes/forms.py": "Form document search AI",
+    "routes/feedback.py": "Feedback agent prompt generation",
 }
 
 GROUNDED_MARKERS = (

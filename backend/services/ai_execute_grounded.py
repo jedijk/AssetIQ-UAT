@@ -158,6 +158,9 @@ async def execute_grounded(
     image_base64: Optional[str] = None,
     file_id: Optional[str] = None,
     media_type: Optional[str] = None,
+    prompt_text: Optional[str] = None,
+    use_registry_prompt: bool = False,
+    prompt_variables: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Single supported AI execution pipeline for AssetIQ.
@@ -224,6 +227,7 @@ async def execute_grounded(
                 prompt_id,
                 user=user,
                 user_message=user_message,
+                prompt_text=prompt_text,
                 image_base64=vision_image,
                 media_type=vision_media_type,
                 endpoint=ep,
@@ -280,6 +284,21 @@ async def execute_grounded(
             if (parsed or {}).get("limitations"):
                 lim = parsed["limitations"]
                 limitations = lim if isinstance(lim, list) else [str(lim)]
+        elif use_registry_prompt:
+            from services.ai_platform import execute_prompt
+
+            result = await execute_prompt(
+                prompt_id,
+                user=user,
+                user_message=query,
+                variables=prompt_variables,
+                context=assembled_context or None,
+                endpoint=ep,
+                model=ai_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            summary_text = result.get("content") or ""
         else:
             from services.ai_orchestrator import run_grounded_recommendation
 

@@ -320,7 +320,7 @@ async def generate_ai_prompt(
     combined_feedback = "\n\n".join(feedback_context)
     
     try:
-        from services.ai_platform import execute_prompt
+        from services.ai_execute_grounded import execute_grounded, overlay_grounded_contract
 
         user_message = f"""Based on the following user feedback items, generate a prompt for an AI coding agent:
 
@@ -328,21 +328,25 @@ async def generate_ai_prompt(
 
 Generate a clear, actionable prompt that can be directly used with an AI development agent."""
 
-        from services.ai_platform import execute_prompt
-
-        generated_prompt = await execute_prompt(
-            "feedback.generate_agent_prompt",
+        grounded = await execute_grounded(
             user=current_user,
-            user_message=user_message,
+            intent="generate_agent_prompt",
+            query=user_message,
+            feature="feedback.generate_prompt",
+            prompt_id="feedback.generate_agent_prompt",
             endpoint="feedback.generate_prompt",
             model="gpt-4o",
             temperature=0.5,
+            use_registry_prompt=True,
         )
 
-        return {
-            "prompt": generated_prompt["content"],
-            "feedback_count": len(feedback_items)
-        }
+        return overlay_grounded_contract(
+            {
+                "prompt": grounded.get("summary") or grounded.get("recommendation") or "",
+                "feedback_count": len(feedback_items),
+            },
+            grounded,
+        )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate prompt: {str(e)}")

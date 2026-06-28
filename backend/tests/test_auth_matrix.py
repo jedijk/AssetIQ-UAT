@@ -99,12 +99,12 @@ def test_tasks_reads_require_tasks_read():
     assert "Depends(_tasks_read)" in block
 
 
-def test_production_logs_ai_parse_uses_ai_platform():
+def test_production_logs_ai_parse_uses_execute_grounded():
     source = (Path(__file__).resolve().parents[1] / "services" / "production_logs_service.py").read_text()
     idx = source.index("async def ai_parse_file")
     block = source[idx: idx + 3500]
-    assert "from services.ai_platform import execute_json_prompt" in block
-    assert "execute_json_prompt" in block
+    assert "from services.ai_execute_grounded import execute_grounded" in block
+    assert "execute_grounded(" in block
     assert 'endpoint="production_logs.ai_parse"' in block
 
 

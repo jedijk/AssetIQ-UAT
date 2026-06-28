@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import { toast } from "sonner";
+import AIRecommendationCard from "../components/ai/AIRecommendationCard";
 
 const InsightsPage = ({ embedded = false }) => {
   const { t } = useLanguage();
@@ -687,22 +688,7 @@ const InsightsPage = ({ embedded = false }) => {
             <CardContent>
               {recommendations?.recommendations ? (
                 <div className="space-y-4">
-                  {recommendations.recommendations.map((rec, i) => (
-                    <div key={i} className="p-4 border rounded-xl hover:bg-slate-50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                            {rec.impact === 'high' ? <ArrowUpRight className="w-4 h-4 text-red-500" /> : 
-                             rec.impact === 'medium' ? <Minus className="w-4 h-4 text-amber-500" /> : 
-                             <ArrowDownRight className="w-4 h-4 text-blue-500" />}
-                            {rec.title}
-                          </h4>
-                          <p className="text-sm text-slate-600 mt-1">{rec.description}</p>
-                        </div>
-                        {getImpactBadge(rec.impact)}
-                      </div>
-                    </div>
-                  ))}
+                  <AIRecommendationCard payload={recommendations} compact />
                   {recommendations.generated_at && (
                     <p className="text-xs text-slate-400 text-right mt-4">
                       Generated: {formatDateTime(recommendations.generated_at)}

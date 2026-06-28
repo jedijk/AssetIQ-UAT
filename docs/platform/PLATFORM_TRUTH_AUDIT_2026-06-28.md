@@ -48,7 +48,7 @@ AssetIQ differentiates on **reliability-native workflow + FMEA depth + grounded 
 2. ~~**Complete reactive graph sync chain**~~ — **Done @ `e5a828e7`** (16/18 edges; UAT backfill 2968 synced §21).  
 3. **48h UAT soak + weekly gate cadence** — `run_uat_post_deploy_gates.sh` on schedule.  
 4. **Production cutover package** — Redis, external workers, prod backfill, strict mode cutover, pen test.  
-5. **Extend AI contract** — **8/8 enforced surfaces done**; extend to `ai_risk_engine` RCA/fault-tree routes (18+ partial).
+5. **Extend AI contract** — **8/8 enforced contract surfaces** + **13/13 grounded LLM routes** via `execute_grounded()`; read-only cache routes excluded.
 
 ---
 
@@ -114,7 +114,7 @@ Source: `backend/architecture/domain_registry.py` (18 domains) + code search.
 | **Graph nodes** | **I** (UAT sample) | 105 threat→obs edges backfilled; reactive sync; **0 DB sample gaps** @ 2026-06-27 |
 | **List API robustness** | **I** (code) | `normalize_threat_list_items` fills sparse projections @ `0880424e`; `test_threat_helpers.py` |
 
-**Remaining operational work:** eventual `threats` collection retirement after soak; extend AI contract to 18+ partial routes.
+**Remaining operational work:** eventual `threats` collection retirement after soak; wire maintenance program AI accept UI to `AIRecommendationCard`.
 
 See [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_PLAN.md).
 
@@ -184,7 +184,7 @@ See [`OBSERVATION_THREAT_CONVERGENCE_PLAN.md`](./OBSERVATION_THREAT_CONVERGENCE_
 | Maintenance history | **I** | Equipment history, task instances |
 | Failure modes | **I** | EFM links, graph edges when synced |
 | Graph relationships | **I (UAT sample)** | 19 handlers; 2968-entity backfill; 0 DB gaps §21 |
-| AI reasoning / citations | **I (enforced surfaces)** | 8/8 contract compliant; `AIRecommendationCard` on 4 UI surfaces | 18+ partial routes remain |
+| AI reasoning / citations | **I (enforced + grounded)** | 8/8 contract + 13/13 grounded LLM routes; `AIRecommendationCard` on 5 UI surfaces (incl. insights) | Read-only cache routes; maintenance program AI UI wiring pending |
 | User decisions | **I** | Audit log, decision engine execution log |
 | Supporting documents | **P** | Document fetch; investigation files |
 
@@ -350,7 +350,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 |---|---------|----------|--------|---------|
 | 6 | Redis not required | `redis_store` optional | 1 wk | Global limits + shared cache |
 | 7 | External job workers | In-process workers | 2–3 wk | Durable worker fleet |
-| 8 | ~~AI citation enforcement (core surfaces)~~ | **Done** — 8/8 enforced @ `e5a828e7` | — | — | — | Extend to 18+ partial routes |
+| 8 | ~~AI citation enforcement (core surfaces)~~ | **Done** — 8/8 contract + 13/13 grounded @ Platform Completion | — | — | — | Maintenance program AI UI wiring |
 | 9 | OIDC production | `auth_oidc.py` spike | 2–3 wk | SSO for pilot #2 |
 | 10 | 48h UAT soak | Deferred | 2 d | Signed pilot stability |
 | 11 | Pen test + upload validation | SOC2 open items | 2–4 wk | Pre-prod gate |
@@ -396,7 +396,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | Multi-tenancy verified | **Two tenants @ UAT** | Phase 3 (prod) |
 | One canonical model per domain | Work signal **converged**; UAT Tyromer verified | Maintained |
 | End-to-end traceable workflow | Core path yes; graph reactive **16/18** | Phase 2 (2 advisory partial) |
-| Grounded auditable AI | **8 enforced surfaces I**; 18+ partial | Phase 2 |
+| Grounded auditable AI | **8 contract + 13 grounded I** | Phase 2 complete for LLM routes |
 | Graph authoritative | **UAT operational**; 2 advisory partial edges | Phase 2 |
 | CI-enforced platform standards | **Yes** | Maintained |
 | Honest security/compliance docs | **Yes** | Phase 3 evidence |

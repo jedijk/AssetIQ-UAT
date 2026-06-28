@@ -135,6 +135,98 @@ async def test_execute_grounded_vision_returns_damage_fields():
     assert result["summary"] == "Moderate corrosion visible"
 
 
+@pytest.mark.asyncio
+async def test_execute_grounded_registry_prompt_returns_contract_fields():
+    from services.ai_execute_grounded import execute_grounded
+
+    fake_evidence = {
+        "citations": [{"id": "d1", "type": "document", "label": "Manual"}],
+        "entities": [],
+        "graph_edges": [],
+        "prompt_summary": "",
+    }
+
+    with patch(
+        "services.ai_execute_grounded.build_evidence_pack",
+        new=AsyncMock(return_value=fake_evidence),
+    ), patch(
+        "services.ai_execute_grounded.log_ai_execution",
+        new=AsyncMock(),
+    ), patch(
+        "services.ai_platform.execute_prompt",
+        new=AsyncMock(
+            return_value={
+                "content": "Check section 3.2 for torque specs.",
+                "prompt_id": "forms.document_search",
+                "prompt_version": "1",
+                "model": "gpt-4o-mini",
+            }
+        ),
+    ):
+        result = await execute_grounded(
+            user={"id": "u1", "company_id": "t1"},
+            intent="document_search",
+            query="What is the torque spec?",
+            feature="forms.document_search",
+            prompt_id="forms.document_search",
+            use_registry_prompt=True,
+            prompt_variables={"doc_context": "Doc: Manual"},
+        )
+
+    assert "torque specs" in (result.get("summary") or "")
+    assert result["execution_id"]
+    assert result["citations"]
+
+
+@pytest.mark.asyncio
+async def test_scheduler_ai_plan_uses_execute_grounded():
+    from unittest.mock import MagicMock
+
+    from services.maintenance_scheduler_ai_service import ai_plan_tasks
+    from models.maintenance_scheduler import AIScheduleRequest
+
+    fake_task = {
+        "id": "t1",
+        "task_name": "Inspect pump",
+        "priority": "high",
+        "due_date": "2026-07-01",
+        "estimated_hours": 2.0,
+    }
+    fake_grounded = {
+        "parsed": {"summary": "Plan ready", "recommendations": [{"task_id": "t1"}]},
+        "summary": "Plan ready",
+        "execution_id": "exec-sched-1",
+        "citations": [],
+        "evidence_not_available": True,
+    }
+
+    tasks_cursor = MagicMock()
+    tasks_cursor.to_list = AsyncMock(return_value=[fake_task])
+    tech_cursor = MagicMock()
+    tech_cursor.to_list = AsyncMock(return_value=[{"id": "tech1", "name": "Tech One"}])
+
+    mock_scheduled = MagicMock()
+    mock_scheduled.find.return_value = tasks_cursor
+    mock_tech = MagicMock()
+    mock_tech.find.return_value = tech_cursor
+    mock_db = MagicMock()
+    mock_db.scheduled_tasks = mock_scheduled
+    mock_db.technician_capacity = mock_tech
+
+    with patch("services.maintenance_scheduler_ai_service.db", mock_db), patch(
+        "services.ai_execute_grounded.execute_grounded",
+        new=AsyncMock(return_value=fake_grounded),
+    ) as mock_grounded, patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        result = await ai_plan_tasks(
+            {"id": "u1", "company_id": "t1"},
+            AIScheduleRequest(start_date="2026-06-01", end_date="2026-06-30"),
+        )
+
+    assert result["summary"] == "Plan ready"
+    assert result["execution_id"] == "exec-sched-1"
+    mock_grounded.assert_awaited_once()
+
+
 def test_overlay_grounded_contract_preserves_domain_fields():
     from services.ai_execute_grounded import overlay_grounded_contract
 

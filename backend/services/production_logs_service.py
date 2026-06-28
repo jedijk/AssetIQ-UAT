@@ -355,21 +355,27 @@ async def ai_parse_file(user: dict,
 
     # Call AI to analyze the log structure
     try:
-        from services.ai_platform import execute_json_prompt
+        from services.ai_execute_grounded import execute_grounded, overlay_grounded_contract
 
-        result = await execute_json_prompt(
-            "production.log_parse",
+        grounded = await execute_grounded(
             user={"id": uid, "company_id": cid},
-            user_message=f"Analyze this production log file sample:\n\n{sample_text}",
+            intent="log_parse",
+            query=f"Analyze this production log file sample:\n\n{sample_text}",
+            feature="production_logs.ai_parse",
+            prompt_id="production.log_parse",
             endpoint="production_logs.ai_parse",
             model="gpt-4o",
             max_tokens=1000,
             temperature=0.1,
+            parse_json=True,
         )
-        analysis = result["parsed"]
+        analysis = grounded.get("parsed") if isinstance(grounded.get("parsed"), dict) else {}
         if not analysis:
             return {"success": False, "error": "AI returned invalid format", "raw": raw[:500]}
-        return {"success": True, "analysis": analysis, "sample_lines": len(sample_text.splitlines())}
+        return overlay_grounded_contract(
+            {"success": True, "analysis": analysis, "sample_lines": len(sample_text.splitlines())},
+            grounded,
+        )
     except Exception as e:
         logger.error(f"[AI Parse] Failed: {e}")
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")

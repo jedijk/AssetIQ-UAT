@@ -375,23 +375,28 @@ async def extract_from_image(
     )
 
     try:
-        from services.ai_platform import execute_vision_json_prompt
+        from services.ai_execute_grounded import execute_grounded
 
-        result = await execute_vision_json_prompt(
-            "vision.field_extraction",
+        grounded = await execute_grounded(
             user=current_user,
-            user_message="",
-            prompt_text=prompt,
-            image_base64=b64,
-            media_type=mime,
+            intent="field_extraction",
+            query="",
+            feature="ai_extract.extract_from_photo",
+            prompt_id="vision.field_extraction",
             endpoint="ai_extract.extract_from_photo",
             model="gpt-4o",
             max_tokens=1000,
             temperature=0.1,
+            image_base64=b64,
+            media_type=mime,
+            prompt_text=prompt,
         )
-        raw = (result.get("content") or "").strip()
+        raw = (grounded.get("summary") or "").strip()
+        if not raw and grounded.get("parsed"):
+            import json as _json
+            raw = _json.dumps(grounded.get("parsed"))
         logger.info(f"[AI Extract] Raw response (first 500 chars): {raw[:500]}")
-        parsed = result.get("parsed") or {}
+        parsed = grounded.get("parsed") if isinstance(grounded.get("parsed"), dict) else {}
         results = parsed.get("results", [])
 
         extracted = []

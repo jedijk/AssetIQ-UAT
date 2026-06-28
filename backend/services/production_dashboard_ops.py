@@ -61,18 +61,6 @@ async def delete_production_event(user: dict, event_id: str):
 
 async def generate_ai_insights(user: dict, data: dict):
     """Generate AI-powered daily insights by analyzing the current production data."""
-    from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
-    from services.ai_evidence_pack import build_evidence_pack
-    from services.ai_gateway import user_context
-
-    uid, cid = user_context(user)
-
-    evidence_pack = await build_evidence_pack(
-        user=user,
-        intent="production_insights",
-        include_fleet=True,
-    )
-
     date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     production_log = data.get("production_log", [])
     viscosity_values = data.get("viscosity_values", [])
@@ -105,25 +93,28 @@ Samples: {kpis.get('sample_count', 0)} extruder, {kpis.get('viscosity_sample_cou
         },
     )
 
-    evidence_block = evidence_pack.get("prompt_summary") or ""
-    citation_block = format_citations_for_prompt(evidence_pack.get("citations") or [])
-    if evidence_block:
-        prompt += f"\n\nFleet reliability context (cite as [cite:<id>] when relevant):\n{evidence_block}"
-    if citation_block:
-        prompt += f"\n{citation_block}"
-
     try:
-        from services.ai_platform import execute_json_prompt
+        from services.ai_execute_grounded import execute_grounded, overlay_grounded_contract
 
-        result = await execute_json_prompt(
-            "production.daily_insights",
+        grounded = await execute_grounded(
             user=user,
-            user_message=prompt,
+            intent="production_insights",
+            query=prompt,
+            feature="production.ai_insights",
+            prompt_id="production.daily_insights",
             endpoint="production.ai_insights",
             model="gpt-4o",
             temperature=0.7,
+            parse_json=True,
+            include_fleet=True,
         )
-        insights = result["parsed"]
+        parsed = grounded.get("parsed")
+        if isinstance(parsed, list):
+            insights = parsed
+        elif isinstance(parsed, dict):
+            insights = parsed.get("insights") or parsed.get("recommendations") or []
+        else:
+            insights = []
         if not isinstance(insights, list) or not insights:
             raise ValueError("AI returned invalid insights JSON")
 
@@ -151,10 +142,9 @@ Samples: {kpis.get('sample_count', 0)} extruder, {kpis.get('viscosity_sample_cou
             event.pop("_id", None)
             saved.append(event)
 
-        return attach_citations_to_response(
+        return overlay_grounded_contract(
             {"status": "ok", "insights": saved, "count": len(saved)},
-            evidence_pack.get("citations") or [],
-            evidence=evidence_pack,
+            grounded,
         )
 
     except Exception as e:
@@ -324,17 +314,20 @@ async def generate_machine_analysis(user: dict, data: dict = None):
     )
 
     try:
-        from services.ai_platform import execute_json_prompt
+        from services.ai_execute_grounded import execute_grounded, overlay_grounded_contract
 
-        result = await execute_json_prompt(
-            "production.machine_settings",
+        grounded = await execute_grounded(
             user=user,
-            user_message=prompt,
+            intent="machine_analysis",
+            query=prompt,
+            feature="production.machine_analysis",
+            prompt_id="production.machine_settings",
             endpoint="production.machine_analysis",
             model="gpt-4o",
             temperature=0.3,
+            parse_json=True,
         )
-        analysis = result["parsed"]
+        analysis = grounded.get("parsed") if isinstance(grounded.get("parsed"), dict) else {}
         if not isinstance(analysis, dict) or not analysis:
             raise ValueError("AI returned invalid machine analysis JSON")
 
@@ -360,7 +353,10 @@ async def generate_machine_analysis(user: dict, data: dict = None):
         await db.production_analyses.insert_one(analysis_doc)
         analysis_doc.pop("_id", None)
 
-        return {"status": "ok", "analysis": analysis, "stats": analysis_doc["stats"], "date_range": date_range}
+        return overlay_grounded_contract(
+            {"status": "ok", "analysis": analysis, "stats": analysis_doc["stats"], "date_range": date_range},
+            grounded,
+        )
 
     except Exception as e:
         logger.error(f"Machine analysis failed: {e}")

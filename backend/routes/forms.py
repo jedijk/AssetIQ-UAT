@@ -458,27 +458,33 @@ async def search_form_documents(
             for d in documents
         ])
         
-        from services.ai_platform import execute_prompt
+        from services.ai_execute_grounded import execute_grounded, overlay_grounded_contract
 
-        answer = await execute_prompt(
-            "forms.document_search",
+        grounded = await execute_grounded(
             user=current_user,
-            user_message=request.query,
-            variables={"doc_context": doc_context},
+            intent="document_search",
+            query=request.query,
+            feature="forms.document_search",
+            prompt_id="forms.document_search",
             endpoint="forms.document_search",
             model="gpt-4o-mini",
             temperature=0.3,
+            use_registry_prompt=True,
+            prompt_variables={"doc_context": doc_context},
         )
 
-        return {
-            "query": request.query,
-            "answer": answer["content"],
-            "relevant_documents": [
-                {"id": d["id"], "name": d["name"], "url": d["url"], "type": d["type"]}
-                for d in documents
-            ],
-            "source": "ai"
-        }
+        return overlay_grounded_contract(
+            {
+                "query": request.query,
+                "answer": grounded.get("summary") or grounded.get("recommendation") or "",
+                "relevant_documents": [
+                    {"id": d["id"], "name": d["name"], "url": d["url"], "type": d["type"]}
+                    for d in documents
+                ],
+                "source": "ai",
+            },
+            grounded,
+        )
         
     except Exception as e:
         logger.error(f"AI document search failed: {e}")

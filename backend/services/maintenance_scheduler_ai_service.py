@@ -92,18 +92,21 @@ async def ai_plan_tasks(
     logger.debug("AI planner session %s", session_id)
 
     try:
-        from services.ai_platform import execute_json_prompt
+        from services.ai_execute_grounded import execute_grounded, overlay_grounded_contract
 
-        result = await execute_json_prompt(
-            "maintenance.scheduler_plan",
+        grounded = await execute_grounded(
             user=user,
-            user_message=json.dumps(user_payload),
+            intent="scheduler_plan",
+            query=json.dumps(user_payload),
+            feature="maintenance_scheduler.ai_plan",
+            prompt_id="maintenance.scheduler_plan",
             endpoint="maintenance_scheduler.ai_plan",
             model="gpt-4o",
             temperature=0.2,
-            response_format={"type": "json_object"},
+            parse_json=True,
+            json_default={"summary": "", "recommendations": []},
         )
-        parsed = result["parsed"]
+        parsed = grounded.get("parsed") if isinstance(grounded.get("parsed"), dict) else {}
     except Exception as e:
         logger.exception("AI planner LLM call failed")
         raise HTTPException(status_code=502, detail=f"AI planner failed: {str(e)}") from e
@@ -115,13 +118,16 @@ async def ai_plan_tasks(
             detail="AI returned non-JSON response",
         )
 
-    return {
-        "message": "AI plan generated",
-        "summary": parsed.get("summary", ""),
-        "recommendations": parsed.get("recommendations", []),
-        "tasks_analyzed": len(tasks_context),
-        "technicians_considered": len(techs_context),
-    }
+    return overlay_grounded_contract(
+        {
+            "message": "AI plan generated",
+            "summary": parsed.get("summary", grounded.get("summary", "")),
+            "recommendations": parsed.get("recommendations", []),
+            "tasks_analyzed": len(tasks_context),
+            "technicians_considered": len(techs_context),
+        },
+        grounded,
+    )
 
 
 async def apply_ai_plan(user: dict, recommendations: list) -> dict:
