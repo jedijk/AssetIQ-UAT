@@ -204,12 +204,13 @@ const ThreatsPage = () => {
     if (key) return t(key);
     return translateEnum(t, status);
   };
-  const { hasPermission } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const isIOSLike = isIOSLikeDevice();
   const touchMobile = isTouchMobileDevice();
   const caps = useCapabilities();
+  const canReadObservations = hasPermission("observations", "read");
   const [searchParams, setSearchParams] = useSearchParams();
   // Default: show the 5 active in-progress stages (excludes terminal Mitigated & Learning)
   const [statusFilter, setStatusFilter] = useState([
@@ -283,6 +284,7 @@ const ThreatsPage = () => {
   const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: queryKeys.stats.all(),
     queryFn: statsAPI.get,
+    enabled: !permissionsLoading && canReadObservations,
   });
 
   // Fetch threats (fetch all, filter client-side for multi-select)
@@ -297,6 +299,7 @@ const ThreatsPage = () => {
       }
       return result;
     },
+    enabled: !permissionsLoading && canReadObservations,
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     retry: 3, // Retry 3 times on failure
@@ -306,6 +309,8 @@ const ThreatsPage = () => {
     refetchIntervalInBackground: false,
     placeholderData: (previousData) => previousData, // Keep previous data while refetching
   });
+
+  const isListLoading = permissionsLoading || (isLoading && rawThreats.length === 0);
 
   const handleRefreshList = () => {
     refetchThreats();
@@ -838,7 +843,7 @@ const ThreatsPage = () => {
         data-testid="observations-list-scroll"
       >
         <div className={`max-w-7xl mx-auto w-full ${useVirtualThreatList ? "flex-1 min-h-0 flex flex-col" : ""}`}>
-          {threatsError && !isLoading && (
+          {threatsError && !isListLoading && (
             <div
               className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
               role="alert"
@@ -863,7 +868,7 @@ const ThreatsPage = () => {
             </div>
           )}
           {/* Threats List */}
-          {isLoading && rawThreats.length === 0 ? (
+          {isListLoading ? (
         <div className="py-6 space-y-3" data-testid="threats-skeleton">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="bg-white border border-slate-200 rounded-xl p-4">
@@ -948,7 +953,7 @@ const ThreatsPage = () => {
                       </div>
                     )}
 
-                    <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
+                    <div className={`hidden sm:flex flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl items-center justify-center ${
                       threat.risk_level === "Critical" ? "bg-red-50" :
                       threat.risk_level === "High" ? "bg-orange-50" :
                       threat.risk_level === "Medium" ? "bg-yellow-50" :
@@ -1053,8 +1058,8 @@ const ThreatsPage = () => {
                 </div>
               )}
               
-              {/* Equipment Icon */}
-              <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
+              {/* Equipment Icon — desktop only; mobile uses full width for title/metadata */}
+              <div className={`hidden sm:flex flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl items-center justify-center ${
                 threat.risk_level === "Critical" ? "bg-red-50" :
                 threat.risk_level === "High" ? "bg-orange-50" :
                 threat.risk_level === "Medium" ? "bg-yellow-50" :

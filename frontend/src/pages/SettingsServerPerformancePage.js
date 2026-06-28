@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatTime, formatDateTime } from "../lib/dateUtils";
 import {
+  ArrowLeft,
   Server,
   Cpu,
   HardDrive,
@@ -186,6 +188,7 @@ const Sparkline = ({ data, color }) => {
 
 const SettingsServerPerformancePage = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { user } = useAuth();
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -426,16 +429,24 @@ const SettingsServerPerformancePage = () => {
   // Show access denied for non-owners
   if (!isOwner) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 text-center">
-            <ShieldX className="w-16 h-16 text-red-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-slate-900 mb-2">Access Restricted</h2>
-            <p className="text-slate-500 mb-6">
-              Server Performance metrics are only available to account owners.
-            </p>
-          </CardContent>
-        </Card>
+      <div className={isMobile ? "app-page-shell bg-slate-50" : "min-h-screen bg-slate-50"}>
+        <div className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0" : ""} flex items-center justify-center p-4`}>
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <ShieldX className="w-16 h-16 text-red-400 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-slate-900 mb-2">Access Restricted</h2>
+              <p className="text-slate-500 mb-6">
+                Server Performance metrics are only available to account owners.
+              </p>
+              {isMobile && (
+                <Button variant="outline" onClick={() => navigate("/settings")}>
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Settings
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -443,16 +454,18 @@ const SettingsServerPerformancePage = () => {
   // Loading skeleton
   if (loading && !metrics) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-8 bg-slate-200 rounded animate-pulse" />
+      <div className={isMobile ? "app-page-shell bg-slate-50" : "min-h-screen bg-slate-50"}>
+        <div className={`${isMobile ? "flex-shrink-0" : "sticky top-0 z-10"} bg-white border-b border-slate-200`}>
+          <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+            <div className="flex items-center gap-2 sm:gap-4">
+              {isMobile && (
+                <div className="w-8 h-8 bg-slate-200 rounded animate-pulse shrink-0" />
+              )}
               <div className="w-48 h-6 bg-slate-200 rounded animate-pulse" />
             </div>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <div className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0" : ""} max-w-6xl mx-auto px-4 sm:px-6 py-6`}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map(i => (
               <Card key={i} className="h-40">
@@ -476,24 +489,38 @@ const SettingsServerPerformancePage = () => {
   const diskColor = getStatusColor(metrics?.disk_percent || 0);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 sm:pb-6">
-      {/* Header - Compact on mobile */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div
+      className={isMobile ? "app-page-shell bg-slate-50" : "min-h-screen bg-slate-50 pb-20 sm:pb-6"}
+      data-testid="server-performance-page"
+    >
+      {/* Header - fixed on mobile, sticky on desktop */}
+      <div className={`${isMobile ? "flex-shrink-0" : "sticky top-0 z-10"} bg-white border-b border-slate-200`}>
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
-          {/* Mobile: Two rows */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-4">
-              <div>
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => navigate("/settings")}
+                  aria-label="Back to settings"
+                  data-testid="server-performance-back-button"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+              )}
+              <div className="min-w-0">
                 <h1 className="text-base sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
-                  <Server className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
-                  Server Performance
+                  <Server className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 shrink-0" />
+                  <span className="truncate">Server Performance</span>
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">Real-time server metrics</p>
               </div>
             </div>
             
             {/* Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
               {/* Connection Status */}
               <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                 {error ? (
@@ -533,7 +560,7 @@ const SettingsServerPerformancePage = () => {
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+      <div className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0 pb-20" : ""} max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6`}>
         {/* Warning Alert */}
         <AnimatePresence>
           {metrics && (metrics.cpu_percent >= 85 || metrics.ram_percent >= 85 || metrics.disk_percent >= 85) && (

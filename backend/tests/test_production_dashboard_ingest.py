@@ -72,3 +72,6 @@ async def test_merge_production_dashboard_ingest_uses_scope_dates():
     assert payload["from_date"] == "2026-06-27"
     assert payload["to_date"] == "2026-06-28"
     assert payload["shift"] == "morning,afternoon,night"
+    assert payload["is_range"] is False
+    assert payload["shift_label"] == "Morning, Afternoon, Night"
+    assert payload["kpis"]["shift_hours"] == "06:00 - 22:00"

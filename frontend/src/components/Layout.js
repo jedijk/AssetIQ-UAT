@@ -70,6 +70,10 @@ import { usePageTracking } from "../hooks/useAnalyticsTracking";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 import { useCapabilities } from "../core/performance";
 import { isTouchMobileDevice } from "../lib/deviceUtils";
+import {
+  cancelObservationsPrefetch,
+  prefetchObservationsWhenIdle,
+} from "../lib/prefetchObservationsList";
 
 /** Skip pull-to-refresh when the user is scrolling inside a nested pane (tiles, chat, etc.). */
 function touchIsInNestedScrollPane(target) {
@@ -91,7 +95,7 @@ function touchIsInNestedScrollPane(target) {
 
 const Layout = () => {
   const { user, logout, mustChangePassword, mustAcceptTerms } = useAuth();
-  const { hasPermission, canSeeNavItem } = usePermissions();
+  const { hasPermission, canSeeNavItem, loading: permissionsLoading } = usePermissions();
   const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
   const { language, setLanguage, toggleLanguage, t } = useLanguage();
   const { isOnline, totalPending, isSyncing, syncAllPending } = useOfflineSync();
@@ -523,6 +527,13 @@ const Layout = () => {
     }
   }, [location.pathname]);
 
+  // Warm observations list + stats while the shell is idle so first navigation feels instant.
+  useEffect(() => {
+    if (permissionsLoading || !user || !hasPermission("observations", "read")) return undefined;
+    const handle = prefetchObservationsWhenIdle(queryClient, language);
+    return () => cancelObservationsPrefetch(handle);
+  }, [permissionsLoading, user, hasPermission, language, queryClient]);
+
   // Handle hierarchy panel resize
   const handleResizeMouseDown = useCallback((e) => {
     e.preventDefault();
@@ -644,7 +655,8 @@ const Layout = () => {
           </>
         )}
 
-        {/* Mobile Hierarchy Sidebar (overlay) */}
+        {/* Mobile Hierarchy Sidebar (overlay) — mount only when open to avoid idle API work */}
+        {hierarchyOpen && (
         <div className="lg:hidden">
           <EquipmentHierarchy 
             isOpen={hierarchyOpen} 
@@ -655,6 +667,7 @@ const Layout = () => {
             onSearchQueryUsed={() => setHierarchySearchQuery("")}
           />
         </div>
+        )}
 
         {/* Main Content with Page Transitions */}
         <main 

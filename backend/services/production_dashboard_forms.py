@@ -38,6 +38,7 @@ from services.production_helpers import (
     _information_text_from_submission,
     _parse_sample_datetime,
     _extract_date_time_field_raw,
+    _extract_waste_reporting_fields,
     _waste_reporting_template_name_matches,
     _information_template_name_matches,
 )

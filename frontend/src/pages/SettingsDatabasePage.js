@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -7,6 +9,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import {
+  ArrowLeft,
   Database,
   Server,
   CheckCircle2,
@@ -33,6 +36,8 @@ import api from "../lib/api";
 import { getDatabaseEnvironment, markDatabaseEnvironmentExplicit } from "../lib/databaseEnv";
 
 export default function SettingsDatabasePage() {
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { user } = useAuth();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
@@ -90,16 +95,24 @@ export default function SettingsDatabasePage() {
   // Check if user is owner
   if (user?.role !== "owner") {
     return (
-      <div className="p-4 sm:p-6">
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="p-6 flex items-center gap-4">
-            <AlertTriangle className="w-8 h-8 text-amber-500" />
-            <div>
-              <h3 className="font-semibold text-amber-800">Access Restricted</h3>
-              <p className="text-sm text-amber-700">Only owners can access database settings.</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className={isMobile ? "app-page-shell bg-slate-50" : ""}>
+        <div className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0" : ""} p-4 sm:p-6`}>
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="p-6 flex items-center gap-4">
+              <AlertTriangle className="w-8 h-8 text-amber-500" />
+              <div>
+                <h3 className="font-semibold text-amber-800">Access Restricted</h3>
+                <p className="text-sm text-amber-700">Only owners can access database settings.</p>
+              </div>
+            </CardContent>
+          </Card>
+          {isMobile && (
+            <Button variant="outline" className="mt-4" onClick={() => navigate("/settings")}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Settings
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -127,32 +140,53 @@ export default function SettingsDatabasePage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Database className="w-6 h-6 text-blue-600" />
-            Database Environment
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Switch between Production and UAT databases
-          </p>
+    <div
+      className={isMobile ? "app-page-shell bg-slate-50" : ""}
+      data-testid="database-settings-page"
+    >
+      {/* Header — fixed on mobile */}
+      <div className={`${isMobile ? "flex-shrink-0 bg-white border-b border-slate-200 px-4 py-3" : "px-4 sm:px-6 pt-4 sm:pt-6"}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            {isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => navigate("/settings")}
+                aria-label="Back to settings"
+                data-testid="database-settings-back-button"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            )}
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <Database className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
+                <span className="truncate">Database Environment</span>
+              </h1>
+              <p className="text-sm text-slate-500 mt-1 hidden sm:block">
+                Switch between Production and UAT databases
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => {
+              refetch();
+              refetchStatus();
+            }}
+            disabled={isLoading || statusLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${(isLoading || statusLoading) ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            refetch();
-            refetchStatus();
-          }}
-          disabled={isLoading || statusLoading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${(isLoading || statusLoading) ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
       </div>
-      
+
+      <div className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0 px-4 pb-20 space-y-6" : "p-4 sm:p-6 space-y-6"}`}>
       {/* Current Environment Banner */}
       <Card className={`border-2 ${currentEnv === "production" ? "border-green-500 bg-green-50" : "border-amber-500 bg-amber-50"}`}>
         <CardContent className="p-4 flex items-center justify-between">
@@ -330,6 +364,7 @@ export default function SettingsDatabasePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }

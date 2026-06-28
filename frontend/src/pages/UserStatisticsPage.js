@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -172,26 +172,83 @@ const UserStatisticsPage = () => {
     enabled: activeTab === "overview" || activeTab === "trends",
   });
 
+  const mobileBackHeader = (
+    <div className="flex-shrink-0 bg-white border-b border-slate-200">
+      <div className="px-3 py-3 space-y-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={() => navigate("/settings")}
+            aria-label="Back to settings"
+            data-testid="user-statistics-back-button"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <h1 className="text-base font-semibold text-slate-900 truncate">
+            {t("settings.statistics") || "User Statistics"}
+          </h1>
+        </div>
+        {!isLoading && error?.message !== "Access denied" && (
+          <div className="flex items-center gap-2">
+            <Select value={timePeriod} onValueChange={setTimePeriod}>
+              <SelectTrigger className="flex-1 h-9 text-xs border-slate-200 bg-white" data-testid="period-filter-mobile">
+                <Calendar className="w-3.5 h-3.5 mr-2 text-slate-400" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today" className="text-xs">Today</SelectItem>
+                <SelectItem value="7" className="text-xs">Last 7 days</SelectItem>
+                <SelectItem value="30" className="text-xs">Last 30 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-slate-200 bg-white"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              aria-label="Refresh statistics"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   // Handle access denied
   if (error?.message === "Access denied") {
     return (
-      <div className="flex flex-col items-center justify-center h-96 text-center p-6">
-        <div className="h-14 w-14 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center mb-4">
-          <Users className="h-6 w-6 text-red-500" />
+      <div className={isMobile ? "app-page-shell bg-slate-50" : ""}>
+        {isMobile && mobileBackHeader}
+        <div
+          className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0 p-4 pb-20" : ""} flex flex-col items-center justify-center h-96 text-center p-6`}
+        >
+          <div className="h-14 w-14 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center mb-4">
+            <Users className="h-6 w-6 text-red-500" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-800 mb-1">Access Restricted</h2>
+          <p className="text-sm text-slate-500 max-w-sm">
+            You do not have permission to view user statistics.
+            This feature is available for Administrators and Managers only.
+          </p>
         </div>
-        <h2 className="text-lg font-semibold text-slate-800 mb-1">Access Restricted</h2>
-        <p className="text-sm text-slate-500 max-w-sm">
-          You do not have permission to view user statistics. 
-          This feature is available for Administrators and Managers only.
-        </p>
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin h-8 w-8 border-2 border-amber-500 border-t-transparent rounded-full" />
+      <div className={isMobile ? "app-page-shell bg-slate-50" : ""}>
+        {isMobile && mobileBackHeader}
+        <div
+          className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0 pb-20" : ""} flex items-center justify-center h-96`}
+        >
+          <div className="animate-spin h-8 w-8 border-2 border-amber-500 border-t-transparent rounded-full" />
+        </div>
       </div>
     );
   }
@@ -220,22 +277,13 @@ const UserStatisticsPage = () => {
   ].filter(d => d.value > 0);
 
   return (
-    <div className={`${isMobile ? 'p-4' : 'p-6 lg:p-8'} max-w-7xl mx-auto`} data-testid="user-statistics-page">
-      {/* Mobile Header with Back Button */}
-      {isMobile && (
-        <div className="flex items-center gap-3 mb-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8"
-            onClick={() => navigate("/")}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-lg font-bold text-slate-900">User Statistics</h1>
-        </div>
-      )}
-      
+    <div
+      className={isMobile ? "app-page-shell bg-slate-50" : "max-w-7xl mx-auto p-6 lg:p-8"}
+      data-testid="user-statistics-page"
+    >
+      {isMobile && mobileBackHeader}
+
+      <div className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0 pb-20 px-3 py-4" : ""}`}>
       {/* Header - matching Observations page style (Desktop) */}
       {!isMobile && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
@@ -279,32 +327,6 @@ const UserStatisticsPage = () => {
               Refresh
             </Button>
           </div>
-        </div>
-      )}
-      
-      {/* Mobile Controls */}
-      {isMobile && (
-        <div className="flex items-center gap-2 mb-4">
-          <Select value={timePeriod} onValueChange={setTimePeriod}>
-            <SelectTrigger className="flex-1 h-9 text-xs border-slate-200 bg-white" data-testid="period-filter-mobile">
-              <Calendar className="w-3.5 h-3.5 mr-2 text-slate-400" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today" className="text-xs">Today</SelectItem>
-              <SelectItem value="7" className="text-xs">Last 7 days</SelectItem>
-              <SelectItem value="30" className="text-xs">Last 30 days</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button 
-            variant="outline" 
-            size="icon"
-            className="h-9 w-9 border-slate-200 bg-white"
-            onClick={() => refetch()} 
-            disabled={isRefetching}
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`} />
-          </Button>
         </div>
       )}
 
@@ -909,6 +931,7 @@ const UserStatisticsPage = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 };

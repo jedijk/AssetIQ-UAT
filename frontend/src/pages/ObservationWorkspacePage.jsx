@@ -81,6 +81,7 @@ import { showAiMutationError } from "../lib/aiMutationErrors";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useDisciplines } from "../hooks/useDisciplines";
 import RiskBadge from "../components/RiskBadge";
+import BackButton from "../components/BackButton";
 import ObservationDetailsSection from "../components/workspace/ObservationDetailsSection";
 import { ALARPCard, ExposureCard, RiskSummaryCard } from "../components/workspace/ExposureCards";
 import { EquipmentReliabilityTimeline } from "../components/workspace/EquipmentReliabilityTimeline";
@@ -379,15 +380,32 @@ const ObservationWorkspacePage = () => {
 
   const { observation, exposure, timeline, reliability_intelligence, recommended_actions, action_plan, process_journey } = workspace;
 
+  const evidencePanelProps = {
+    equipmentId: observation?.linked_equipment_id,
+    equipmentName: observation?.asset || observation?.equipment_type,
+    anchorNodeType: "threat",
+    anchorNodeId: id,
+    anchorLabel: observation?.title || displayTitle,
+    labelHints:
+      observation?.failure_mode_id && observation?.failure_mode
+        ? { [`failure_mode:${observation.failure_mode_id}`]: observation.failure_mode }
+        : {},
+    buttonLabel: "Graph evidence",
+    buttonVariant: "outline",
+  };
+
   return (
     <div className="app-page-shell bg-slate-50" data-testid="observation-workspace-page">
       {/* Hero header — fixed at top of the flex panel; scroll lives in the pane below */}
       <div className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
-          {/* Mobile: title row (with ⋯ menu pinned right) + action bar row stack vertically.
-              Desktop: everything inline on a single row. */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-3 py-2">
-            <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <div className="flex items-start gap-1 sm:gap-2 py-2">
+            <BackButton
+              fallbackPath="/observations"
+              className="lg:hidden h-8 w-8 p-0 -ml-1 shrink-0 self-center"
+            />
+
+            <div className="flex flex-1 min-w-0 flex-col lg:flex-row lg:items-center lg:justify-between lg:gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <RiskBadge level={observation?.risk_level} size="sm" />
@@ -395,29 +413,21 @@ const ObservationWorkspacePage = () => {
                     {observation?.threat_number}
                   </span>
                 </div>
-                <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate leading-tight">
-                  {displayTitle}
-                </h1>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <h1 className="flex-1 min-w-0 font-semibold text-sm sm:text-base text-slate-900 truncate leading-tight">
+                    {displayTitle}
+                  </h1>
+                  <div className="flex items-center gap-1 flex-shrink-0 lg:hidden">
+                    <ReliabilityEvidencePanel {...evidencePanelProps} />
+                    <div id="workspace-hero-slot-mobile" />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-center">
-              <ReliabilityEvidencePanel
-                equipmentId={observation?.linked_equipment_id}
-                equipmentName={observation?.asset || observation?.equipment_type}
-                anchorNodeType="threat"
-                anchorNodeId={id}
-                anchorLabel={observation?.title || displayTitle}
-                labelHints={
-                  observation?.failure_mode_id && observation?.failure_mode
-                    ? { [`failure_mode:${observation.failure_mode_id}`]: observation.failure_mode }
-                    : {}
-                }
-                buttonLabel="Graph evidence"
-                buttonVariant="outline"
-              />
-              <div id="workspace-hero-slot-mobile" className="lg:hidden" />
-              <div id="workspace-hero-slot" className="hidden lg:flex lg:items-center lg:gap-2" />
+              <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+                <ReliabilityEvidencePanel {...evidencePanelProps} />
+                <div id="workspace-hero-slot" className="flex items-center gap-2" />
+              </div>
             </div>
           </div>
         </div>

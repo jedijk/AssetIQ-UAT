@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, RefreshCw, Search, Filter, User, Clock, Calendar as CalendarIcon, Download } from "lucide-react";
+import { useIsMobile } from "../hooks/useIsMobile";
+import { Shield, RefreshCw, Search, Filter, User, Clock, Calendar as CalendarIcon, Download, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -102,6 +103,7 @@ function statusVariant(status) {
 
 export default function SettingsAuditLogPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { effectiveRole } = useEffectiveRole();
 
   const isAllowed = effectiveRole === "owner";
@@ -170,53 +172,97 @@ export default function SettingsAuditLogPage() {
 
   if (!isAllowed) {
     return (
-      <div className="max-w-5xl mx-auto p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-slate-600" />
-            <h1 className="text-xl font-semibold">Audit Log</h1>
+      <div className={isMobile ? "app-page-shell bg-slate-50" : "max-w-5xl mx-auto p-4"}>
+        {isMobile && (
+          <div className="flex-shrink-0 bg-white border-b border-slate-200">
+            <div className="max-w-6xl mx-auto px-3 py-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => navigate("/settings")}
+                  aria-label="Back to settings"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <h1 className="text-base font-semibold truncate">Audit Log</h1>
+              </div>
+            </div>
           </div>
+        )}
+        <div className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0 p-4 pb-20" : "space-y-4"}`}>
+          {!isMobile && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-slate-600" />
+                <h1 className="text-xl font-semibold">Audit Log</h1>
+              </div>
+            </div>
+          )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Access restricted</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-slate-600">
+              Only owners and admins can view the audit log.
+            </CardContent>
+          </Card>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Access restricted</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-slate-600">
-            Only owners and admins can view the audit log.
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <Shield className="w-5 h-5 text-slate-600 shrink-0" />
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold truncate">Audit Log</h1>
-            <p className="text-sm text-slate-600 truncate">
-              {total ? `${total} events` : "Change & transaction history"}
-            </p>
+    <div
+      className={isMobile ? "app-page-shell bg-slate-50" : "max-w-6xl mx-auto p-4 pb-20 sm:pb-4"}
+      data-testid="audit-log-page"
+    >
+      <div className={`${isMobile ? "flex-shrink-0" : ""} bg-white border-b border-slate-200`}>
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => navigate("/settings")}
+                  aria-label="Back to settings"
+                  data-testid="audit-log-back-button"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+              )}
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-xl font-semibold truncate flex items-center gap-2">
+                  {!isMobile && <Shield className="w-5 h-5 text-slate-600 shrink-0" />}
+                  <span className="truncate">Audit Log</span>
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-600 truncate">
+                  {total ? `${total} events` : "Change & transaction history"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={() => exportLog("csv")} className="gap-1 px-2 sm:px-3">
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">CSV</span>
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportLog("json")} className="gap-1 px-2 sm:px-3">
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">JSON</span>
+              </Button>
+              <Button size="sm" onClick={load} disabled={loading} className="gap-1 px-2 sm:px-3">
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" onClick={() => exportLog("csv")} className="gap-2">
-            <Download className="w-4 h-4" />
-            CSV
-          </Button>
-          <Button variant="outline" onClick={() => exportLog("json")} className="gap-2">
-            <Download className="w-4 h-4" />
-            JSON
-          </Button>
-          <Button onClick={load} disabled={loading} className="gap-2">
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
         </div>
       </div>
 
+      <div className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0 pb-20" : ""} max-w-6xl mx-auto px-3 sm:px-4 py-4 space-y-4`}>
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -344,6 +390,7 @@ export default function SettingsAuditLogPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

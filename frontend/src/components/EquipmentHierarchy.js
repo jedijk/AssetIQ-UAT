@@ -725,7 +725,7 @@ const LevelSummaryItem = ({ level, count, isActive, onClick, isHidden, onToggleH
 
 const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, initialSearchQuery = "", onSearchQueryUsed }) => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const scrollContainerRef = useRef(null);
   const searchInputRef = useRef(null);
   
@@ -826,6 +826,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
     queryKey: queryKeys.equipment.nodes(),
     queryFn: equipmentHierarchyAPI.getNodes,
     staleTime: 30000,
+    enabled: isOpen,
   });
 
   // Fetch equipment types for details popup
@@ -833,12 +834,15 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
     queryKey: queryKeys.equipment.types(),
     queryFn: equipmentHierarchyAPI.getEquipmentTypes,
     staleTime: 60000,
+    enabled: isOpen,
   });
 
   // Fetch threats to show counts
   const { data: threats = [] } = useQuery({
-    queryKey: queryKeys.threats.all(),
-    queryFn: () => threatsAPI.getAll(),
+    queryKey: [...queryKeys.threats.all(), language],
+    queryFn: () => threatsAPI.getAll(null, { language }),
+    staleTime: 30 * 1000,
+    enabled: isOpen,
   });
 
   const nodes = useMemo(() => nodesData?.nodes ?? [], [nodesData]);

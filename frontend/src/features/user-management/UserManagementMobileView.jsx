@@ -2,6 +2,7 @@ import React from "react";
 import {
   Users,
   Search,
+  ArrowLeft,
   Shield,
   ShieldCheck,
   Eye,
@@ -123,18 +124,38 @@ export function UserManagementMobileView({
   setSelectedInstallations,
   setPasswordDialog,
   }) {
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
   return (
     <>
-      <div className="min-h-screen bg-slate-50 pb-20" data-testid="user-management-page-mobile">
-        {/* Mobile Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-bold text-slate-900">Users & Roles</h1>
-            <Button variant="ghost" size="icon" onClick={() => refetch()}>
+      <div className="app-page-shell bg-slate-50" data-testid="user-management-page-mobile">
+        {/* Fixed header — search and filters stay above the scroll pane */}
+        <div className="flex-shrink-0 bg-white border-b border-slate-200 px-4 py-3">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={handleBack}
+                aria-label="Back"
+                data-testid="user-management-back-button"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <h1 className="text-lg font-bold text-slate-900 truncate">Users & Roles</h1>
+            </div>
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => refetch()}>
               <RefreshCw className="w-4 h-4" />
             </Button>
           </div>
-          
+
           {/* Search */}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -146,10 +167,10 @@ export function UserManagementMobileView({
               data-testid="mobile-user-search"
             />
           </div>
-          
+
           {/* Role Filter Pills */}
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
-            <Badge 
+            <Badge
               variant={roleFilter === "all" ? "default" : "outline"}
               className="cursor-pointer whitespace-nowrap shrink-0"
               onClick={() => setRoleFilter("all")}
@@ -159,7 +180,7 @@ export function UserManagementMobileView({
             {Object.entries(roles).map(([roleKey, roleInfo]) => {
               const count = users.filter(u => u.role === roleKey).length;
               return (
-                <Badge 
+                <Badge
                   key={roleKey}
                   variant={roleFilter === roleKey ? "default" : "outline"}
                   className={`cursor-pointer whitespace-nowrap shrink-0 ${roleFilter === roleKey ? '' : roleColors[roleKey]}`}
@@ -181,6 +202,7 @@ export function UserManagementMobileView({
           </div>
         </div>
 
+        <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 pb-20">
         {/* Pending Approvals Banner */}
         {pendingData?.count > 0 && (
           <div className="mx-4 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -429,6 +451,7 @@ export function UserManagementMobileView({
               );
             })
           )}
+        </div>
         </div>
 
         {/* Mobile Edit Profile Dialog - Full Screen */}

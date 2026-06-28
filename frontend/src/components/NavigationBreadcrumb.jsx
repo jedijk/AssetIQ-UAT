@@ -29,7 +29,6 @@ const NavigationBreadcrumb = ({ className = '' }) => {
   const currentLabel = currentEntry ? getDisplayLabel(currentEntry) : null;
   const hideMobileTitle =
     isObservationWorkspacePath(currentPath) || isActionDetailPath(currentPath);
-  const useMobileDetailHeader = hideMobileTitle;
 
   if (!showTrail && !currentLabel) {
     return null;
@@ -37,9 +36,7 @@ const NavigationBreadcrumb = ({ className = '' }) => {
 
   return (
     <div
-      className={`sticky top-[var(--app-header-offset)] z-[35] bg-slate-50 flex justify-start items-center gap-2 min-w-0 w-full mb-0 pointer-events-none border-b border-slate-200/80 sm:border-b-0 pb-2 sm:pb-0 ${
-        useMobileDetailHeader || !showTrail ? 'hidden sm:flex' : 'flex'
-      } ${className}`}
+      className={`sticky top-[var(--app-header-offset)] z-[35] bg-slate-50 hidden sm:flex justify-start items-center gap-2 min-w-0 w-full mb-0 pointer-events-none border-b border-slate-200/80 sm:border-b-0 pb-2 sm:pb-0 ${className}`}
     >
       {showTrail ? (
         <Breadcrumb className="min-w-0 flex-1 pointer-events-auto">
