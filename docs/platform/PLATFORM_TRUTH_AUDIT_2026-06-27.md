@@ -434,21 +434,27 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 
 ## 13. Verification Evidence Index
 
-| Script / test | Purpose | Last known @ 2026-06-27 |
+| Script / test | Purpose | Last known @ 2026-06-28 |
 |---------------|---------|-------------------------|
+| `run_platform_truth_audit.sh --local` | **Ultimate truth audit (local bundle)** | **12/12 PASS** @ `42d0cffe` |
 | `pytest --collect-only` | Backend test inventory | **1680** collected @ `0880424e` (local) |
 | `verify_platform_standards.py` | WS8 | **4/4 PASS** (local) |
 | `ai_entry_point_report.py` | AI gateway enforcement | **0** new violations (local) |
 | `tenant_service_filter_audit.py` | Tenant heuristic | **0** flagged, 152 clean (local) |
 | `graph_coverage_report.py` | Handler registry | **10/10** entities (local) |
+| `verify_canonical_models.py` | WS3 domain registry | **13 domains PASS** (local) |
+| `verify_read_models_registry.py` | WS6 read models | **12 models PASS** (local) |
+| `verify_graph_performance_benchmarks.py` | WS7 harness | Static **PASS** (local, micro skipped without `MONGO_URL`) |
 | `verify_reliability_graph_sync.py` | Graph static + DB | Static **PASS** (local); DB **PASS** @ UAT 2026-06-27 |
-| `test_auth_matrix.py` + convergence + helpers | Routes / lifecycle | **67 passed** with `MONGO_URL` set; collection errors without it (import-time DB init) |
-| `npm run test:ci` | Frontend unit gate | **43 suites, 286 passed** (local) |
-| `run_uat_post_deploy_gates.sh` | Eight-step post-deploy bundle | **PASS** @ UAT 2026-06-27 |
+| `route_auth_inventory.py` | Route auth matrix | **758** handlers scanned (local) |
+| `check_frontend_imports.sh` | Frontend import hygiene | **PASS** (local) |
+| `test_auth_matrix.py` + convergence + tenant suite | Routes / lifecycle / isolation | **163 passed** @ `42d0cffe` (local) |
+| `verify_frontend_unit_tests.py` | Frontend unit gate | **43 suites, 286 passed** (local) |
+| `run_uat_post_deploy_gates.sh` | Nine-step post-deploy bundle | **PASS** @ UAT 2026-06-28 (multi-tenant sprint) |
 | `verify_threat_observation_convergence.py` | Same-id gate | **PASS** — 29/29 Tyromer |
 | `phase1_data_integrity_report.py` | Phase 1 bundle | **PASS** — 0 unbridged tasks |
 | `verify_uat_gates.py` | UAT wrapper | **PASS** |
-| `audit_maturity_scorecard.py` | Composite gate | 10/10 tested dims @ UAT 2026-06-26 |
+| `audit_maturity_scorecard.py` | Composite gate | 10/10 tested dims @ UAT 2026-06-28 |
 
 ---
 
@@ -494,7 +500,7 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 
 **Remediation highlights:** v2 programs for 10 `bearing_radial` equipment; 121 apply_strategy graph edges; schedule drift cleared.
 
-**Deferred:** Redis/external workers, top-5 reactive graph handlers. *(Second tenant proof sprint tooling added §18 — live run pending Atlas credentials.)*
+**Deferred:** Redis/external workers, top-5 reactive graph handlers. *(Multi-tenant proof sprint completed §18.)*
 
 ---
 
@@ -560,6 +566,58 @@ cd backend && \
 | 48h soak | Deferred | — |
 
 **Audit checklist (§8.1):** Multi-tenant isolation **Implemented** on UAT (two tenants, strict mode, live pen test).
+
+---
+
+## 19. Ultimate truth audit rerun (2026-06-28)
+
+**Runner:** `backend/scripts/run_platform_truth_audit.sh`  
+**Commit:** `42d0cffe` (`deploy-uat`)  
+**Mode:** local-only (Atlas credentials rotated — live UAT phase blocked on auth)
+
+### Local code gates — **12/12 PASS**
+
+| Gate | Result |
+|------|--------|
+| `tenant_service_filter_audit.py` | 0 flagged, 152 clean |
+| `verify_platform_standards.py` | 4/4 |
+| `ai_entry_point_report.py` | 0 new violations |
+| `graph_coverage_report.py` | 10/10 entities |
+| `verify_canonical_models.py` | 13 domains |
+| `verify_read_models_registry.py` | 12 read models |
+| `verify_graph_performance_benchmarks.py` | harness PASS (micro skipped) |
+| `verify_reliability_graph_sync.py` | static PASS |
+| `route_auth_inventory.py` | 758 handlers |
+| `check_frontend_imports.sh` | PASS |
+| pytest core tenant/auth suite | **163 passed** |
+| `verify_frontend_unit_tests.py` | 43 suites, 286 tests |
+
+### Live UAT gates — **BLOCKED**
+
+| Gate | Result |
+|------|--------|
+| `run_cross_tenant_pen_test.py` | **SKIP** — `bad auth : authentication failed` (AtlasError 8000) |
+| `validate_tenant_onboarding.py --all` | **SKIP** — same |
+| `run_uat_post_deploy_gates.sh` | **SKIP** — same |
+| `run_uat_audit_milestone.py --verify-only` | **SKIP** — same |
+| `audit_maturity_scorecard.py` | **SKIP** — same |
+
+**Prior live evidence still valid:** §16 (2026-06-27 Tyromer gates) and §18 (2026-06-28 multi-tenant sprint) were executed successfully on Atlas before credential rotation.
+
+**To rerun full audit:**
+
+```bash
+cd backend && \
+  MONGO_URL='...' JWT_SECRET_KEY='...' DB_NAME=assetiq-UAT \
+  TENANT_STRICT_MODE=true BACKFILL_TENANT_ID=Tyromer \
+  ./scripts/run_platform_truth_audit.sh
+```
+
+Local-only (no Atlas):
+
+```bash
+cd backend && ./scripts/run_platform_truth_audit.sh --local
+```
 
 ---
 

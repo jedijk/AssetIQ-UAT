@@ -4,10 +4,10 @@
 
 > This document stays active for operational gate commands and exit codes until archived after the next **successful** live UAT gate run.
 
-**Version:** 2026-06-27 (audit refresh @ `0880424e`)  
+**Version:** 2026-06-28 (ultimate truth audit @ `42d0cffe`)  
 **Repository:** AssetIQ-Dev  
-**Branch / commit assessed:** `deploy-uat` @ `0880424e` (`uat/main`)  
-**Environment assessed:** Local code gates + **live UAT Atlas** (`assetiq-UAT`, tenant `Tyromer`)
+**Branch / commit assessed:** `deploy-uat` @ `42d0cffe`  
+**Environment assessed:** Local code gates (**12/12 PASS**); live UAT Atlas re-run **blocked** (credential rotation — prior §16/§18 evidence still valid)
 
 **Purpose:** Operational gate status and reproducible verification commands. Product/platform truth lives in [`PLATFORM_TRUTH_AUDIT_2026-06-27.md`](./PLATFORM_TRUTH_AUDIT_2026-06-27.md); this file reconciles due diligence, `PHASE1_EXECUTION.md`, Platform 1.0 documents, and executable scripts.
 
@@ -21,8 +21,8 @@
 
 | Category | Status |
 |----------|--------|
-| **Code / CI gates** | **Pass** |
-| **UAT live data gates** | **PASS** @ 2026-06-27 — all eight post-deploy steps exit 0 (schedule drift + task bridge remediated) |
+| **Code / CI gates** | **Pass** — `run_platform_truth_audit.sh --local` **12/12** @ `42d0cffe` |
+| **UAT live data gates** | **Prior PASS** @ 2026-06-27/28 (§16 + §18); **re-run blocked** on Atlas auth @ 2026-06-28 |
 | **Production readiness** | **Deferred** — prod backfill, 48h soak explicitly out of scope |
 | **Platform 1.0 completion** | **Partial** — Phase 1 UAT bundle exit 0; prod rollout pending |
 
@@ -176,6 +176,25 @@ Live Atlas `assetiq-UAT`, tenant `Tyromer`. Runner: `run_uat_post_deploy_gates.s
 **Remediation (steps 5–6):** `MaintenanceProgramService.ensure_programs_for_equipment_ids` for 10 `bearing_radial` equipment → v2 programs; `sync_edges_for_apply_strategy` (121 edges upserted); `backfill_tenant_id.py --collections scheduled_tasks` (769 rows → `tenant_id=Tyromer`); `backfill_scheduled_task_instances.py` (769 `task_instance` rows created under `TENANT_STRICT_MODE=true`).
 
 **Unblocked follow-on work:** second tenant proof, Redis/external workers, top-5 graph reactive handlers (still deferred per scope).
+
+### Ultimate truth audit — reproducible commands
+
+**Local only (no Atlas):**
+
+```bash
+cd backend && ./scripts/run_platform_truth_audit.sh --local
+```
+
+**Full audit (local + live UAT):**
+
+```bash
+cd backend && MONGO_URL=<uat-atlas-uri> JWT_SECRET_KEY=<secret> \
+  DB_NAME=assetiq-UAT ENVIRONMENT=uat TENANT_STRICT_MODE=true \
+  BACKFILL_TENANT_ID=Tyromer \
+  ./scripts/run_platform_truth_audit.sh
+```
+
+Last local run @ `42d0cffe`: **12/12 PASS**. Live UAT phase blocked @ 2026-06-28 (Atlas auth failure — rotate `assetiq_user` password and retry).
 
 ### UAT live data gates — reproducible commands
 
