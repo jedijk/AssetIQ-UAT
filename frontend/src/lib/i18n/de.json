@@ -16,7 +16,8 @@
     "feedback": "Feedback",
     "permissions": "Berechtigungen",
     "aiUsage": "KI-Nutzung",
-    "maintenanceReadiness": "Maintenance Readiness",
+    "maintenanceReadiness": "Wartungsbereitschaft",
+    "fileSecurity": "Dateisicherheit",
     "taskScheduler": "Planer",
     "formSubmissions": "Berichte",
     "reliabilityIntelligence": "Zuverlässigkeitsintelligenz",
@@ -188,12 +189,16 @@
         "description": "Coverage dashboard & technical dictionary"
       },
       "auditLog": {
-        "label": "Audit Log",
-        "description": "Who changed what, and when"
+        "label": "Audit-Protokoll",
+        "description": "Wer hat was wann geändert"
+      },
+      "fileSecurity": {
+        "label": "Dateisicherheit",
+        "description": "Upload-Pipeline, Quarantäne und Scan-Status"
       },
       "maintenanceReadiness": {
-        "label": "Maintenance Readiness",
-        "description": "UAT cutover snapshot and queue health"
+        "label": "Wartungsbereitschaft",
+        "description": "UAT-Cutover-Snapshot und Warteschlangenstatus"
       }
     },
     "maintenanceReadiness": {
@@ -224,7 +229,43 @@
       "uatGatesTitle": "UAT Gates Verification",
       "uatGatesDesc": "Run the gates script before production cutover",
       "uatGatesScript": "Script path",
-      "uatGatesInstruction": "From the backend directory, run: cd backend && MONGO_URL=<your-db> python scripts/verify_uat_gates.py — exit code 0 means all gates passed."
+      "uatGatesInstruction": "Im Backend-Verzeichnis ausführen: cd backend && MONGO_URL=<ihre-db> python scripts/verify_uat_gates.py — Exit-Code 0 bedeutet, dass alle Gates bestanden wurden."
+    },
+    "fileSecurity": {
+      "title": "Dateisicherheit",
+      "subtitle": "Upload-Pipeline-Status, quarantänisierte Dateien und Audit-Aktivität",
+      "accessRestricted": "Zugriff nur für Administrator oder Eigentümer.",
+      "desktopOnly": "Dateisicherheit",
+      "refresh": "Aktualisieren",
+      "loadingDashboard": "Dashboard wird geladen…",
+      "available": "Verfügbar",
+      "quarantined": "In Quarantäne",
+      "rejected": "Abgelehnt",
+      "pendingScan": "Scan ausstehend",
+      "ratesTitle": "Quoten",
+      "ratesDesc": "Anteil aller hochgeladenen Dateidatensätze",
+      "rejectionRate": "Ablehnungsquote",
+      "quarantineRate": "Quarantänequote",
+      "totalRecords": "Datensätze gesamt",
+      "recentEventsTitle": "Aktuelle Upload-Ereignisse",
+      "recentEventsDesc": "Neueste Audit-Einträge für sichere Datei-Uploads",
+      "noRecentEvents": "Keine aktuellen Ereignisse",
+      "quarantineTitle": "Quarantänisierte Dateien",
+      "quarantineDesc": "Technische Details zur Admin-Prüfung",
+      "loadingQuarantine": "Quarantäneliste wird geladen…",
+      "noQuarantined": "Keine quarantänisierten Dateien",
+      "filename": "Dateiname",
+      "user": "Benutzer",
+      "reason": "Grund",
+      "malware": "Malware",
+      "date": "Datum",
+      "actions": "Aktionen",
+      "rescan": "Erneut scannen",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "pageOf": "Seite {page} von {total}",
+      "rescanQueued": "Erneuter Scan eingeplant",
+      "rescanFailed": "Erneuter Scan fehlgeschlagen"
     },
     "preferences": {
       "title": "Preferences",

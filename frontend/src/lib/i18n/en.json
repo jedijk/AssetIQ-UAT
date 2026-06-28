@@ -17,6 +17,7 @@
     "permissions": "Permissions",
     "aiUsage": "AI Usage",
     "maintenanceReadiness": "Maintenance Readiness",
+    "fileSecurity": "File Security",
     "taskScheduler": "Execution",
     "formSubmissions": "Reports",
     "reliabilityIntelligence": "Reliability Intelligence",
@@ -191,6 +192,10 @@
         "label": "Audit Log",
         "description": "Who changed what, and when"
       },
+      "fileSecurity": {
+        "label": "File Security",
+        "description": "Upload pipeline, quarantine, and scan status"
+      },
       "maintenanceReadiness": {
         "label": "Maintenance Readiness",
         "description": "UAT cutover snapshot and queue health"
@@ -225,6 +230,42 @@
       "uatGatesDesc": "Run the gates script before production cutover",
       "uatGatesScript": "Script path",
       "uatGatesInstruction": "From the backend directory, run: cd backend && MONGO_URL=<your-db> python scripts/verify_uat_gates.py — exit code 0 means all gates passed."
+    },
+    "fileSecurity": {
+      "title": "File Security",
+      "subtitle": "Upload pipeline status, quarantined files, and audit activity",
+      "accessRestricted": "Admin or owner access required.",
+      "desktopOnly": "File Security",
+      "refresh": "Refresh",
+      "loadingDashboard": "Loading dashboard…",
+      "available": "Available",
+      "quarantined": "Quarantined",
+      "rejected": "Rejected",
+      "pendingScan": "Pending scan",
+      "ratesTitle": "Rates",
+      "ratesDesc": "Share of all uploaded file records",
+      "rejectionRate": "Rejection rate",
+      "quarantineRate": "Quarantine rate",
+      "totalRecords": "Total records",
+      "recentEventsTitle": "Recent upload events",
+      "recentEventsDesc": "Latest secure file upload audit entries",
+      "noRecentEvents": "No recent events",
+      "quarantineTitle": "Quarantined files",
+      "quarantineDesc": "Technical details for admin review",
+      "loadingQuarantine": "Loading quarantine list…",
+      "noQuarantined": "No quarantined files",
+      "filename": "Filename",
+      "user": "User",
+      "reason": "Reason",
+      "malware": "Malware",
+      "date": "Date",
+      "actions": "Actions",
+      "rescan": "Re-scan",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {page} of {total}",
+      "rescanQueued": "Re-scan queued",
+      "rescanFailed": "Re-scan failed"
     },
     "preferences": {
       "title": "Preferences",

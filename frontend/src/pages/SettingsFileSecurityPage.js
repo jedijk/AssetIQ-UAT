@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import BackButton from "../components/BackButton";
@@ -60,6 +61,7 @@ function StatCard({ title, value, icon: Icon, variant = "default" }) {
 }
 
 export default function SettingsFileSecurityPage() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
@@ -82,26 +84,36 @@ export default function SettingsFileSecurityPage() {
   const rescanMutation = useMutation({
     mutationFn: requestFileRescan,
     onSuccess: () => {
-      toast.success("Re-scan queued");
+      toast.success(t("settings.fileSecurity.rescanQueued") || "Re-scan queued");
       queryClient.invalidateQueries({ queryKey: ["file-security-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["file-security-quarantine"] });
     },
     onError: (err) => {
       const detail = err.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "Re-scan failed");
+      toast.error(
+        typeof detail === "string"
+          ? detail
+          : t("settings.fileSecurity.rescanFailed") || "Re-scan failed"
+      );
     },
   });
 
   if (!isAdmin) {
     return (
       <div className="p-6">
-        <p className="text-muted-foreground">Admin or owner access required.</p>
+        <p className="text-muted-foreground">
+          {t("settings.fileSecurity.accessRestricted") || "Admin or owner access required."}
+        </p>
       </div>
     );
   }
 
   if (isMobile) {
-    return <DesktopOnlyMessage title="File Security" />;
+    return (
+      <DesktopOnlyMessage
+        title={t("settings.fileSecurity.desktopOnly") || "File Security"}
+      />
+    );
   }
 
   const summary = dashboardQuery.data?.summary || {};
@@ -118,10 +130,11 @@ export default function SettingsFileSecurityPage() {
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Shield className="h-6 w-6" />
-            File Security
+            {t("settings.fileSecurity.title") || "File Security"}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Upload pipeline status, quarantined files, and audit activity
+            {t("settings.fileSecurity.subtitle") ||
+              "Upload pipeline status, quarantined files, and audit activity"}
           </p>
         </div>
         <Button
@@ -139,55 +152,86 @@ export default function SettingsFileSecurityPage() {
           ) : (
             <RefreshCw className="h-4 w-4" />
           )}
-          <span className="ml-2">Refresh</span>
+          <span className="ml-2">{t("settings.fileSecurity.refresh") || "Refresh"}</span>
         </Button>
       </div>
 
       {dashboardQuery.isLoading ? (
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
-          Loading dashboard…
+          {t("settings.fileSecurity.loadingDashboard") || "Loading dashboard…"}
         </div>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Available" value={summary.available} icon={CheckCircle2} variant="success" />
-            <StatCard title="Quarantined" value={summary.quarantined} icon={FileWarning} variant="warning" />
-            <StatCard title="Rejected" value={summary.rejected} icon={XCircle} variant="danger" />
-            <StatCard title="Pending scan" value={summary.pending} icon={Clock} />
+            <StatCard
+              title={t("settings.fileSecurity.available") || "Available"}
+              value={summary.available}
+              icon={CheckCircle2}
+              variant="success"
+            />
+            <StatCard
+              title={t("settings.fileSecurity.quarantined") || "Quarantined"}
+              value={summary.quarantined}
+              icon={FileWarning}
+              variant="warning"
+            />
+            <StatCard
+              title={t("settings.fileSecurity.rejected") || "Rejected"}
+              value={summary.rejected}
+              icon={XCircle}
+              variant="danger"
+            />
+            <StatCard
+              title={t("settings.fileSecurity.pendingScan") || "Pending scan"}
+              value={summary.pending}
+              icon={Clock}
+            />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Rates</CardTitle>
-                <CardDescription>Share of all uploaded file records</CardDescription>
+                <CardTitle>{t("settings.fileSecurity.ratesTitle") || "Rates"}</CardTitle>
+                <CardDescription>
+                  {t("settings.fileSecurity.ratesDesc") ||
+                    "Share of all uploaded file records"}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <p>
-                  Rejection rate:{" "}
+                  {t("settings.fileSecurity.rejectionRate") || "Rejection rate"}:{" "}
                   <span className="font-medium">
                     {((summary.rejection_rate || 0) * 100).toFixed(1)}%
                   </span>
                 </p>
                 <p>
-                  Quarantine rate:{" "}
+                  {t("settings.fileSecurity.quarantineRate") || "Quarantine rate"}:{" "}
                   <span className="font-medium">
                     {((summary.quarantine_rate || 0) * 100).toFixed(1)}%
                   </span>
                 </p>
-                <p className="text-muted-foreground">Total records: {summary.total ?? 0}</p>
+                <p className="text-muted-foreground">
+                  {t("settings.fileSecurity.totalRecords") || "Total records"}: {summary.total ?? 0}
+                </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Recent upload events</CardTitle>
-                <CardDescription>Latest secure file upload audit entries</CardDescription>
+                <CardTitle>
+                  {t("settings.fileSecurity.recentEventsTitle") || "Recent upload events"}
+                </CardTitle>
+                <CardDescription>
+                  {t("settings.fileSecurity.recentEventsDesc") ||
+                    "Latest secure file upload audit entries"}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {recentEvents.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No recent events</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.fileSecurity.noRecentEvents") || "No recent events"}
+                  </p>
                 ) : (
                   <ul className="max-h-64 space-y-2 overflow-y-auto text-sm">
                     {recentEvents.map((evt) => (
@@ -216,28 +260,35 @@ export default function SettingsFileSecurityPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Quarantined files</CardTitle>
-          <CardDescription>Technical details for admin review</CardDescription>
+          <CardTitle>{t("settings.fileSecurity.quarantineTitle") || "Quarantined files"}</CardTitle>
+          <CardDescription>
+            {t("settings.fileSecurity.quarantineDesc") ||
+              "Technical details for admin review"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {quarantineQuery.isLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              Loading quarantine list…
+              {t("settings.fileSecurity.loadingQuarantine") || "Loading quarantine list…"}
             </div>
           ) : quarantineItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No quarantined files</p>
+            <p className="text-sm text-muted-foreground">
+              {t("settings.fileSecurity.noQuarantined") || "No quarantined files"}
+            </p>
           ) : (
             <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Filename</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Malware</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("settings.fileSecurity.filename") || "Filename"}</TableHead>
+                    <TableHead>{t("settings.fileSecurity.user") || "User"}</TableHead>
+                    <TableHead>{t("settings.fileSecurity.reason") || "Reason"}</TableHead>
+                    <TableHead>{t("settings.fileSecurity.malware") || "Malware"}</TableHead>
+                    <TableHead>{t("settings.fileSecurity.date") || "Date"}</TableHead>
+                    <TableHead className="text-right">
+                      {t("settings.fileSecurity.actions") || "Actions"}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -257,7 +308,7 @@ export default function SettingsFileSecurityPage() {
                           disabled={rescanMutation.isPending}
                           onClick={() => rescanMutation.mutate(item.file_id)}
                         >
-                          Re-scan
+                          {t("settings.fileSecurity.rescan") || "Re-scan"}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -273,10 +324,13 @@ export default function SettingsFileSecurityPage() {
                     disabled={quarantinePage <= 1}
                     onClick={() => setQuarantinePage((p) => Math.max(1, p - 1))}
                   >
-                    Previous
+                    {t("settings.fileSecurity.previous") || "Previous"}
                   </Button>
                   <span className="text-sm text-muted-foreground">
-                    Page {quarantinePage} of {totalPages}
+                    {t("settings.fileSecurity.pageOf", {
+                      page: quarantinePage,
+                      total: totalPages,
+                    }) || `Page ${quarantinePage} of ${totalPages}`}
                   </span>
                   <Button
                     variant="outline"
@@ -284,7 +338,7 @@ export default function SettingsFileSecurityPage() {
                     disabled={quarantinePage >= totalPages}
                     onClick={() => setQuarantinePage((p) => p + 1)}
                   >
-                    Next
+                    {t("settings.fileSecurity.next") || "Next"}
                   </Button>
                 </div>
               )}

@@ -17,6 +17,7 @@
     "permissions": "Machtigingen",
     "aiUsage": "AI Gebruik",
     "maintenanceReadiness": "Onderhoudsgereedheid",
+    "fileSecurity": "Bestandsbeveiliging",
     "taskScheduler": "Uitvoering",
     "formSubmissions": "Rapporten",
     "reliabilityIntelligence": "Betrouwbaarheidsintelligentie",
@@ -191,6 +192,10 @@
         "label": "Auditlog",
         "description": "Wie heeft wat gewijzigd, en wanneer"
       },
+      "fileSecurity": {
+        "label": "Bestandsbeveiliging",
+        "description": "Uploadpipeline, quarantaine en scanstatus"
+      },
       "maintenanceReadiness": {
         "label": "Onderhoudsgereedheid",
         "description": "UAT-cutovermomentopname en wachtrijstatus"
@@ -225,6 +230,42 @@
       "uatGatesDesc": "Voer het gates-script uit vóór productie-cutover",
       "uatGatesScript": "Scriptpad",
       "uatGatesInstruction": "Voer vanuit de backend-map uit: cd backend && MONGO_URL=<uw-db> python scripts/verify_uat_gates.py — exitcode 0 betekent dat alle gates zijn geslaagd."
+    },
+    "fileSecurity": {
+      "title": "Bestandsbeveiliging",
+      "subtitle": "Status uploadpipeline, quarantainebestanden en auditactiviteit",
+      "accessRestricted": "Alleen beheerder of eigenaar heeft toegang.",
+      "desktopOnly": "Bestandsbeveiliging",
+      "refresh": "Vernieuwen",
+      "loadingDashboard": "Dashboard laden…",
+      "available": "Beschikbaar",
+      "quarantined": "In quarantaine",
+      "rejected": "Afgewezen",
+      "pendingScan": "Scan in behandeling",
+      "ratesTitle": "Ratio's",
+      "ratesDesc": "Aandeel van alle geüploade bestandsrecords",
+      "rejectionRate": "Afwijzingsratio",
+      "quarantineRate": "Quarantaineratio",
+      "totalRecords": "Totaal records",
+      "recentEventsTitle": "Recente uploadgebeurtenissen",
+      "recentEventsDesc": "Laatste audititems van beveiligde bestandsuploads",
+      "noRecentEvents": "Geen recente gebeurtenissen",
+      "quarantineTitle": "Bestanden in quarantaine",
+      "quarantineDesc": "Technische details voor beheerdersbeoordeling",
+      "loadingQuarantine": "Quarantainelijst laden…",
+      "noQuarantined": "Geen bestanden in quarantaine",
+      "filename": "Bestandsnaam",
+      "user": "Gebruiker",
+      "reason": "Reden",
+      "malware": "Malware",
+      "date": "Datum",
+      "actions": "Acties",
+      "rescan": "Opnieuw scannen",
+      "previous": "Vorige",
+      "next": "Volgende",
+      "pageOf": "Pagina {page} van {total}",
+      "rescanQueued": "Her-scan ingepland",
+      "rescanFailed": "Her-scan mislukt"
     },
     "preferences": {
       "title": "Voorkeuren",
