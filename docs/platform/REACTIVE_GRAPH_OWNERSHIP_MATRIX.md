@@ -49,7 +49,7 @@ This matrix maps **functional-spec edge names** to **canonical Mongo `reliabilit
 | `graph_coverage_report.py` | **PASS** — 19 handlers registered, 11/11 entities (100%) |
 | `verify_reliability_graph_sync.py` | **PASS** — static OK; 2 advisory partial edges only |
 | Sprint 6 pytest | **PASS** — `test_graph_sync_registry`, `test_lifecycle_graph_handler`, `test_reliability_graph_platform` |
-| UAT `--phase all` backfill dry-run | **BLOCKED** — `MONGO_URL` unset (prior §16 reactive backfill valid) |
+| UAT `--phase all` backfill | **PASS** @ 2026-06-28 — 2968 synced, 0 errors; live graph verify 0 gaps |
 
 ## Dispatch handler registry
 

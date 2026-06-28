@@ -22,7 +22,7 @@
 | Category | Status |
 |----------|--------|
 | **Code / CI gates** | **Pass** — `run_platform_truth_audit.sh --local` **12/12** @ `e5a828e7`; Sprint 6 pytest **24/24** |
-| **UAT live data gates** | **Prior PASS** @ 2026-06-27/28 (§16 + §18); **re-run blocked** (`MONGO_URL` unset @ Sprint 6) |
+| **UAT live data gates** | **PASS** @ 2026-06-28 — post-deploy 9/9, pen test, graph backfill 2968 synced, maturity 9.5/10 |
 | **Production readiness** | **Deferred** — prod backfill, 48h soak explicitly out of scope |
 | **Platform 1.0 completion** | **Partial** — Phase 1 UAT bundle exit 0; prod rollout pending |
 

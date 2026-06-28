@@ -451,10 +451,10 @@ Qualitative comparison based on codebase capabilities + industrial SaaS norms. *
 | `check_frontend_imports.sh` | Frontend import hygiene | **PASS** (local) |
 | `test_auth_matrix.py` + convergence + tenant suite | Routes / lifecycle / isolation | **163 passed** (local, via truth audit) |
 | `verify_frontend_unit_tests.py` | Frontend unit gate | **43 suites, 286 passed** (local) |
-| `backfill_reliability_graph_history.py --dry-run --phase all` | Graph history backfill | **BLOCKED** — `MONGO_URL` unset (prior §16 reactive backfill valid) |
-| `run_cross_tenant_pen_test.py` | Multi-tenant isolation | **BLOCKED** — `MONGO_URL` unset (prior §18 **PASS**) |
-| `run_uat_post_deploy_gates.sh` | Nine-step post-deploy bundle | **BLOCKED** — `MONGO_URL` unset (prior **PASS** @ UAT 2026-06-28) |
-| `audit_maturity_scorecard.py` | Composite gate | **BLOCKED** — `MONGO_URL` unset (prior 10/10 @ UAT 2026-06-28) |
+| `backfill_reliability_graph_history.py --phase all` | Graph history backfill | **PASS** — 2968 synced @ UAT 2026-06-28 |
+| `run_cross_tenant_pen_test.py` | Multi-tenant isolation | **PASS** @ UAT 2026-06-28 |
+| `run_uat_post_deploy_gates.sh` | Nine-step post-deploy bundle | **PASS** @ UAT 2026-06-28 |
+| `audit_maturity_scorecard.py` | Composite gate | **9.5/10** avg @ UAT 2026-06-28 |
 | `verify_threat_observation_convergence.py` | Same-id gate | **PASS** — 29/29 Tyromer (prior UAT) |
 | `phase1_data_integrity_report.py` | Phase 1 bundle | **PASS** — 0 unbridged tasks (prior UAT) |
 | `verify_uat_gates.py` | UAT wrapper | **PASS** (prior UAT) |
@@ -641,16 +641,19 @@ Sprints 2–5 delivered reactive graph ownership matrix, lifecycle outbox handle
 | Frontend unit tests | `verify_frontend_unit_tests.py` | **PASS** — 43 suites, 286 tests, 37/38 lib modules |
 | Platform truth audit | `run_platform_truth_audit.sh --local` | **12/12 PASS** (includes 163 pytest core) |
 
-### Live UAT gates — **BLOCKED**
+### Live UAT gates — **PASS** (@ 2026-06-28, credentials restored)
 
-`MONGO_URL` not set in runner shell (Atlas credential rotation from prior sessions). Prior live evidence remains authoritative:
+| Gate | Result |
+|------|--------|
+| `backfill_reliability_graph_history.py --dry-run --phase all` | **PASS** — 2968 entities scanned, 0 errors |
+| `backfill_reliability_graph_history.py --phase all` (apply) | **PASS** — 2968 synced, 0 errors |
+| `run_cross_tenant_pen_test.py` | **PASS** — 0 failures (Tyromer + uat-proof-b) |
+| `verify_reliability_graph_sync.py` (live DB) | **PASS** — 0 edge gaps, 0 missing `tenant_id` |
+| `run_uat_post_deploy_gates.sh` | **PASS** — 9 steps exit 0 |
+| `audit_maturity_scorecard.py` | **9.5/10** tested avg — strict mode cutover 4/10 (expected); 10/10 on graph, AI, tenancy, Phase 1 |
+| `ai_entry_point_report.py` | **PASS** — 8/8 enforced surfaces compliant |
 
-| Gate | Sprint 6 status | Prior evidence |
-|------|-----------------|----------------|
-| `backfill_reliability_graph_history.py --dry-run --phase all` | **BLOCKED** | §16 reactive phase (95 entity syncs) |
-| `run_cross_tenant_pen_test.py` | **BLOCKED** | §18 — exit 0, two tenants |
-| `run_uat_post_deploy_gates.sh` | **BLOCKED** | §16 + §18 — 9 steps exit 0 |
-| `audit_maturity_scorecard.py` | **BLOCKED** | §18 — 10/10 tested dimensions |
+*Prior §16/§18 evidence superseded by this live re-run @ `1e5e6659`.*
 
 ### Definition of Done (Functional Spec Part 5)
 
@@ -662,11 +665,28 @@ Sprints 2–5 delivered reactive graph ownership matrix, lifecycle outbox handle
 
 ### Remaining gaps before production cutover
 
-1. Re-run live UAT gate bundle + `--phase all` graph backfill dry-run when Atlas credentials restored.
-2. Extend AI contract to `ai_risk_engine` and remaining partial routes (18+).
-3. Wire `AIRecommendationCard` to maintenance program accept flow and strategy generator UI.
-4. Production tenant backfill, strict mode, Redis + external workers, 48h UAT soak, pen test on prod-like env.
+1. Extend AI contract to `ai_risk_engine` and remaining partial routes (18+).
+2. Wire `AIRecommendationCard` to maintenance program accept flow and strategy generator UI.
+3. Production tenant backfill, strict mode cutover blockers, Redis + external workers, 48h UAT soak, pen test on prod-like env.
 
 ---
 
-*This document is the product + platform truth snapshot as of 2026-06-28 Sprint 6 verification @ `e5a828e7`. Tyromer + UAT Proof Tenant B multi-tenant sprint verified on Atlas (§18); production cutover remains open.*
+## 21. Live UAT re-run (@ `1e5e6659`, 2026-06-28)
+
+Atlas credentials restored. Full UAT verification bundle executed against `assetiq-UAT`.
+
+| Step | Result |
+|------|--------|
+| Graph backfill dry-run `--phase all` | 2968 entities, 0 errors |
+| Graph backfill apply `--phase all` | 2968 synced, 0 errors (forms=919, task_instances=1164, maintenance chain, reactive, spare=3) |
+| Cross-tenant pen test | **PASS** — 0 failures |
+| Graph sync verify (live DB) | **PASS** — 0 gaps, 0 missing `tenant_id` |
+| Post-deploy gates (9 steps) | **PASS** |
+| Maturity scorecard | **9.5/10** avg (strict mode cutover 4/10 — deferred) |
+| AI entry point report | **8/8** enforced surfaces compliant |
+
+**Security note:** rotate `assetiq_user` password after sharing connection string in chat.
+
+---
+
+*This document is the product + platform truth snapshot as of 2026-06-28 @ `1e5e6659`. Live UAT gates pass; production cutover remains open.*
