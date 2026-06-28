@@ -15,7 +15,7 @@
 # Usage:
 #   cd backend && MONGO_URL='...' JWT_SECRET_KEY='...' ./scripts/run_uat_post_deploy_gates.sh
 #
-# Exit 0 only if all eight steps pass.
+# Exit 0 only if all nine steps pass.
 
 set -euo pipefail
 
@@ -53,6 +53,7 @@ echo "  Commit:   $(git -C "${BACKEND_ROOT}/.." rev-parse --short HEAD 2>/dev/nu
 run scripts/backfill_threat_observation_convergence.py --tenant-id "${TENANT_ID}" --execute
 run scripts/verify_threat_observation_convergence.py --tenant-id "${TENANT_ID}"
 run scripts/backfill_graph_threat_to_observation_edges.py --execute
+run scripts/backfill_reliability_edge_tenant.py
 run scripts/verify_reliability_graph_sync.py
 run scripts/backfill_tenant_id.py --collections scheduled_tasks
 run scripts/backfill_scheduled_task_instances.py
@@ -60,4 +61,4 @@ run scripts/verify_uat_gates.py
 run scripts/phase1_data_integrity_report.py
 
 echo ""
-echo "OK: all UAT post-deploy gates passed"
+echo "OK: all UAT post-deploy gates passed (9 steps)"
