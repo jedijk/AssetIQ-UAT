@@ -39,6 +39,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { cn } from '../../lib/utils';
 import SparePartRequirementsEditor from '../spareiq/SparePartRequirementsEditor';
 import { taskConsumesSpareParts } from '../spareiq/sparePartUtils';
+import AIRecommendationCard from '../ai/AIRecommendationCard';
 
 const PANEL_ROOT_CLASS = 'min-w-0 max-w-full overflow-x-hidden space-y-3 sm:space-y-4';
 
@@ -944,6 +945,8 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   const [editingTask, setEditingTask] = useState(null);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showDisabledTasks, setShowDisabledTasks] = useState(true);
+  const [aiPayload, setAiPayload] = useState(null);
+  const [acceptedAiIds, setAcceptedAiIds] = useState(new Set());
   
   // Fetch program
   const { data: programData, isLoading: isLoadingProgram, error: programError } = useQuery({
@@ -1060,6 +1063,36 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     },
   });
   
+  const generateAiMutation = useMutation({
+    mutationFn: () => maintenanceProgramAPI.generateAIRecommendations(equipmentId),
+    onSuccess: (data) => {
+      setAiPayload(data);
+      setAcceptedAiIds(new Set());
+      const count = data?.recommendations?.length ?? 0;
+      toast.success(
+        count
+          ? `Generated ${count} AI maintenance recommendations`
+          : 'AI analysis complete',
+      );
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || error.message || 'Failed to generate AI recommendations');
+    },
+  });
+
+  const acceptAiMutation = useMutation({
+    mutationFn: (task) => maintenanceProgramAPI.acceptAIRecommendation(equipmentId, task),
+    onSuccess: (_data, task) => {
+      setAcceptedAiIds((prev) => new Set([...prev, task.id]));
+      queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
+      refreshMaintenanceSchedulerQueries(queryClient);
+      toast.success(`Accepted "${task.task_title}"`);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || error.message || 'Failed to accept recommendation');
+    },
+  });
+
   // Regenerate mutation
   const regenerateMutation = useMutation({
     mutationFn: () => maintenanceProgramAPI.regenerateProgram(equipmentId, {
@@ -1364,6 +1397,96 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
         </div>
       )}
       
+      {canMutateTasks && !pmImportOnly && (
+        <Card data-testid="maintenance-program-ai-panel">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-600" />
+                  AI Maintenance Recommendations
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  Generate grounded task suggestions from failure history and equipment context
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => generateAiMutation.mutate()}
+                disabled={generateAiMutation.isPending}
+                data-testid="maintenance-program-generate-ai-btn"
+                className="w-full sm:w-auto"
+              >
+                {generateAiMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {aiPayload?.recommendations?.length || aiPayload?.summary ? (
+              <div className="space-y-4">
+                <AIRecommendationCard payload={aiPayload} compact />
+                {(aiPayload.recommendations || []).length > 0 && (
+                  <div className="space-y-2" data-testid="maintenance-program-ai-task-list">
+                    <p className="text-xs font-medium text-slate-700">Suggested tasks</p>
+                    {(aiPayload.recommendations || []).map((rec, idx) => {
+                      const accepted = acceptedAiIds.has(rec.id);
+                      return (
+                        <div
+                          key={rec.id || `ai-rec-${idx}`}
+                          className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-md border border-slate-100 bg-slate-50 p-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-900">{rec.task_title}</p>
+                            {rec.task_description && (
+                              <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{rec.task_description}</p>
+                            )}
+                            {rec.traceability?.ai_reasoning && (
+                              <p className="text-[10px] text-slate-400 mt-1">{rec.traceability.ai_reasoning}</p>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={accepted ? 'outline' : 'default'}
+                            className="shrink-0"
+                            disabled={accepted || acceptAiMutation.isPending}
+                            onClick={() => acceptAiMutation.mutate(rec)}
+                            data-testid={`maintenance-program-accept-ai-${rec.id || idx}`}
+                          >
+                            {accepted ? (
+                              <>
+                                <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                                Accepted
+                              </>
+                            ) : (
+                              'Accept'
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-sm text-gray-500">
+                <Brain className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                Click Generate to get AI-powered maintenance task recommendations
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filter Bar */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0">
         <div className="relative flex-1 w-full min-w-0">

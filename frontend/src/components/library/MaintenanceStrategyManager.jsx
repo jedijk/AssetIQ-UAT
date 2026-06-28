@@ -1316,11 +1316,14 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
     schedulableProgramsQuery,
     affectedEquipmentQuery,
     versionHistoryQuery,
+    libraryFailureModesQuery,
     strategyData,
     strategy,
     hasStrategy,
     libraryFmsById,
   } = useMaintenanceStrategyData(equipmentTypeId, { affectedEquipmentDialogOpen });
+
+  const libraryFailureModes = libraryFailureModesQuery.data?.failure_modes || [];
 
   const { isLoading: strategyLoading, refetch: refetchStrategy } = strategyQuery;
   const schedulableProgramsData = schedulableProgramsQuery.data;
@@ -1917,6 +1920,9 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
           t={t}
           onGenerate={handleCreateStrategy}
           isPending={createStrategyMutation.isPending}
+          equipmentTypeId={equipmentTypeId}
+          equipmentTypeName={equipmentTypeName}
+          failureModes={libraryFailureModes}
         />
       )}
 
