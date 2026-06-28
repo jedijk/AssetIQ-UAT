@@ -540,6 +540,13 @@ INDEX_DEFINITIONS = {
         {"keys": [("asset_id", 1), ("hour", 1)]},
         {"keys": [("hour", -1)]},
     ],
+    "uploaded_files": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("tenant_id", 1), ("status", 1), ("created_at", -1)]},
+        {"keys": [("tenant_id", 1), ("linked_entity_type", 1), ("linked_entity_id", 1)]},
+        {"keys": [("uploaded_by", 1), ("created_at", -1)]},
+        {"keys": [("status", 1), ("scan_started_at", 1)]},
+    ],
 }
 
 

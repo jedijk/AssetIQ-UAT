@@ -159,6 +159,33 @@ async def handle_run_scheduler(job: dict) -> dict:
     return {"status": "completed"}
 
 
+async def handle_scan_uploaded_file(job: dict) -> dict:
+    """Run secure upload scan stub (Phase 2 minimal)."""
+    payload = job.get("payload") or {}
+    file_id = payload.get("file_id")
+    if not file_id:
+        raise ValueError("scan_uploaded_file job missing file_id")
+
+    from workers.scan_uploaded_file import scan_uploaded_file
+
+    result = await scan_uploaded_file(file_id)
+    if isinstance(result, dict):
+        return result
+    return {"status": "completed"}
+
+
+async def handle_upload_cleanup(job: dict) -> dict:
+    """Delete abandoned temp uploads and expired quarantined files."""
+    from workers.upload_cleanup import run_upload_cleanup
+
+    payload = job.get("payload") or {}
+    return await run_upload_cleanup(
+        temp_retention_hours=int(payload.get("temp_retention_hours", 2)),
+        quarantine_retention_days=int(payload.get("quarantine_retention_days", 30)),
+        dry_run=bool(payload.get("dry_run", False)),
+    )
+
+
 JOB_HANDLERS: Dict[str, Callable[..., Any]] = {
     "apply_strategy": handle_apply_strategy,
     "run_scheduler": handle_run_scheduler,
@@ -167,4 +194,6 @@ JOB_HANDLERS: Dict[str, Callable[..., Any]] = {
     "reliability_snapshots_daily_refresh": handle_reliability_snapshots_daily_refresh,
     "executive_kpi_refresh": handle_executive_kpi_refresh,
     "process_domain_event_outbox": handle_process_domain_event_outbox,
+    "scan_uploaded_file": handle_scan_uploaded_file,
+    "upload_cleanup": handle_upload_cleanup,
 }
