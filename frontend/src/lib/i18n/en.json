@@ -18,6 +18,7 @@
     "aiUsage": "AI Usage",
     "maintenanceReadiness": "Maintenance Readiness",
     "fileSecurity": "File Security",
+    "externalApi": "External API Access",
     "taskScheduler": "Execution",
     "formSubmissions": "Reports",
     "reliabilityIntelligence": "Reliability Intelligence",
@@ -196,6 +197,10 @@
         "label": "File Security",
         "description": "Upload pipeline, quarantine, and scan status"
       },
+      "externalApi": {
+        "label": "External API Access",
+        "description": "API keys for third-party observation ingestion"
+      },
       "maintenanceReadiness": {
         "label": "Maintenance Readiness",
         "description": "UAT cutover snapshot and queue health"
@@ -266,6 +271,44 @@
       "pageOf": "Page {page} of {total}",
       "rescanQueued": "Re-scan queued",
       "rescanFailed": "Re-scan failed"
+    },
+    "externalApi": {
+      "title": "External API Access",
+      "subtitle": "Manage API keys for third-party observation ingestion",
+      "accessRestricted": "Admin or owner access required.",
+      "desktopOnly": "External API Access",
+      "refresh": "Refresh",
+      "createKey": "Create API Key",
+      "createKeyDesc": "Create a tenant-scoped key with observations:create scope.",
+      "keyCreated": "API key created",
+      "keyCreatedDesc": "Copy this key now — it will not be shown again.",
+      "copyKey": "Copy key",
+      "copied": "Copied to clipboard",
+      "copyFailed": "Copy failed",
+      "createSuccess": "API key created",
+      "createFailed": "Failed to create API key",
+      "updated": "API key updated",
+      "updateFailed": "Failed to update API key",
+      "revoked": "API key revoked",
+      "revokeFailed": "Failed to revoke API key",
+      "rotated": "API key rotated",
+      "rotateFailed": "Failed to rotate API key",
+      "create": "Create",
+      "done": "Done",
+      "endpointTitle": "External endpoint",
+      "endpointDesc": "POST /api/v1/external/observations — authenticate with Bearer or X-API-Key header.",
+      "keysTitle": "API keys",
+      "keysDesc": "Keys are shown once on create or rotate. Stored as SHA-256 hashes only.",
+      "loading": "Loading keys…",
+      "noKeys": "No API keys yet.",
+      "name": "Name",
+      "prefix": "Prefix",
+      "status": "Status",
+      "lastUsed": "Last used",
+      "actions": "Actions",
+      "description": "Description",
+      "usageTitle": "Key usage",
+      "usageDesc": "Request counts, errors, and recent activity for this key."
     },
     "preferences": {
       "title": "Preferences",

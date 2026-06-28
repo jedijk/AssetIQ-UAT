@@ -547,6 +547,26 @@ INDEX_DEFINITIONS = {
         {"keys": [("uploaded_by", 1), ("created_at", -1)]},
         {"keys": [("status", 1), ("scan_started_at", 1)]},
     ],
+    "external_api_keys": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("key_hash", 1)], "unique": True},
+        {"keys": [("tenant_id", 1), ("created_at", -1)]},
+        {"keys": [("tenant_id", 1), ("enabled", 1)]},
+    ],
+    "external_api_requests": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("tenant_id", 1), ("key_id", 1), ("created_at", -1)]},
+        {"keys": [("key_id", 1), ("created_at", -1)]},
+    ],
+    "external_observation_payloads": [
+        {"keys": [("id", 1)], "unique": True},
+        {
+            "keys": [("tenant_id", 1), ("source_system", 1), ("external_reference", 1)],
+            "unique": True,
+        },
+        {"keys": [("observation_id", 1)]},
+        {"keys": [("tenant_id", 1), ("created_at", -1)]},
+    ],
 }
 
 

@@ -28,6 +28,7 @@ import {
   ClipboardCheck,
   Monitor,
   Building2,
+  Plug,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -149,6 +150,14 @@ const SETTINGS_SECTIONS = [
     sectionKey: "fileSecurity",
     icon: Shield,
     path: "/settings/file-security",
+    roles: ["owner", "admin"],
+    requiresSettings: true,
+  },
+  {
+    id: "external-api",
+    sectionKey: "externalApi",
+    icon: Plug,
+    path: "/settings/external-api",
     roles: ["owner", "admin"],
     requiresSettings: true,
   },

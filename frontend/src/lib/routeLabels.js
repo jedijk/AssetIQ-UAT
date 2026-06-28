@@ -18,6 +18,7 @@ import {
   Shield,
   Sliders,
   Sparkles,
+  Plug,
 } from 'lucide-react';
 
 /**
@@ -63,6 +64,7 @@ const staticRouteLabels = {
   '/settings/risk-calculation': 'Risk Calculation',
   '/settings/ai-usage': 'AI Usage',
   '/settings/file-security': 'File Security',
+  '/settings/external-api': 'External API Access',
   '/settings/server-performance': 'Server Performance',
   '/settings/maintenance-readiness': 'Maintenance Readiness',
   '/settings/database': 'Database',
@@ -126,6 +128,7 @@ const staticRouteIcons = {
   '/settings/risk-calculation': Sliders,
   '/settings/ai-usage': Brain,
   '/settings/file-security': Shield,
+  '/settings/external-api': Plug,
   '/settings/server-performance': Server,
   '/settings/maintenance-readiness': ClipboardCheck,
   '/settings/database': Database,

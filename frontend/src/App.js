@@ -74,6 +74,7 @@ const SettingsNotificationsPage = lazy(() => import("./pages/SettingsNotificatio
 const SettingsRiskCalculationPage = lazy(() => import("./pages/SettingsRiskCalculationPage"));
 const SettingsAIUsagePage = lazy(() => import("./pages/SettingsAIUsagePage"));
 const SettingsFileSecurityPage = lazy(() => import("./pages/SettingsFileSecurityPage"));
+const SettingsExternalApiPage = lazy(() => import("./pages/SettingsExternalApiPage"));
 const SettingsServerPerformancePage = lazy(() => import("./pages/SettingsServerPerformancePage"));
 const SettingsMaintenanceReadinessPage = lazy(() => import("./pages/SettingsMaintenanceReadinessPage"));
 const SettingsDatabasePage = lazy(() => import("./pages/SettingsDatabasePage"));
@@ -593,6 +594,7 @@ function App() {
                   <Route path="risk-calculation" element={<Suspense fallback={<RouteFallback />}><SettingsRiskCalculationPage /></Suspense>} />
                   <Route path="ai-usage" element={<Suspense fallback={<RouteFallback />}><SettingsAIUsagePage /></Suspense>} />
                   <Route path="file-security" element={<Suspense fallback={<RouteFallback />}><SettingsFileSecurityPage /></Suspense>} />
+                  <Route path="external-api" element={<Suspense fallback={<RouteFallback />}><SettingsExternalApiPage /></Suspense>} />
                   <Route path="server-performance" element={<Suspense fallback={<RouteFallback />}><SettingsServerPerformancePage /></Suspense>} />
                   <Route path="maintenance-readiness" element={<Suspense fallback={<RouteFallback />}><SettingsMaintenanceReadinessPage /></Suspense>} />
                   <Route path="database" element={<Suspense fallback={<RouteFallback />}><SettingsDatabasePage /></Suspense>} />

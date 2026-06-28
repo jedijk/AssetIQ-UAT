@@ -681,6 +681,7 @@ async def csrf_protect_cookie_auth(request: Request, call_next):
             "/api/display/request-pairing",
             "/api/display/connect",
             "/api/display/heartbeat",
+            "/api/v1/external",
             "/health",
             "/api/health",
         )
