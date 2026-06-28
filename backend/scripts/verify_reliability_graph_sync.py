@@ -29,6 +29,42 @@ os.environ.setdefault("JWT_SECRET_KEY", "graph-audit-script")
 os.environ.setdefault("ENVIRONMENT", "test")
 
 
+def _static_registry_checks() -> tuple[list[str], list[str]]:
+    """Registry coverage checks. Returns (failures, advisories)."""
+    failures: list[str] = []
+    advisories: list[str] = []
+
+    from services.reliability_graph.graph_sync_registry import (
+        SPEC_EDGE_MAPPINGS,
+        validate_backfill_coverage,
+        validate_handler_registration,
+        validate_spec_edge_registry,
+        registry_summary,
+    )
+
+    for msg in validate_handler_registration():
+        failures.append(f"registry: {msg}")
+
+    for msg in validate_spec_edge_registry():
+        failures.append(f"registry: {msg}")
+
+    summary = registry_summary()
+    expected_spec = 18
+    if summary["spec_edges_total"] != expected_spec:
+        failures.append(
+            f"registry: expected {expected_spec} spec edge mappings, got {summary['spec_edges_total']}"
+        )
+
+    for row in SPEC_EDGE_MAPPINGS:
+        if row.status in ("partial", "gap"):
+            advisories.append(f"spec edge {row.spec_name}: {row.status} — {row.notes or row.owner}")
+
+    for msg in validate_backfill_coverage():
+        advisories.append(msg)
+
+    return failures, advisories
+
+
 def _static_path_checks() -> list[str]:
     """Return list of static check failures."""
     failures: list[str] = []
@@ -41,6 +77,11 @@ def _static_path_checks() -> list[str]:
         validate_ownership_covers_handlers,
     )
     from services.reliability_ontology import RELATIONS
+
+    registry_failures, registry_advisories = _static_registry_checks()
+    failures.extend(registry_failures)
+    for note in registry_advisories:
+        print(f"ADVISORY: {note}")
 
     handler_gaps = validate_ownership_covers_handlers(frozenset(GRAPH_SYNC_HANDLERS.keys()))
     for msg in handler_gaps:
@@ -111,9 +152,24 @@ def _static_path_checks() -> list[str]:
             "GraphTraversalService",
         ),
         (
-            BACKEND_ROOT / "services" / "reliability_graph.py",
+            BACKEND_ROOT / "services" / "reliability_graph" / "__init__.py",
             ["tenant_id", "retire_edges_for_entity", "sync_outcome_edges", "dispatch_graph_sync"],
             "reliability_graph platform",
+        ),
+        (
+            BACKEND_ROOT / "services" / "reliability_graph" / "graph_sync_registry.py",
+            ["GRAPH_SYNC_HANDLERS", "SYNC_NAME_TO_EVENT_TYPE", "SPEC_EDGE_MAPPINGS"],
+            "graph_sync_registry",
+        ),
+        (
+            BACKEND_ROOT / "services" / "spare_parts_graph_sync.py",
+            ["sync_spare_part_equipment_links", "sync_entity_requires_spare_parts"],
+            "spare_parts_graph_sync",
+        ),
+        (
+            BACKEND_ROOT / "services" / "form_service_reliability.py",
+            ["dispatch_graph_sync", "after_form_submission_reliability_update"],
+            "form_service_reliability",
         ),
         (
             BACKEND_ROOT / "services" / "reliability_snapshot_service.py",

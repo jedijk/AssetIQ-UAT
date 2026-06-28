@@ -13,7 +13,7 @@ os.environ.setdefault("DB_NAME", "test")
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
 
-from services.reliability_graph import GRAPH_SYNC_HANDLERS  # noqa: E402
+from services.reliability_graph.graph_sync_registry import GRAPH_SYNC_HANDLERS  # noqa: E402
 
 # Entity write paths expected to dispatch graph sync (handler must exist in registry).
 ENTITY_COVERAGE = [

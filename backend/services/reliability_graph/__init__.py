@@ -6,9 +6,12 @@ Thin facade re-exporting split modules and graph sync dispatch registry.
 from __future__ import annotations
 
 import logging
-import os
-from typing import Any, Callable, Dict
+from typing import Any, Dict
 
+from services.reliability_graph.graph_sync_registry import (
+    GRAPH_SYNC_HANDLERS,
+    graph_event_type,
+)
 from services.reliability_graph_core import (
     COLLECTION,
     EDGE_STATUS_ACTIVE,
@@ -51,29 +54,6 @@ from services.reliability_graph_strategy import (
 
 logger = logging.getLogger(__name__)
 
-_GRAPH_SYNC_EVENT_TYPES: Dict[str, str] = {}
-
-
-def _graph_event_type(sync_name: str) -> str:
-    if sync_name not in _GRAPH_SYNC_EVENT_TYPES:
-        from services.domain_events import DomainEventType
-
-        mapping = {
-            "sync_observation_edges": DomainEventType.GRAPH_SYNC_OBSERVATION.value,
-            "sync_threat_edges": DomainEventType.GRAPH_SYNC_THREAT.value,
-            "sync_investigation_edges": DomainEventType.GRAPH_SYNC_INVESTIGATION.value,
-            "sync_cause_edge": DomainEventType.GRAPH_SYNC_CAUSE.value,
-            "sync_action_edges": DomainEventType.GRAPH_SYNC_ACTION.value,
-            "sync_outcome_edges": DomainEventType.GRAPH_SYNC_OUTCOME.value,
-            "sync_edges_for_scheduled_task": DomainEventType.GRAPH_SYNC_SCHEDULED_TASK.value,
-            "sync_task_instance_completion_edges": DomainEventType.GRAPH_SYNC_TASK_COMPLETION.value,
-            "sync_edges_for_apply_strategy": DomainEventType.GRAPH_SYNC_APPLY_STRATEGY.value,
-            "sync_prediction_edges": DomainEventType.GRAPH_SYNC_PREDICTION.value,
-            "sync_edge_for_pm_import_task": DomainEventType.GRAPH_SYNC_PM_IMPORT.value,
-        }
-        _GRAPH_SYNC_EVENT_TYPES.update(mapping)
-    return _GRAPH_SYNC_EVENT_TYPES.get(sync_name, f"graph.{sync_name}")
-
 
 async def dispatch_graph_sync(sync_name: str, label: str, **kwargs: Any) -> None:
     """
@@ -95,7 +75,7 @@ async def dispatch_graph_sync(sync_name: str, label: str, **kwargs: Any) -> None
             or label
         )
         await publish_event(
-            event_type=_graph_event_type(sync_name),
+            event_type=graph_event_type(sync_name),
             aggregate_type="reliability_graph",
             aggregate_id=str(aggregate_id),
             payload={"sync_name": sync_name, "kwargs": kwargs, "label": label},
@@ -125,20 +105,6 @@ async def dispatch_graph_sync(sync_name: str, label: str, **kwargs: Any) -> None
     except Exception:
         pass
 
-
-GRAPH_SYNC_HANDLERS: Dict[str, Callable[..., Any]] = {
-    "sync_observation_edges": sync_observation_edges,
-    "sync_threat_edges": sync_threat_edges,
-    "sync_investigation_edges": sync_investigation_edges,
-    "sync_prediction_edges": sync_prediction_edges,
-    "sync_cause_edge": sync_cause_edge,
-    "sync_action_edges": sync_action_edges,
-    "sync_outcome_edges": sync_outcome_edges,
-    "sync_edges_for_scheduled_task": sync_edges_for_scheduled_task,
-    "sync_task_instance_completion_edges": sync_task_instance_completion_edges,
-    "sync_edges_for_apply_strategy": sync_edges_for_apply_strategy,
-    "sync_edge_for_pm_import_task": sync_edge_for_pm_import_task,
-}
 
 __all__ = [
     "COLLECTION",
