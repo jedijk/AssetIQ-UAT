@@ -126,20 +126,24 @@ async def dashboard_intent(
     }
 
     try:
-        from services.ai_platform import execute_json_prompt
+        from services.ai_execute_grounded import execute_grounded, overlay_grounded_contract
 
         model = os.environ.get("OPENAI_MODEL_DASHBOARD_BUILDER", "gpt-4o-mini")
-        result = await execute_json_prompt(
-            "dashboard.intent_classifier",
+        grounded = await execute_grounded(
             user=actor,
-            user_message=json.dumps(user),
+            intent="dashboard_intent",
+            query=json.dumps(user),
+            feature="ai_risk_dashboard.dashboard_intent",
+            prompt_id="dashboard.intent_classifier",
             endpoint="ai_routes.dashboard_intent",
             model=model,
             temperature=0.2,
             max_tokens=500,
-            response_format={"type": "json_object"},
+            parse_json=True,
+            json_default={"template_id": "clarify"},
+            include_fleet=True,
         )
-        parsed = result["parsed"] or {}
+        parsed = grounded.get("parsed") or {}
         template_id = parsed.get("template_id")
         if template_id not in {t["template_id"] for t in templates}:
             template_id = "clarify"
@@ -166,7 +170,7 @@ async def dashboard_intent(
             metadata={"template_id": template_id},
         )
 
-        return {"success": True, "intent": intent}
+        return overlay_grounded_contract({"success": True, "intent": intent}, grounded)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:

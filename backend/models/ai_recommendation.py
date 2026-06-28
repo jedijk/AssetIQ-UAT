@@ -34,23 +34,35 @@ class AIRecommendationItem(BaseModel):
 
 class AIRecommendationResponse(BaseModel):
     """
-    Universal AI recommendation contract (functional spec Sprint 3).
+    Universal AI recommendation contract (functional spec — AI Platform Completion).
 
-    All user-facing AI recommendation endpoints should return this shape
-    (directly or as a superset via extra fields).
+    All user-facing AI endpoints return this shape (directly or as a superset).
     """
 
     model_config = {"extra": "allow"}
 
+    recommendation: Optional[str] = None
     summary: Optional[str] = None
+    confidence: Optional[str] = None
+    evidence: Optional[Dict[str, Any]] = None
+    citations: List[Union[AICitation, Dict[str, Any]]] = Field(default_factory=list)
+    related_entities: List[Dict[str, Any]] = Field(default_factory=list)
+    graph_path: List[Dict[str, Any]] = Field(default_factory=list)
+    assumptions: Optional[List[str]] = None
+    limitations: Optional[List[str]] = None
+    evidence_not_available: bool = True
+    suggested_actions: List[Union[AIRecommendationItem, Dict[str, Any]]] = Field(
+        default_factory=list
+    )
     recommendations: List[Union[AIRecommendationItem, Dict[str, Any]]] = Field(
         default_factory=list
     )
-    citations: List[Union[AICitation, Dict[str, Any]]] = Field(default_factory=list)
-    evidence_not_available: bool = True
     deterministic_inputs: Optional[Dict[str, Any]] = None
-    limitations: Optional[List[str]] = None
-    confidence: Optional[str] = None
+    generated_at: Optional[str] = None
+    ai_model: Optional[str] = None
+    prompt_version: Optional[str] = None
+    prompt_id: Optional[str] = None
+    execution_id: Optional[str] = None
 
     @classmethod
     def from_contract_dict(cls, payload: Dict[str, Any]) -> "AIRecommendationResponse":

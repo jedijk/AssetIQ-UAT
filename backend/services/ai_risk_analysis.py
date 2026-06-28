@@ -35,6 +35,36 @@ logger = logging.getLogger(__name__)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 ai_engine = AIRiskEngine(api_key=OPENAI_API_KEY)
 
+_UNIVERSAL_CONTRACT_FIELDS = (
+    "recommendation",
+    "summary",
+    "confidence",
+    "evidence",
+    "citations",
+    "related_entities",
+    "graph_path",
+    "assumptions",
+    "limitations",
+    "evidence_not_available",
+    "suggested_actions",
+    "generated_at",
+    "ai_model",
+    "prompt_version",
+    "prompt_id",
+    "execution_id",
+)
+
+
+def _merge_grounded_contract(payload: dict) -> dict:
+    contract = getattr(ai_engine, "_last_grounded_response", None) or {}
+    if not contract:
+        return payload
+    merged = dict(payload)
+    for key in _UNIVERSAL_CONTRACT_FIELDS:
+        if key in contract:
+            merged[key] = contract[key]
+    return merged
+
 
 async def chat_analyze(
     actor: dict,
@@ -55,26 +85,34 @@ async def chat_analyze(
     check_injection_attempt({"message": message}, endpoint="/ai/chat-analyze")
 
     try:
-        from services.ai_platform import execute_prompt
+        from services.ai_execute_grounded import execute_grounded, overlay_grounded_contract
 
-        result = await execute_prompt(
-            "chat.general_assistant",
+        equipment_id = data.get("equipment_id")
+        grounded = await execute_grounded(
             user=actor,
-            user_message=message,
+            intent="chat_analyze",
+            query=message,
+            feature="ai_risk_analysis.chat_analyze",
+            equipment_id=equipment_id,
+            prompt_id="chat.general_assistant",
             endpoint="ai_routes.chat_analyze",
             model="gpt-4o",
             temperature=0.7,
             max_tokens=1000,
+            parse_json=False,
         )
-        ai_response = result["content"]
+        ai_response = grounded.get("summary") or grounded.get("recommendation") or ""
 
-        return {
-            "success": True,
-            "message": "Chat analyze working",
-            "input": message,
-            "response": ai_response,
-            "model": "gpt-4o",
-        }
+        return overlay_grounded_contract(
+            {
+                "success": True,
+                "message": "Chat analyze working",
+                "input": message,
+                "response": ai_response,
+                "model": grounded.get("ai_model", "gpt-4o"),
+            },
+            grounded,
+        )
 
     except Exception as e:
         logger.error(f"Chat analyze error: {str(e)}")
@@ -416,6 +454,7 @@ async def generate_threat_causes(
             equipment_data=equipment_data,
             equipment_history=equipment_history,
             max_causes=max_causes,
+            user=actor,
         )
 
         installation_name = threat.get("installation", threat.get("location", "default"))
@@ -496,7 +535,7 @@ async def explain_threat(
             "cached": True,
         }
 
-    result = await ai_engine.generate_causes(threat=threat, max_causes=5)
+    result = await ai_engine.generate_causes(threat=threat, max_causes=5, user=actor)
 
     await upsert_ai_doc(
         actor,
@@ -512,14 +551,14 @@ async def explain_threat(
         },
     )
 
-    return {
+    return _merge_grounded_contract({
         "threat_id": threat_id,
         "summary": result.summary,
         "probable_causes": [c.model_dump() for c in result.probable_causes],
         "contributing_factors": result.contributing_factors,
         "confidence": result.confidence.value,
         "cached": False,
-    }
+    })
 
 
 async def generate_fault_tree(
@@ -537,6 +576,7 @@ async def generate_fault_tree(
     result = await ai_engine.generate_fault_tree(
         threat=threat,
         max_depth=max_depth,
+        user=actor,
     )
 
     await upsert_ai_doc(
@@ -552,7 +592,7 @@ async def generate_fault_tree(
         },
     )
 
-    return result.model_dump()
+    return _merge_grounded_contract(result.model_dump())
 
 
 async def get_fault_tree(
@@ -575,7 +615,7 @@ async def generate_bow_tie(
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
 
-    result = await ai_engine.generate_bow_tie(threat=threat)
+    result = await ai_engine.generate_bow_tie(threat=threat, user=actor)
 
     await upsert_ai_doc(
         actor,
@@ -593,7 +633,7 @@ async def generate_bow_tie(
         },
     )
 
-    return result.model_dump()
+    return _merge_grounded_contract(result.model_dump())
 
 
 async def get_bow_tie(
@@ -643,6 +683,7 @@ async def optimize_threat_actions(
         causes=causes,
         budget_limit=budget_limit,
         prioritize_by=prioritize_by,
+        user=actor,
     )
 
     await upsert_ai_doc(
@@ -659,7 +700,7 @@ async def optimize_threat_actions(
         },
     )
 
-    return result.model_dump()
+    return _merge_grounded_contract(result.model_dump())
 
 
 async def get_action_optimization(

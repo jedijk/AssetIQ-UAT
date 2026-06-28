@@ -109,6 +109,9 @@ export default function AIRecommendationCard({
   const noEvidence =
     evidenceNotAvailable ?? data.evidence_not_available ?? (!citations?.length);
   const conf = confidence ?? data.confidence;
+  const graphPath = data.graph_path ?? [];
+  const executionId = data.execution_id;
+  const aiModel = data.ai_model;
 
   return (
     <Card
@@ -159,6 +162,26 @@ export default function AIRecommendationCard({
             <li key={`lim-${i}`}>{lim}</li>
           ))}
         </ul>
+      )}
+
+      {graphPath.length > 0 && (
+        <div className="mt-3 text-xs" data-testid="ai-graph-path">
+          <p className="font-medium text-slate-700 mb-1">Graph path</p>
+          <ol className="list-decimal pl-4 space-y-0.5 text-slate-600">
+            {graphPath.map((step, idx) => (
+              <li key={step.entity_id || idx}>
+                {(step.type ? `${step.type}: ` : "") + (step.label || step.entity_id || "—")}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {executionId && (
+        <p className="mt-2 text-[10px] text-slate-400" data-testid="ai-execution-id">
+          Execution {executionId.slice(0, 8)}…
+          {aiModel ? ` · ${aiModel}` : ""}
+        </p>
       )}
 
       {showApproval && (onApprove || onReject) && (

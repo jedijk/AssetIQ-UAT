@@ -472,23 +472,27 @@ Focus on:
 Return as JSON array with fields: title, description, impact (high/medium/low)
 """
         
-        from services.ai_platform import execute_json_prompt
+        from services.ai_execute_grounded import execute_grounded
 
-        result = await execute_json_prompt(
-            "insights.recommendations",
+        grounded = await execute_grounded(
             user=user,
-            user_message=context,
+            intent="executive_recommendations",
+            query=context,
+            feature="insights.ai_recommendations",
+            prompt_id="insights.recommendations",
             endpoint="insights.ai_recommendations",
             model="gpt-4o",
             temperature=0.5,
+            parse_json=True,
+            include_fleet=True,
         )
-        parsed = result["parsed"]
+        parsed = grounded.get("parsed") or {}
         if isinstance(parsed, list):
             recommendations = parsed
         elif isinstance(parsed, dict):
             recommendations = parsed.get("actions", parsed.get("recommendations", []))
         else:
-            recommendations = None
+            recommendations = grounded.get("recommendations")
 
         if not recommendations:
             # Fallback recommendations
@@ -547,8 +551,12 @@ Return as JSON array with fields: title, description, impact (high/medium/low)
                 "recommendations": recommendations,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "data_summary": evidence["deterministic"],
+                "execution_id": grounded.get("execution_id"),
+                "ai_model": grounded.get("ai_model"),
+                "prompt_version": grounded.get("prompt_version"),
+                "prompt_id": grounded.get("prompt_id"),
             },
-            citations=citations,
+            citations=citations[:20],
             evidence=evidence,
         )
         

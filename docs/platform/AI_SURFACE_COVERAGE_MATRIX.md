@@ -1,10 +1,10 @@
 # AI Surface Coverage Matrix
 
 **Sprint 3–6 — Universal AI Contract inventory**  
-**Last updated:** 2026-06-28 (@ `e5a828e7`, Sprint 6 verification)  
-**Contract:** `models/ai_recommendation.py` (`AIRecommendationResponse`), `services/ai_recommendation_contract.py`, `services/ai_recommendation_schema.py`  
-**Platform entry:** `services/ai_platform.py` (`finalize_recommendation_response`)  
-**Gate:** `scripts/ai_entry_point_report.py` — **8/8 enforced surfaces compliant** (verified Sprint 6)
+**Last updated:** 2026-06-28 (AI Platform Completion — `execute_grounded` pipeline)  
+**Contract:** `models/ai_recommendation.py` (`AIRecommendationResponse`), `services/ai_recommendation_contract.py`, `services/ai_execute_grounded.py`  
+**Platform entry:** `services/ai_execute_grounded.execute_grounded()` → `services/ai_platform.finalize_recommendation_response`  
+**Gate:** `scripts/ai_entry_point_report.py` — **8/8 contract surfaces**, **7/7 grounded surfaces**
 
 ## Contract requirements
 
@@ -42,24 +42,25 @@ Gate scan: **8 enforced surfaces · 8 compliant** (`ai_entry_point_report.py` @ 
 
 | Route | Service | ai_platform | Contract | Status |
 |-------|---------|-------------|----------|--------|
-| `POST /ai/chat-analyze` | `ai_risk_service` | Yes | No | **Partial** |
-| `POST /ai/dashboard-intent` | `ai_risk_service` | Yes | No | **Partial** |
-| `GET /ai/risk-insights/{threat_id}` | `ai_risk_service` | Cached | No | **Partial** |
-| `GET /ai/top-risks` | `ai_risk_service` | Yes | No | **Partial** |
-| `POST /ai/generate-causes/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
-| `GET /ai/causal-analysis/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
-| `POST /ai/explain/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
-| `POST/GET /ai/fault-tree/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
-| `POST/GET /ai/bow-tie/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
-| `POST/GET /ai/optimize-actions/{threat_id}` | `ai_risk_engine` | Yes | No | **Partial** |
+| `POST /ai/generate-causes/{threat_id}` | `ai_risk_engine` → `execute_grounded` | `_merge_grounded_contract` | **Compliant** ✓ |
+| `POST /ai/fault-tree/{threat_id}` | `ai_risk_engine` → `execute_grounded` | `_merge_grounded_contract` | **Compliant** ✓ |
+| `POST/GET /ai/bow-tie/{threat_id}` | `ai_risk_engine` → `execute_grounded` | `_merge_grounded_contract` | **Compliant** ✓ |
+| `POST /ai/optimize-actions/{threat_id}` | `ai_risk_engine` → `execute_grounded` | `_merge_grounded_contract` | **Compliant** ✓ |
+| `POST /ai/chat-analyze` | `ai_risk_service` → `execute_grounded` | `overlay_grounded_contract` | **Compliant** ✓ |
+| `POST /ai/dashboard-intent` | `ai_risk_dashboard` → `execute_grounded` | `overlay_grounded_contract` | **Compliant** ✓ |
+| `GET /ai/risk-insights/{threat_id}` | `ai_risk_service` | Cached | No | **Partial** (read-only cache) |
+| `GET /ai/top-risks` | `ai_risk_service` | Cached aggregation | No | **Partial** (read-only cache) |
+| `GET /ai/causal-analysis/{threat_id}` | `ai_risk_engine` | Cached | No | **Partial** (read-only cache) |
+| `POST /ai/explain/{threat_id}` | `ai_risk_engine` → `execute_grounded` | `_merge_grounded_contract` | **Compliant** ✓ |
 | `POST /scheduler/ai-plan` | `maintenance_scheduler_ai_service` | Yes | No | **Partial** |
 | `POST /production/ai-insights` | `production_dashboard_ops` | Yes | No | **Partial** |
 | `POST /production-logs/ai-parse` | `production_logs_service` | Yes | No | **Partial** |
 | `POST /ai/extract` | `ai_extract` routes | Yes | No | **Partial** |
 | `POST /forms/templates/{id}/document-search` | `forms` route | Yes | No | **Partial** |
 | `POST /observations/suggest-failure-modes` | observation workspace | Indirect | No | **Partial** |
-| `POST /image-analysis/*` | `image_analysis_service` | Gateway/vision | No | **Partial** |
-| `POST /chat/*` | `chat` routes | Via risk engine | No | **Partial** |
+| `POST /image-analysis/*` | `image_analysis_service` → `execute_grounded` | Vision + contract overlay | **Compliant** ✓ |
+| `POST /chat/*` (attachment vision) | `ai_helpers` → `execute_grounded` | Vision + audit | **Compliant** ✓ |
+| `POST /ai/recommendations` | `insights_service` → `execute_grounded` | `finalize_ai_recommendation_response` | **Compliant** ✓ |
 | `POST /feedback/*` (AI prompt gen) | `feedback` route | Yes | No | **Missing** |
 
 ## Coverage summary
@@ -67,7 +68,7 @@ Gate scan: **8 enforced surfaces · 8 compliant** (`ai_entry_point_report.py` @ 
 | Status | Count |
 |--------|-------|
 | Compliant (enforced gate) | **8** |
-| Partial (ai_platform, no contract) | 18+ |
+| Partial (ai_platform, no contract) | 14+ |
 | Missing | 1 |
 
 **Sprint 6 gate:** `ai_entry_point_report.py` → enforced **8/8 compliant**; legacy OpenAI bypasses **0**.
@@ -92,9 +93,8 @@ Reusable component: `frontend/src/components/ai/AIRecommendationCard.jsx`
 | `test_ai_recommendation_schema.py` | **PASS** (in Sprint 6 pytest bundle) |
 | Frontend `AIRecommendationCard` | Wired on observation panel, investigation summary, PM import, RIL copilot |
 
-## Post-Sprint 6 remaining
+## Post-Sprint 6 / Platform Completion remaining
 
 1. Wire `AIRecommendationCard` to maintenance program AI accept flow and strategy generator UI.
-2. Extend contract enforcement to `ai_risk_engine` RCA/fault-tree endpoints (18+ partial routes).
+2. Migrate remaining **partial** routes (production logs, scheduler AI, causal-analysis cache reads) to `execute_grounded()`.
 3. Re-run `backfill_reliability_graph_history.py --phase all` on UAT when Atlas creds restored.
-4. Executive dashboard KPI partial edge — validate read-model projection in UAT.

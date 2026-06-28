@@ -1,20 +1,18 @@
 """
 Image Analysis Service for Damage Detection
-Uses OpenAI GPT Vision to analyze equipment photos for damage, wear, corrosion, and defects.
+Uses GPT Vision via the universal ``execute_grounded`` pipeline.
 """
-import os
 import logging
-import json
-import base64
-import re
+import os
 from typing import Optional, Dict, Any
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# System prompt for damage detection analysis
+# Kept for prompt registry bootstrap (vision.damage_analysis)
 DAMAGE_ANALYSIS_PROMPT = """You are an expert industrial equipment inspector specializing in visual damage assessment. 
 Analyze the provided image and identify any damage, wear, corrosion, defects, or anomalies.
 
@@ -59,187 +57,173 @@ Focus on:
 - Surface degradation
 """
 
+_DEFAULT_ERROR = {
+    "damage_detected": False,
+    "confidence": "low",
+    "severity": "none",
+    "findings": [],
+    "overall_assessment": "Analysis failed",
+    "recommended_actions": [],
+    "requires_immediate_attention": False,
+}
+
+
+def _normalize_damage_result(parsed: Dict[str, Any], grounded: Dict[str, Any]) -> Dict[str, Any]:
+    result = dict(parsed or {})
+    result.setdefault("damage_detected", False)
+    result.setdefault("confidence", "medium")
+    result.setdefault("severity", "none")
+    result.setdefault("findings", [])
+    result.setdefault("overall_assessment", grounded.get("summary") or "Analysis complete")
+    result.setdefault("recommended_actions", grounded.get("suggested_actions") or [])
+    result.setdefault("requires_immediate_attention", False)
+    for key in (
+        "execution_id",
+        "ai_model",
+        "prompt_version",
+        "prompt_id",
+        "citations",
+        "evidence_not_available",
+    ):
+        if key in grounded:
+            result[key] = grounded[key]
+    return result
+
 
 async def analyze_image_for_damage(
-    image_base64: str,
+    image_base64: Optional[str] = None,
+    *,
+    file_id: Optional[str] = None,
     context: Optional[str] = None,
     equipment_type: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    user: Optional[dict] = None,
     user_id: str = "system",
     company_id: str = "default",
 ) -> Dict[str, Any]:
     """
     Analyze an image for damage detection.
-    
-    Args:
-        image_base64: Base64 encoded image (with or without data URI prefix)
-        context: Optional context about what's being inspected
-        equipment_type: Optional equipment type for more specific analysis
-        
-    Returns:
-        Dictionary with analysis results
+
+    Prefers ``file_id`` from secure upload (``status=available``) when provided;
+    falls back to inline ``image_base64`` for backward compatibility.
     """
+    if not image_base64 and not file_id:
+        return {
+            **_DEFAULT_ERROR,
+            "overall_assessment": "Image data is required",
+            "error": "image_base64 or file_id is required",
+        }
+
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         logger.error("OPENAI_API_KEY not found in environment")
         return {
-            "damage_detected": False,
-            "confidence": "low",
-            "severity": "none",
-            "findings": [],
+            **_DEFAULT_ERROR,
             "overall_assessment": "Analysis failed - API key not configured",
-            "recommended_actions": [],
-            "requires_immediate_attention": False,
-            "error": "API configuration error"
+            "error": "API configuration error",
         }
-    
+
+    actor = user or {"id": user_id, "company_id": company_id}
+
+    analysis_prompt = "Analyze this equipment image for any damage, wear, corrosion, or defects."
+    if context:
+        analysis_prompt += f"\n\nContext: {context}"
+    if equipment_type:
+        analysis_prompt += f"\nEquipment type: {equipment_type}"
+
     try:
-        # Clean base64 string - remove data URI prefix if present
-        if "base64," in image_base64:
-            image_base64 = image_base64.split("base64,")[1]
-        
-        # Validate base64
-        try:
-            base64.b64decode(image_base64)
-        except Exception:
-            return {
-                "damage_detected": False,
-                "confidence": "low",
-                "severity": "none",
-                "findings": [],
-                "overall_assessment": "Invalid image data provided",
-                "recommended_actions": [],
-                "requires_immediate_attention": False,
-                "error": "Invalid base64 image data"
-            }
-        
-        # Build analysis prompt
-        analysis_prompt = "Analyze this equipment image for any damage, wear, corrosion, or defects."
-        if context:
-            analysis_prompt += f"\n\nContext: {context}"
-        if equipment_type:
-            analysis_prompt += f"\nEquipment type: {equipment_type}"
+        from services.ai_execute_grounded import execute_grounded
 
-        from services.ai_platform import execute_vision_json_prompt
-
-        result = await execute_vision_json_prompt(
-            "vision.damage_analysis",
-            user={"id": user_id, "company_id": company_id},
-            user_message=analysis_prompt,
-            image_base64=image_base64,
+        grounded = await execute_grounded(
+            user=actor,
+            intent="damage_analysis",
+            query=analysis_prompt,
+            feature="image_analysis.analyze_damage",
+            equipment_id=equipment_id,
+            prompt_id="vision.damage_analysis",
             endpoint="image_analysis.analyze_damage",
             model="gpt-4o",
             temperature=0.3,
+            max_tokens=1200,
+            image_base64=image_base64,
+            file_id=file_id,
         )
-        response_text = result.get("content") or ""
-        
-        # Parse JSON response
-        try:
+        parsed = grounded.get("parsed") if isinstance(grounded.get("parsed"), dict) else {}
+        if not parsed:
             from services.ai_output_validation import parse_json_from_llm
             import re
 
-            json_match = re.search(r'\{[\s\S]*\}', response_text)
-            if json_match:
-                result = parse_json_from_llm(json_match.group())
-            else:
-                result = parse_json_from_llm(response_text)
-            
-            # Ensure all required fields are present
-            result.setdefault("damage_detected", False)
-            result.setdefault("confidence", "medium")
-            result.setdefault("severity", "none")
-            result.setdefault("findings", [])
-            result.setdefault("overall_assessment", "Analysis complete")
-            result.setdefault("recommended_actions", [])
-            result.setdefault("requires_immediate_attention", False)
-            
-            logger.info(f"Image analysis complete: damage_detected={result['damage_detected']}, severity={result['severity']}")
-            return result
-            
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse JSON response: {e}")
-            # Return a structured response based on text analysis
-            return {
-                "damage_detected": "damage" in response_text.lower() or "defect" in response_text.lower(),
-                "confidence": "medium",
-                "severity": "unknown",
-                "findings": [],
-                "overall_assessment": response_text[:500] if len(response_text) > 500 else response_text,
-                "recommended_actions": [],
-                "requires_immediate_attention": "immediate" in response_text.lower() or "urgent" in response_text.lower(),
-                "raw_response": response_text
-            }
-            
+            content = grounded.get("summary") or ""
+            json_match = re.search(r"\{[\s\S]*\}", content)
+            parsed = parse_json_from_llm(json_match.group() if json_match else content)
+
+        result = _normalize_damage_result(parsed, grounded)
+        logger.info(
+            "Image analysis complete: damage_detected=%s, severity=%s",
+            result["damage_detected"],
+            result["severity"],
+        )
+        return result
+
     except Exception as e:
-        logger.error(f"Image analysis error: {str(e)}")
+        logger.error("Image analysis error: %s", e)
         return {
-            "damage_detected": False,
-            "confidence": "low",
-            "severity": "none",
-            "findings": [],
+            **_DEFAULT_ERROR,
             "overall_assessment": f"Analysis failed: {str(e)}",
-            "recommended_actions": [],
-            "requires_immediate_attention": False,
-            "error": str(e)
+            "error": str(e),
         }
 
 
 async def analyze_multiple_images(
     images: list,
     context: Optional[str] = None,
-    equipment_type: Optional[str] = None
+    equipment_type: Optional[str] = None,
+    user: Optional[dict] = None,
 ) -> Dict[str, Any]:
-    """
-    Analyze multiple images and aggregate results.
-    
-    Args:
-        images: List of base64 encoded images
-        context: Optional context
-        equipment_type: Optional equipment type
-        
-    Returns:
-        Aggregated analysis results
-    """
+    """Analyze multiple images and aggregate results."""
     all_findings = []
     any_damage = False
     requires_attention = False
     max_severity = "none"
     severity_order = ["none", "minor", "moderate", "severe", "critical"]
-    
+
+    first_actions: list = []
     for idx, image in enumerate(images):
         result = await analyze_image_for_damage(
             image_base64=image,
             context=f"{context} (Image {idx + 1})" if context else f"Image {idx + 1}",
-            equipment_type=equipment_type
+            equipment_type=equipment_type,
+            user=user,
         )
-        
+
         if result.get("damage_detected"):
             any_damage = True
-            
+
         if result.get("requires_immediate_attention"):
             requires_attention = True
-            
-        # Track max severity
+
         result_severity = result.get("severity", "none")
         if result_severity in severity_order:
             if severity_order.index(result_severity) > severity_order.index(max_severity):
                 max_severity = result_severity
-        
-        # Add findings with image index
+
         for finding in result.get("findings", []):
             finding["image_index"] = idx + 1
             all_findings.append(finding)
-    
+
+        if idx == 0:
+            first_actions = list(result.get("recommended_actions") or [])
+
     return {
         "damage_detected": any_damage,
         "confidence": "high" if len(images) > 1 else "medium",
         "severity": max_severity,
         "findings": all_findings,
-        "overall_assessment": f"Analyzed {len(images)} images. {'Damage detected.' if any_damage else 'No significant damage detected.'}",
-        "recommended_actions": list(set([
-            action 
-            for result in [await analyze_image_for_damage(img, context, equipment_type) for img in images[:1]]  # Limit to first image for actions
-            for action in result.get("recommended_actions", [])
-        ])),
+        "overall_assessment": (
+            f"Analyzed {len(images)} images. "
+            f"{'Damage detected.' if any_damage else 'No significant damage detected.'}"
+        ),
+        "recommended_actions": first_actions,
         "requires_immediate_attention": requires_attention,
-        "images_analyzed": len(images)
+        "images_analyzed": len(images),
     }

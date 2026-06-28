@@ -82,7 +82,10 @@ async def test_create_work_signal_writes_observation_then_threat():
     assert threat["id"] == "sig-99"
     assert threat["projection_of"] == "observation"
     assert graph_sync.await_count == 1
-    publish.assert_called_once()
+    assert publish.await_count == 2
+    event_types = [call.kwargs["event_type"] for call in publish.call_args_list]
+    assert "observation.created" in event_types
+    assert "threat.created" in event_types
 
 
 def test_observation_doc_from_threat_uses_same_id():

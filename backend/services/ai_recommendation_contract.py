@@ -77,6 +77,18 @@ def finalize_ai_recommendation_response(
     out = attach_citations_to_response(response_dict, cites, evidence=evidence)
     out["evidence_not_available"] = not bool(cites)
 
+    if evidence and "evidence" not in out:
+        out["evidence"] = evidence
+
+    if out.get("recommendation") and not out.get("summary"):
+        out["summary"] = out["recommendation"]
+    elif out.get("summary") and not out.get("recommendation"):
+        out["recommendation"] = out["summary"]
+
+    suggested = out.get("suggested_actions")
+    if suggested and not out.get("recommendations"):
+        out["recommendations"] = suggested
+
     recs = _recommendation_items(out, recommendations_key)
     if recs and cites:
         enriched = enrich_recommendations_with_evidence(recs, cites)

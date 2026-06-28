@@ -11,10 +11,11 @@ def test_all_waves_in_wave_collections():
     assert WAVE5_COLLECTIONS.issubset(WAVE_COLLECTIONS)
 
 
-def test_strict_mode_defaults_off():
+def test_strict_mode_defaults_off(monkeypatch):
     import importlib
     import services.tenant_schema as ts
 
+    monkeypatch.delenv("TENANT_STRICT_MODE", raising=False)
     importlib.reload(ts)
     assert ts.TENANT_STRICT_MODE is False
 

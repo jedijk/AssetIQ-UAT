@@ -13,9 +13,11 @@ router = APIRouter(prefix="/image-analysis", tags=["Image Analysis"])
 
 class ImageAnalysisRequest(BaseModel):
     """Request model for single image analysis."""
-    image_base64: str = Field(..., description="Base64 encoded image (with or without data URI prefix)")
+    image_base64: Optional[str] = Field(None, description="Base64 encoded image (legacy; prefer file_id)")
+    file_id: Optional[str] = Field(None, description="Secure upload file_id (status=available)")
     context: Optional[str] = Field(None, description="Context about what's being inspected")
     equipment_type: Optional[str] = Field(None, description="Type of equipment for more specific analysis")
+    equipment_id: Optional[str] = Field(None, description="Linked equipment for evidence pack context")
 
 
 class MultiImageAnalysisRequest(BaseModel):
@@ -63,22 +65,25 @@ async def analyze_image(
     - Discoloration or burn marks
     - Misalignment or loose components
     """
-    if not request.image_base64:
-        raise HTTPException(status_code=400, detail="Image data is required")
-    
-    # Check if image is too small (likely invalid)
-    clean_base64 = request.image_base64
-    if "base64," in clean_base64:
-        clean_base64 = clean_base64.split("base64,")[1]
-    
-    if len(clean_base64) < 100:
-        raise HTTPException(status_code=400, detail="Image data appears to be invalid or too small")
+    if not request.image_base64 and not request.file_id:
+        raise HTTPException(status_code=400, detail="image_base64 or file_id is required")
+
+    if request.image_base64:
+        clean_base64 = request.image_base64
+        if "base64," in clean_base64:
+            clean_base64 = clean_base64.split("base64,")[1]
+
+        if len(clean_base64) < 100:
+            raise HTTPException(status_code=400, detail="Image data appears to be invalid or too small")
     
     uid, cid = user_context(current_user)
     result = await analyze_image_for_damage(
         image_base64=request.image_base64,
+        file_id=request.file_id,
         context=request.context,
         equipment_type=request.equipment_type,
+        equipment_id=request.equipment_id,
+        user=current_user,
         user_id=uid,
         company_id=cid,
     )
@@ -124,7 +129,8 @@ async def analyze_multiple_images_endpoint(
     result = await analyze_multiple_images(
         images=request.images,
         context=request.context,
-        equipment_type=request.equipment_type
+        equipment_type=request.equipment_type,
+        user=current_user,
     )
     
     # Convert findings to proper format

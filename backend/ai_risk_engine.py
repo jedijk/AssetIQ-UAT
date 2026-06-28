@@ -323,6 +323,15 @@ class AIRiskEngine:
     
     def __init__(self, api_key: str):
         self.api_key = api_key
+        self._last_grounded_response: Optional[Dict[str, Any]] = None
+
+    def _threat_equipment_id(self, threat: dict, equipment_data: dict = None) -> Optional[str]:
+        return (
+            threat.get("equipment_id")
+            or threat.get("linked_equipment_id")
+            or threat.get("asset_id")
+            or (equipment_data or {}).get("id")
+        )
     
     # Token limits for different analysis types
     TOKEN_LIMITS = {
@@ -333,31 +342,69 @@ class AIRiskEngine:
         'action_optimization': 4000
     }
     
+    async def _call_grounded_json(
+        self,
+        prompt_id: str,
+        user_message: str,
+        analysis_type: str = "risk_analysis",
+        *,
+        user: Optional[dict] = None,
+        equipment_id: Optional[str] = None,
+    ) -> dict:
+        """Grounded JSON execution via the universal AI pipeline."""
+        from services.ai_execute_grounded import execute_grounded
+
+        max_tokens = self.TOKEN_LIMITS.get(analysis_type, 3000)
+        temperature = 0.3 if analysis_type == "risk_analysis" else 0.4
+        try:
+            logger.info(
+                "execute_grounded analysis_type=%s prompt_id=%s max_tokens=%s",
+                analysis_type,
+                prompt_id,
+                max_tokens,
+            )
+            result = await execute_grounded(
+                user=user,
+                intent=analysis_type,
+                query=user_message,
+                feature=f"ai_risk_engine.{analysis_type}",
+                equipment_id=equipment_id,
+                prompt_id=prompt_id,
+                endpoint=f"ai_risk_engine.{analysis_type}",
+                model="gpt-4o",
+                max_tokens=max_tokens,
+                temperature=temperature,
+                parse_json=True,
+                json_default={},
+            )
+            self._last_grounded_response = result
+            parsed = result.get("parsed")
+            if isinstance(parsed, dict):
+                return parsed
+            return self._parse_json_response(result.get("summary") or "")
+        except Exception as e:
+            logger.error("Grounded AI call failed: %s", e)
+            raise
+
     async def _call_openai(
         self,
         prompt_id: str,
         user_message: str,
         analysis_type: str = "risk_analysis",
+        *,
+        user: Optional[dict] = None,
+        equipment_id: Optional[str] = None,
     ) -> str:
-        """Make a guarded chat completion via the unified AI platform."""
-        from services.ai_platform import execute_prompt
-
-        max_tokens = self.TOKEN_LIMITS.get(analysis_type, 3000)
-        temperature = 0.3 if analysis_type == "risk_analysis" else 0.4
-        try:
-            logger.info("Calling AI platform with model gpt-4o, max_tokens=%s", max_tokens)
-            result = await execute_prompt(
-                prompt_id,
-                user_message=user_message,
-                endpoint=f"ai_risk_engine.{analysis_type}",
-                model="gpt-4o",
-                max_completion_tokens=max_tokens,
-                temperature=temperature,
-            )
-            return result["content"]
-        except Exception as e:
-            logger.error(f"OpenAI API error: {str(e)}")
-            raise
+        """Deprecated — prefer ``_call_grounded_json``; kept for compatibility."""
+        data = await self._call_grounded_json(
+            prompt_id,
+            user_message,
+            analysis_type,
+            user=user,
+            equipment_id=equipment_id,
+        )
+        import json as _json
+        return _json.dumps(data)
     
     def _parse_json_response(self, response: str) -> dict:
         """Parse JSON from LLM response, handling markdown code blocks"""
@@ -547,7 +594,8 @@ EQUIPMENT INFORMATION:
         equipment_data: dict = None,
         historical_threats: list = None,
         equipment_history: dict = None,
-        include_forecast: bool = True
+        include_forecast: bool = True,
+        user: Optional[dict] = None,
     ) -> RiskInsight:
         """Analyze threat and generate dynamic risk assessment"""
         try:
@@ -569,9 +617,13 @@ EQUIPMENT INFORMATION:
                 except Exception as graph_exc:
                     logger.debug("graph risk context skipped: %s", graph_exc)
             
-            response = await self._call_openai("risk.analysis", f"Analyze this threat:\n{context}", 'risk_analysis')
-            
-            data = self._parse_json_response(response) or {}
+            data = await self._call_grounded_json(
+                "risk.analysis",
+                f"Analyze this threat:\n{context}",
+                "risk_analysis",
+                user=user,
+                equipment_id=eq_id or self._threat_equipment_id(threat, equipment_data),
+            ) or {}
             
             if eq_id:
                 await self._annotate_twin_risk_edges(
@@ -732,14 +784,20 @@ EQUIPMENT INFORMATION:
         threat: dict,
         equipment_data: dict = None,
         equipment_history: dict = None,
-        max_causes: int = 5
+        max_causes: int = 5,
+        user: Optional[dict] = None,
     ) -> CausalExplanation:
         """Generate probable causes for a threat"""
         try:
             context = self._build_threat_context(threat, equipment_data, None, equipment_history)
             
-            response = await self._call_openai("risk.cause_analysis", f"Analyze causes for this threat (max {max_causes} causes):\n{context}", 'cause_analysis')
-            data = self._parse_json_response(response)
+            data = await self._call_grounded_json(
+                "risk.cause_analysis",
+                f"Analyze causes for this threat (max {max_causes} causes):\n{context}",
+                "cause_analysis",
+                user=user,
+                equipment_id=self._threat_equipment_id(threat, equipment_data),
+            ) or {}
             
             # Build probable causes with normalized probability levels
             probable_causes = []
@@ -786,14 +844,20 @@ EQUIPMENT INFORMATION:
     async def generate_fault_tree(
         self, 
         threat: dict,
-        max_depth: int = 4
+        max_depth: int = 4,
+        user: Optional[dict] = None,
     ) -> FaultTree:
         """Generate a fault tree for the threat"""
         try:
             context = self._build_threat_context(threat)
             
-            response = await self._call_openai("risk.fault_tree", f"Generate a fault tree (max depth {max_depth}):\n{context}", 'fault_tree')
-            data = self._parse_json_response(response)
+            data = await self._call_grounded_json(
+                "risk.fault_tree",
+                f"Generate a fault tree (max depth {max_depth}):\n{context}",
+                "fault_tree",
+                user=user,
+                equipment_id=self._threat_equipment_id(threat),
+            ) or {}
             
             def parse_node(node_data: dict) -> FaultTreeNode:
                 return FaultTreeNode(
@@ -829,13 +893,18 @@ EQUIPMENT INFORMATION:
                 generated_at=datetime.now(timezone.utc).isoformat()
             )
     
-    async def generate_bow_tie(self, threat: dict) -> BowTieModel:
+    async def generate_bow_tie(self, threat: dict, user: Optional[dict] = None) -> BowTieModel:
         """Generate a bow-tie risk model"""
         try:
             context = self._build_threat_context(threat)
             
-            response = await self._call_openai("risk.bow_tie", f"Generate a bow-tie model:\n{context}", 'bow_tie')
-            data = self._parse_json_response(response)
+            data = await self._call_grounded_json(
+                "risk.bow_tie",
+                f"Generate a bow-tie model:\n{context}",
+                "bow_tie",
+                user=user,
+                equipment_id=self._threat_equipment_id(threat),
+            ) or {}
             
             preventive_barriers = [
                 BowTieBarrier(**barrier) for barrier in data.get("preventive_barriers", [])
@@ -871,7 +940,8 @@ EQUIPMENT INFORMATION:
         threat: dict,
         causes: List[ProbableCause] = None,
         budget_limit: float = None,
-        prioritize_by: str = "roi"
+        prioritize_by: str = "roi",
+        user: Optional[dict] = None,
     ) -> ActionOptimizationResult:
         """Optimize and recommend actions for risk reduction"""
         try:
@@ -887,8 +957,13 @@ EQUIPMENT INFORMATION:
             
             context += f"\nPRIORITIZE BY: {prioritize_by}\n"
             
-            response = await self._call_openai("risk.action_optimization", f"Recommend optimized actions:\n{context}", 'action_optimization')
-            data = self._parse_json_response(response)
+            data = await self._call_grounded_json(
+                "risk.action_optimization",
+                f"Recommend optimized actions:\n{context}",
+                "action_optimization",
+                user=user,
+                equipment_id=self._threat_equipment_id(threat),
+            ) or {}
             
             recommended_actions = [
                 RecommendedAction(**action) for action in data.get("recommended_actions", [])

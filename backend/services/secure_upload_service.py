@@ -412,6 +412,23 @@ async def get_file_status(user: dict, file_id: str) -> dict:
     return _public_file_view(doc, user=user)
 
 
+async def read_available_file_bytes(user: dict, file_id: str) -> tuple[bytes, str]:
+    """Load bytes from a secure upload with ``status=available`` (for AI vision inputs)."""
+    assert_secure_upload_enabled()
+    doc = await _get_file_doc(file_id, user)
+    await assert_file_access(user, doc)
+    if doc["status"] != UploadStatus.AVAILABLE.value:
+        raise HTTPException(
+            status_code=403,
+            detail=f"File is not available for AI analysis (status={doc['status']})",
+        )
+    key = doc.get("safe_storage_key") or doc.get("storage_key")
+    if not key:
+        raise HTTPException(status_code=404, detail="File storage key missing")
+    data, content_type = await fetch_bytes(key)
+    return data, content_type or doc.get("content_type") or "application/octet-stream"
+
+
 async def get_download_url(user: dict, file_id: str) -> dict:
     assert_secure_upload_enabled()
     doc = await _get_file_doc(file_id, user)

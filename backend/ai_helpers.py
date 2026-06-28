@@ -603,28 +603,42 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
 
 
 
-async def analyze_attachment_image(image_base64: str, threat_context: str) -> dict:
+async def analyze_attachment_image(
+    image_base64: str = None,
+    threat_context: str = "",
+    *,
+    file_id: str = None,
+    user: dict = None,
+    equipment_id: str = None,
+) -> dict:
     """Analyze an image attachment for an existing observation and return findings + action recommendations."""
     try:
-        from services.ai_platform import execute_multimodal_json_prompt
+        from services.ai_execute_grounded import execute_grounded
 
-        user_content = [
-            {"type": "text", "text": f"Observation context: {threat_context}"},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
-        ]
-        result = await execute_multimodal_json_prompt(
-            "chat.attachment_analysis",
-            user={"id": "system", "company_id": "default"},
-            user_content=user_content,
+        query = f"Observation context: {threat_context}" if threat_context else "Analyze this equipment photo."
+        actor = user or {"id": "system", "company_id": "default"}
+        grounded = await execute_grounded(
+            user=actor,
+            intent="attachment_analysis",
+            query=query,
+            feature="chat.attachment_analysis",
+            equipment_id=equipment_id,
+            prompt_id="chat.attachment_analysis",
             endpoint="ai_helpers.analyze_attachment_image",
             model="gpt-4o",
             temperature=0.3,
             max_tokens=500,
+            image_base64=image_base64,
+            file_id=file_id,
         )
-        parsed = result.get("parsed")
+        parsed = grounded.get("parsed")
         if not parsed or not isinstance(parsed, dict):
             raise ValueError("empty JSON from attachment analysis")
-        logger.info(f"Image analysis complete: severity={parsed.get('severity')}, actions={len(parsed.get('recommended_actions', []))}")
+        logger.info(
+            "Image analysis complete: severity=%s, actions=%s",
+            parsed.get("severity"),
+            len(parsed.get("recommended_actions", [])),
+        )
         return parsed
 
     except Exception as e:

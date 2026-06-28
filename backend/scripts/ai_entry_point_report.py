@@ -38,9 +38,26 @@ ENFORCED_CONTRACT_SURFACES: dict[str, str] = {
     "services/maintenance_routes_service.py": "Maintenance Strategy AI",
 }
 
+# Surfaces that must route through execute_grounded (or _call_grounded_json wrapper).
+ENFORCED_GROUNDED_SURFACES: dict[str, str] = {
+    "ai_risk_engine.py": "Observation risk / RCA / fault tree engine",
+    "services/ai_execute_grounded.py": "Universal AI pipeline",
+    "services/ai_risk_dashboard.py": "Executive dashboard intent AI",
+    "services/ai_risk_analysis.py": "Chat analyze / risk surfaces",
+    "services/insights_service.py": "Executive AI recommendations",
+    "services/image_analysis_service.py": "Image vision damage analysis",
+    "ai_helpers.py": "Chat attachment vision",
+}
+
+GROUNDED_MARKERS = (
+    "execute_grounded(",
+    "_call_grounded_json(",
+)
+
 CONTRACT_MARKERS = (
     "finalize_recommendation_response",
     "finalize_ai_recommendation_response",
+    "_merge_grounded_contract",
 )
 
 PROMPT_CALL_RE = re.compile(
@@ -106,6 +123,30 @@ def scan_ai_gateway_usage() -> dict:
     }
 
 
+def scan_enforced_grounded_surfaces() -> dict:
+    violations: list[str] = []
+    compliant: list[str] = []
+    missing: list[str] = []
+
+    for rel, label in sorted(ENFORCED_GROUNDED_SURFACES.items()):
+        path = BACKEND_DIR / rel
+        if not path.is_file():
+            missing.append(f"{rel} ({label})")
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if any(marker in text for marker in GROUNDED_MARKERS):
+            compliant.append(rel)
+        else:
+            violations.append(f"{rel} ({label})")
+
+    return {
+        "grounded_surface_count": len(ENFORCED_GROUNDED_SURFACES),
+        "grounded_compliant": compliant,
+        "grounded_violations": violations,
+        "missing_grounded_files": missing,
+    }
+
+
 def scan_enforced_contract_surfaces() -> dict:
     """Sprint 4 — enforced AI surfaces must use contract finalization."""
     violations: list[str] = []
@@ -162,11 +203,13 @@ def build_report() -> dict:
     imports = scan_openai_imports()
     usage = scan_ai_gateway_usage()
     contract = scan_enforced_contract_surfaces()
+    grounded = scan_enforced_grounded_surfaces()
     prompts = scan_unregistered_prompts()
     return {
         **imports,
         **usage,
         **contract,
+        **grounded,
         **prompts,
         "gateway_user_count": len(usage["ai_gateway_users"]),
         "openai_bypass_count": len(imports["baseline_bypasses"]) + len(imports["violations"]),
@@ -206,7 +249,21 @@ def main() -> int:
             print(f"  - {rel}")
         return 1
 
+    print(f"\nEnforced grounded surfaces: {report.get('grounded_surface_count', 0)}")
+    print(f"  compliant: {len(report.get('grounded_compliant', []))}")
+    if report.get("grounded_violations"):
+        print("\nGROUNDED pipeline violations:")
+        for rel in report["grounded_violations"]:
+            print(f"  - {rel}")
+    if report.get("missing_grounded_files"):
+        print("\nMissing grounded surface files:")
+        for rel in report["missing_grounded_files"]:
+            print(f"  - {rel}")
+
     if report["contract_violations"] or report["missing_enforced_files"]:
+        return 1
+
+    if report.get("grounded_violations") or report.get("missing_grounded_files"):
         return 1
 
     if report["direct_openai_client"]:

@@ -11,15 +11,18 @@ sys.path.insert(0, str(BACKEND_ROOT))
 sys.path.insert(0, str(BACKEND_ROOT / "scripts"))
 
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017/test")
-os.environ["TENANT_STRICT_MODE"] = "true"
-
-from services.tenant_schema import merge_tenant_filter
 
 
-@pytest.mark.asyncio
-async def test_tenant_a_cannot_read_tenant_b_via_merge_filter():
+def test_tenant_a_cannot_read_tenant_b_via_merge_filter(monkeypatch):
+    monkeypatch.setenv("TENANT_STRICT_MODE", "true")
+    import importlib
+
+    import services.tenant_schema as ts
+
+    importlib.reload(ts)
+
     user_a = {"company_id": "tenant-a", "tenant_id": "tenant-a", "id": "a"}
-    query = merge_tenant_filter({"id": "proof-b-action"}, user_a)
+    query = ts.merge_tenant_filter({"id": "proof-b-action"}, user_a)
     assert query == {"$and": [{"id": "proof-b-action"}, {"tenant_id": "tenant-a"}]}
 
 

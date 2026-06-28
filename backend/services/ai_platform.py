@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "build_ai_context",
+    "execute_grounded",
     "execute_grounded_prompt",
     "execute_json_prompt",
     "execute_multimodal_json_prompt",
@@ -31,6 +32,13 @@ __all__ = [
     "render_prompt",
     "user_context",
 ]
+
+
+async def execute_grounded(*args, **kwargs):
+    """Lazy export — implementation lives in ``services.ai_execute_grounded``."""
+    from services.ai_execute_grounded import execute_grounded as _execute_grounded
+
+    return await _execute_grounded(*args, **kwargs)
 
 
 async def _completion_content(
@@ -293,29 +301,28 @@ async def execute_grounded_prompt(
     model: Optional[str] = None,
     temperature: float = 0.3,
     max_tokens: int = 1200,
+    feature: str = "grounded_assistant",
 ) -> Dict[str, Any]:
-    """
-    Grounded execution: evidence pack + optional copilot tools + registered prompt.
-    """
-    from services.ai_orchestrator import run_grounded_recommendation
+    """Grounded execution via the universal ``execute_grounded`` pipeline."""
+    from services.ai_execute_grounded import execute_grounded
 
-    result = await run_grounded_recommendation(
+    return await execute_grounded(
         user=user,
         intent=intent,
-        equipment_id=equipment_id,
         query=query,
+        feature=feature,
+        equipment_id=equipment_id,
+        prompt_id=prompt_id,
         tools=tools,
         db=db,
         copilot_service=copilot_service,
         include_fleet=include_fleet,
         endpoint=endpoint,
-        model=model or get_prompt(prompt_id).default_model,
+        model=model,
         temperature=temperature,
         max_tokens=max_tokens,
+        parse_json=False,
     )
-    result["prompt_id"] = prompt_id
-    result["prompt_version"] = get_prompt(prompt_id).version
-    return result
 
 
 def finalize_recommendation_response(
