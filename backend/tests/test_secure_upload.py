@@ -153,7 +153,9 @@ class TestScanWorker:
             result = await scan_uploaded_file("file-1")
 
         assert result["status"] == UploadStatus.AVAILABLE.value
-        mock_store.assert_called_once()
+        assert mock_store.call_count >= 1
+        safe_call = mock_store.call_args_list[0]
+        assert "uploads-safe/" in safe_call[0][0]
 
     @pytest.mark.asyncio
     async def test_scan_rejects_spoofed_extension(self):

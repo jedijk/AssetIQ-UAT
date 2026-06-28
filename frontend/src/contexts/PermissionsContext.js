@@ -54,6 +54,7 @@ const FEATURE_PATHS = {
     "/settings/notifications",
     "/settings/risk-calculation",
     "/settings/ai-usage",
+    "/settings/file-security",
     "/settings/server-performance",
     "/settings/database",
     "/settings/audit-log",

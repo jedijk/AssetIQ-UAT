@@ -19,6 +19,8 @@ EVENT_AVAILABLE = "file_available"
 EVENT_DOWNLOAD_REQUESTED = "file_download_requested"
 EVENT_DELETED = "file_deleted"
 EVENT_ACCESS_DENIED = "file_access_denied"
+EVENT_RESCAN_REQUESTED = "file_rescan_requested"
+EVENT_PREVIEW_REQUESTED = "file_preview_requested"
 
 
 async def log_upload_audit_event(

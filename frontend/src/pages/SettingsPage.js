@@ -145,6 +145,14 @@ const SETTINGS_SECTIONS = [
     requiresSettings: true,
   },
   {
+    id: "file-security",
+    sectionKey: "fileSecurity",
+    icon: Shield,
+    path: "/settings/file-security",
+    roles: ["owner", "admin"],
+    requiresSettings: true,
+  },
+  {
     id: "maintenance-readiness",
     sectionKey: "maintenanceReadiness",
     icon: ClipboardCheck,

@@ -22,7 +22,16 @@ from services.secure_upload_audit import (
 )
 from services.secure_upload_malware import MalwareScanResult, scan_bytes
 from services.secure_upload_content import process_upload_content
-from services.secure_upload_storage import fetch_bytes, move_object, quarantine_key, safe_key, remove_object, store_bytes
+from services.secure_upload_preview import generate_preview
+from services.secure_upload_storage import (
+    fetch_bytes,
+    move_object,
+    preview_key,
+    quarantine_key,
+    remove_object,
+    safe_key,
+    store_bytes,
+)
 from services.secure_upload_validation import validate_file_content
 
 logger = logging.getLogger(__name__)
@@ -223,23 +232,40 @@ async def scan_uploaded_file(file_id: str, **_: Any) -> Dict[str, Any]:
         return await _reject(doc, USER_REJECTION_MESSAGE, internal_reason=str(exc))
 
     now = _now_iso()
+    update_fields: Dict[str, Any] = {
+        "status": UploadStatus.AVAILABLE.value,
+        "safe_storage_key": dest,
+        "storage_key": dest,
+        "detected_mime_type": final_content_type,
+        "actual_size": len(final_data),
+        "sha256_hash": final_hash,
+        "sanitized": content_result.sanitized,
+        "content_validation_result": content_result.details,
+        "scan_completed_at": now,
+        "available_at": now,
+        "updated_at": now,
+        "rejection_reason": None,
+        "user_message": None,
+        "preview_available": False,
+        "preview_storage_key": None,
+        "preview_content_type": None,
+    }
+
+    if FILE_UPLOAD_CONFIG.get("enable_preview_generation", True):
+        preview = generate_preview(ext, final_content_type, final_data)
+        if preview.ok and preview.data:
+            pkey = preview_key(tenant_id, file_id)
+            try:
+                await store_bytes(pkey, preview.data, preview.content_type or "image/png")
+                update_fields["preview_available"] = True
+                update_fields["preview_storage_key"] = pkey
+                update_fields["preview_content_type"] = preview.content_type or "image/png"
+            except Exception as exc:
+                logger.warning("Failed to store preview for %s: %s", file_id, exc)
+
     await db[COLLECTION].update_one(
         {"id": file_id},
-        {"$set": {
-            "status": UploadStatus.AVAILABLE.value,
-            "safe_storage_key": dest,
-            "storage_key": dest,
-            "detected_mime_type": final_content_type,
-            "actual_size": len(final_data),
-            "sha256_hash": final_hash,
-            "sanitized": content_result.sanitized,
-            "content_validation_result": content_result.details,
-            "scan_completed_at": now,
-            "available_at": now,
-            "updated_at": now,
-            "rejection_reason": None,
-            "user_message": None,
-        }},
+        {"$set": update_fields},
     )
 
     await log_upload_audit_event(

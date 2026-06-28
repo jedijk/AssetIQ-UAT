@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 
 from config.file_upload_config import (
     SIGNED_URL_EXPIRY_SECONDS,
+    STORAGE_PREFIX_PREVIEW,
     STORAGE_PREFIX_QUARANTINE,
     STORAGE_PREFIX_SAFE,
     STORAGE_PREFIX_TEMP,
@@ -40,6 +41,11 @@ def safe_key(tenant_id: str, file_id: str, extension: str) -> str:
 
 def quarantine_key(tenant_id: str, file_id: str, extension: str) -> str:
     return build_storage_key(STORAGE_PREFIX_QUARANTINE, tenant_id, file_id, extension)
+
+
+def preview_key(tenant_id: str, file_id: str) -> str:
+    """Preview thumbnails are always stored as PNG."""
+    return f"{STORAGE_PREFIX_PREVIEW}{tenant_id}/{file_id}.png"
 
 
 def presigned_put_url(key: str, content_type: str, expiry_seconds: Optional[int] = None) -> Optional[str]:

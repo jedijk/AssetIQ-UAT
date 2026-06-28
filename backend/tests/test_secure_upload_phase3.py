@@ -125,7 +125,7 @@ class TestScanWorkerPhase3Integration:
             result = await scan_uploaded_file("file-img")
 
         assert result["status"] == UploadStatus.AVAILABLE.value
-        mock_store.assert_called_once()
-        stored_data = mock_store.call_args[0][1]
+        assert mock_store.call_count >= 1
+        stored_data = mock_store.call_args_list[0][0][1]
         assert isinstance(stored_data, bytes)
         assert len(stored_data) > 0

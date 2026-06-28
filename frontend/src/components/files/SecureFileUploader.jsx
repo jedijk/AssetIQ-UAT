@@ -3,6 +3,8 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { authFetch, getApiUrl } from "../../lib/apiConfig";
 import { formatApiErrorDetail } from "../../lib/apiErrors";
+import { getDownloadUrl } from "../../lib/apis/files";
+import SecureFilePreview from "./SecureFilePreview";
 
 const STATUS_LABELS = {
   initiated: { label: "Ready to upload", variant: "secondary" },
@@ -63,6 +65,7 @@ export function SecureFileUploader({
   const [fileRecord, setFileRecord] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const pollCountRef = useRef(0);
   const pollTimerRef = useRef(null);
 
@@ -188,6 +191,19 @@ export function SecureFileUploader({
     }
   };
 
+  const handleDownload = async () => {
+    if (!fileRecord?.file_id) return;
+    try {
+      const data = await getDownloadUrl(fileRecord.file_id);
+      if (data.download_url) {
+        window.open(data.download_url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || "Download failed";
+      setError(typeof msg === "string" ? msg : "Download failed");
+    }
+  };
+
   const badge = status ? STATUS_LABELS[status] || { label: status, variant: "outline" } : null;
 
   return (
@@ -206,6 +222,16 @@ export function SecureFileUploader({
           </label>
         </Button>
         {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
+        {status === "available" && fileRecord?.preview_available && (
+          <Button type="button" variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
+            Preview
+          </Button>
+        )}
+        {status === "available" && (
+          <Button type="button" variant="outline" size="sm" onClick={handleDownload}>
+            Download
+          </Button>
+        )}
       </div>
 
       {fileRecord?.original_filename && (
@@ -229,6 +255,13 @@ export function SecureFileUploader({
           Your file is being validated. This usually takes a few seconds.
         </p>
       )}
+
+      <SecureFilePreview
+        fileId={fileRecord?.file_id}
+        filename={fileRecord?.original_filename}
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+      />
     </div>
   );
 }

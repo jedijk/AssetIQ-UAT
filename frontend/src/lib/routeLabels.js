@@ -15,6 +15,7 @@ import {
   ScrollText,
   Server,
   Settings,
+  Shield,
   Sliders,
   Sparkles,
 } from 'lucide-react';
@@ -61,6 +62,7 @@ const staticRouteLabels = {
   '/settings/notifications': 'Notifications',
   '/settings/risk-calculation': 'Risk Calculation',
   '/settings/ai-usage': 'AI Usage',
+  '/settings/file-security': 'File Security',
   '/settings/server-performance': 'Server Performance',
   '/settings/maintenance-readiness': 'Maintenance Readiness',
   '/settings/database': 'Database',
@@ -123,6 +125,7 @@ const staticRouteIcons = {
   '/settings/notifications': Settings,
   '/settings/risk-calculation': Sliders,
   '/settings/ai-usage': Brain,
+  '/settings/file-security': Shield,
   '/settings/server-performance': Server,
   '/settings/maintenance-readiness': ClipboardCheck,
   '/settings/database': Database,

@@ -18,6 +18,7 @@ import {
   BarChart3,
   Monitor,
   Package,
+  Shield,
 } from "lucide-react";
 
 export function buildNavItems(t) {
@@ -46,6 +47,7 @@ export function buildSettingsMenuItems(t) {
     { path: "/settings/server-performance", label: "Server Performance", icon: Server, ownerOnly: true, mobileOwnerOnly: true },
     { path: "/settings/database", label: "Database Environment", icon: Database, ownerOnly: true, mobileOwnerOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
+    { path: "/settings/file-security", label: "File Security", icon: Shield, adminOnly: true, desktopOnly: true },
     { path: "/settings/maintenance-readiness", label: t("nav.maintenanceReadiness"), icon: ClipboardCheck, adminOnly: true, desktopOnly: true },
     { path: "/settings/audit-log", label: "Audit Log", icon: ScrollText, roles: ["owner"], mobileOwnerOnly: true },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3, mobileOwnerOnly: true },

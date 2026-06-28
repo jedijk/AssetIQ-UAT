@@ -83,6 +83,14 @@ USER_REJECTION_MESSAGE = (
 STORAGE_PREFIX_TEMP = "uploads-temp/"
 STORAGE_PREFIX_SAFE = "uploads-safe/"
 STORAGE_PREFIX_QUARANTINE = "uploads-quarantine/"
+STORAGE_PREFIX_PREVIEW = "uploads-preview/"
+
+# Extensions eligible for thumbnail / first-page preview generation
+TRUSTED_PREVIEW_TYPES: FrozenSet[str] = frozenset({
+    "jpg", "jpeg", "png", "webp", "pdf",
+})
+
+PREVIEW_MAX_DIMENSION = 400
 
 FILE_UPLOAD_CONFIG = {
     "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
@@ -105,5 +113,9 @@ FILE_UPLOAD_CONFIG = {
         "temp": STORAGE_PREFIX_TEMP,
         "safe": STORAGE_PREFIX_SAFE,
         "quarantine": STORAGE_PREFIX_QUARANTINE,
+        "preview": STORAGE_PREFIX_PREVIEW,
     },
+    "enable_preview_generation": True,
+    "preview_max_dimension": PREVIEW_MAX_DIMENSION,
+    "trusted_preview_types": sorted(TRUSTED_PREVIEW_TYPES),
 }

@@ -76,6 +76,14 @@ async def get_download_url(
     return await svc.get_download_url(current_user, file_id)
 
 
+@router.get("/{file_id}/preview-url")
+async def get_preview_url(
+    file_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    return await svc.get_preview_url(current_user, file_id)
+
+
 @router.delete("/{file_id}")
 async def delete_file(
     file_id: str,
