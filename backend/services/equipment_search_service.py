@@ -6,6 +6,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from utils.mongo_regex import case_insensitive_contains
+from services.tenant_schema import merge_tenant_filter
 from services.tenant_scope import scoped_job
 from utils.equipment_search_i18n import (
     expand_equipment_keywords,
@@ -345,6 +346,103 @@ def extract_tag_from_message(message: str) -> str | None:
     """Extract tag from 'Name (TAG)' format."""
     m = re.search(r'\(([A-Z0-9][A-Z0-9\-]+)\)\s*$', message)
     return m.group(1).strip() if m else None
+
+
+# AssetIQ-style tags: P-104, HX-201, 1R-2003, 1R-2003-0054
+_EQUIPMENT_TAG_CANDIDATE_RE = re.compile(
+    r"\b("
+    r"(?:\d{1,2}[A-Z]-\d{2,4}(?:-\d{2,4})+)"  # 1R-2003-0054
+    r"|[A-Z]{1,3}-\d{2,4}[A-Z]?"  # P-104, HX-201
+    r"|\d{1,2}[A-Z]-\d{4}"  # 1T-2001
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def extract_equipment_tag_candidates(text: str) -> List[str]:
+    """Return tag-like tokens from free text, longest first."""
+    if not text:
+        return []
+    upper = text.upper()
+    seen = set()
+    candidates: List[str] = []
+    for match in _EQUIPMENT_TAG_CANDIDATE_RE.finditer(upper):
+        tag = match.group(1).strip()
+        if tag and tag not in seen:
+            seen.add(tag)
+            candidates.append(tag)
+    candidates.sort(key=len, reverse=True)
+    return candidates
+
+
+async def resolve_equipment_id_from_query(
+    db,
+    query: str,
+    *,
+    user: Optional[dict] = None,
+) -> Optional[str]:
+    """Resolve equipment_nodes.id from a tag embedded in natural language."""
+    for tag in extract_equipment_tag_candidates(query):
+        doc = await _lookup_equipment_node_by_tag(db, tag, user=user)
+        if doc:
+            return doc.get("id")
+    return None
+
+
+async def _lookup_equipment_node_by_tag(
+    db,
+    tag: str,
+    *,
+    user: Optional[dict] = None,
+) -> Optional[Dict[str, Any]]:
+    """Tenant-scoped equipment lookup with exact and normalized tag matching."""
+    if not tag:
+        return None
+
+    tag = tag.strip()
+    tag_escaped = re.escape(tag)
+    tag_no_hyphens = _normalize_tag(tag)
+
+    exact_filter = merge_tenant_filter(
+        {
+            "$or": [
+                {"tag": {"$regex": f"^{tag_escaped}$", "$options": "i"}},
+                {"id": {"$regex": f"^{tag_escaped}$", "$options": "i"}},
+                {"name": {"$regex": f"^{tag_escaped}$", "$options": "i"}},
+            ]
+        },
+        user,
+    )
+    doc = await db.equipment_nodes.find_one(exact_filter, {"_id": 0, "id": 1, "tag": 1})
+    if doc:
+        return doc
+
+    tag_filter = merge_tenant_filter(
+        {"tag": {"$exists": True, "$nin": [None, "", "None"]}},
+        user,
+    )
+    cursor = db.equipment_nodes.find(
+        tag_filter,
+        {"_id": 0, "id": 1, "tag": 1},
+    ).limit(500)
+
+    best: Optional[Dict[str, Any]] = None
+    best_score = 0
+    query_norm = tag_no_hyphens
+    async for node in cursor:
+        node_tag = node.get("tag")
+        if not node_tag:
+            continue
+        node_norm = _normalize_tag(node_tag)
+        if query_norm == node_norm:
+            return node
+        if query_norm.startswith(node_norm) or node_norm.startswith(query_norm):
+            score = min(len(query_norm), len(node_norm))
+            if score > best_score:
+                best_score = score
+                best = node
+
+    return best
 
 
 def message_looks_like_equipment(message: str) -> bool:

@@ -64,10 +64,17 @@ class ReliabilityCopilotService:
         intent = await self._classify_intent(query)
         
         # Gather relevant data based on intent
-        data = await self._gather_data(owner_id, intent, query, equipment_id)
+        data = await self._gather_data(
+            owner_id, intent, query, equipment_id, current_user=current_user
+        )
+        resolved_equipment_id = (
+            equipment_id
+            or data.get("resolved_equipment_id")
+            or (data.get("equipment") or {}).get("id")
+        )
 
         # Copilot tools for equipment-scoped queries
-        eq_id = equipment_id or (data.get("equipment") or {}).get("id")
+        eq_id = resolved_equipment_id
         if eq_id:
             if intent in ("risk_analysis", "equipment_details", "changes_summary", "general_summary"):
                 chain = await self._invoke_copilot_tool(
@@ -85,7 +92,7 @@ class ReliabilityCopilotService:
         # Phase 4 — shared evidence pack for grounded AI context
         evidence_pack = None
         risk_paths: List[Dict[str, Any]] = []
-        eq_id = equipment_id or (data.get("equipment") or {}).get("id")
+        eq_id = resolved_equipment_id
         try:
             from services.ai_evidence_pack import build_evidence_pack
 
@@ -137,6 +144,10 @@ class ReliabilityCopilotService:
         # Evidence/detail queries
         if any(word in query_lower for word in ["evidence", "show", "details", "all about"]):
             return "equipment_details"
+
+        # Equipment health / condition queries
+        if any(word in query_lower for word in ["health", "condition", "how is", "status of"]):
+            return "equipment_details"
         
         # Attention/priority queries
         if any(word in query_lower for word in ["attention", "need", "urgent", "priority", "focus"]):
@@ -185,14 +196,31 @@ class ReliabilityCopilotService:
         owner_id: str,
         intent: str,
         query: str,
-        equipment_id: Optional[str]
+        equipment_id: Optional[str],
+        *,
+        current_user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Gather relevant data based on intent"""
-        data = {}
+        data: Dict[str, Any] = {}
         
         # Try to extract equipment tag from query if not provided
         if not equipment_id:
-            equipment_id = await self._extract_equipment_from_query(owner_id, query)
+            equipment_id = await self._extract_equipment_from_query(
+                owner_id, query, current_user=current_user
+            )
+
+        if equipment_id:
+            from services.tenant_schema import merge_tenant_filter
+
+            equipment = await self.db.equipment_nodes.find_one(
+                merge_tenant_filter({"id": equipment_id}, current_user),
+                {"_id": 0},
+            )
+            if equipment:
+                data["equipment"] = equipment
+                data["resolved_equipment_id"] = equipment_id
+            else:
+                equipment_id = None
         
         if intent == "risk_analysis":
             if equipment_id:
@@ -334,36 +362,43 @@ class ReliabilityCopilotService:
     async def _extract_equipment_from_query(
         self,
         owner_id: str,
-        query: str
+        query: str,
+        *,
+        current_user: Optional[dict] = None,
     ) -> Optional[str]:
-        """Try to extract equipment reference from query"""
-        # Common patterns: P-104, HX-201, etc.
+        """Try to extract equipment reference from query text."""
+        from services.equipment_search_service import resolve_equipment_id_from_query
+
+        resolved = await resolve_equipment_id_from_query(
+            self.db, query, user=current_user
+        )
+        if resolved:
+            return resolved
+
+        # Legacy owner_id exact tag match (single-segment tags)
         import re
-        
-        # Look for tag patterns
+        from utils.mongo_regex import case_insensitive_contains
+
         tag_patterns = [
-            r'\b([A-Z]{1,3}-\d{2,4}[A-Z]?)\b',  # P-104, HX-201
-            r'\b(\d{1,2}[A-Z]-\d{4})\b',  # 1T-2001
+            r'\b([A-Z]{1,3}-\d{2,4}[A-Z]?)\b',
+            r'\b(\d{1,2}[A-Z]-\d{4})\b',
         ]
-        
         for pattern in tag_patterns:
             matches = re.findall(pattern, query.upper())
-            if matches:
-                tag = matches[0]
-                # Search for equipment with this tag
-                from utils.mongo_regex import case_insensitive_contains
+            if not matches:
+                continue
+            tag = matches[0]
+            tag_match = case_insensitive_contains(tag)
+            tag_clauses = [{"tag": tag}]
+            if tag_match:
+                tag_clauses.append({"name": tag_match})
+            equipment = await self.db.equipment_nodes.find_one({
+                "owner_id": owner_id,
+                "$or": tag_clauses,
+            })
+            if equipment:
+                return equipment.get("id")
 
-                tag_match = case_insensitive_contains(tag)
-                tag_clauses = [{"tag": tag}]
-                if tag_match:
-                    tag_clauses.append({"name": tag_match})
-                equipment = await self.db.equipment_nodes.find_one({
-                    "owner_id": owner_id,
-                    "$or": tag_clauses,
-                })
-                if equipment:
-                    return equipment.get("id")
-        
         return None
     
     async def _invoke_copilot_tool(
