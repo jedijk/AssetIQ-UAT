@@ -88,6 +88,89 @@ async def test_build_evidence_pack_equipment_scope():
 
 
 @pytest.mark.asyncio
+async def test_build_evidence_pack_graph_edge_labels():
+    mock_state = {
+        "found": True,
+        "health_score": 62.0,
+        "risk_level": "High",
+        "open_observation_count": 2,
+        "overdue_pm_count": 1,
+        "exposure": {"score": 55.0},
+        "graph_edge_count": 1,
+        "canonical_source": "equipment_reliability_state",
+    }
+    obs_id = "4a5c67f7-f3c4-4b26-9827-63f9d0ad13b7"
+    eq_id = "715656f7-da36-48bd-bf73-709fa79a5986"
+    edge_id = f"observation:{obs_id}:observed_on:equipment:{eq_id}"
+    mock_risk = {
+        "path_entries": [
+            {
+                "edge_id": edge_id,
+                "relation": "observed_on",
+                "source": f"observation:{obs_id}",
+                "target": f"equipment:{eq_id}",
+            }
+        ],
+        "relevant_edges": [
+            {
+                "id": edge_id,
+                "relation": "observed_on",
+                "source_type": "observation",
+                "source_id": obs_id,
+                "target_type": "equipment",
+                "target_id": eq_id,
+            }
+        ],
+    }
+    mock_ctx = {
+        "found": True,
+        "equipment": {"id": "eq-1", "name": "Oil Pump", "tag": "1R-2003-0054"},
+        "open_threats": [],
+        "graph": {"edge_count": 1},
+    }
+
+    mock_db = MagicMock()
+    mock_db.threats = MagicMock()
+    mock_db.threats.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(
+        return_value=[]
+    )
+
+    label_map = {
+        f"observation:{obs_id}": "High vibration on bearing",
+        f"equipment:{eq_id}": "Oil Pump (1R-2003-0054)",
+    }
+
+    with patch(
+        "services.ai_evidence_pack.build_equipment_reliability_state",
+        new_callable=AsyncMock,
+        return_value=mock_state,
+    ), patch(
+        "services.ai_evidence_pack.GraphTraversalService"
+    ) as mock_graph_cls, patch(
+        "services.ai_evidence_pack.ReliabilityContextService"
+    ) as mock_ctx_cls, patch(
+        "services.ai_evidence_pack.resolve_node_labels",
+        new_callable=AsyncMock,
+        return_value=label_map,
+    ):
+        mock_graph_cls.return_value.explain_risk = AsyncMock(return_value=mock_risk)
+        mock_ctx_cls.return_value.get_context = AsyncMock(return_value=mock_ctx)
+
+        pack = await build_evidence_pack(
+            user={"id": "u-1", "company_id": "co-1"},
+            equipment_id="eq-1",
+            intent="equipment_details",
+            database=mock_db,
+        )
+
+    edge_cite = next(c for c in pack["citations"] if c["type"] == "graph_edge")
+    assert "High vibration on bearing" in edge_cite["label"]
+    assert "Oil Pump (1R-2003-0054)" in edge_cite["label"]
+    assert "observed on" in edge_cite["label"].lower()
+    assert obs_id not in edge_cite["label"]
+
+
+@pytest.mark.asyncio
 async def test_build_evidence_pack_fleet_only():
     fleet = {
         "unified_open_signals": 12,

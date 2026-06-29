@@ -15,6 +15,7 @@ from services.equipment_reliability_state_service import (
     build_equipment_reliability_state,
     compute_fleet_reliability_summary,
 )
+from services.graph_node_label_service import node_ref_key, resolve_node_labels
 from services.reliability_context_service import (
     ReliabilityContextService,
     format_context_for_prompt,
@@ -37,6 +38,53 @@ def _threat_url(threat_id: str) -> str:
 
 def _graph_edge_url(edge_id: str, equipment_id: str) -> str:
     return f"/equipment/{equipment_id}/reliability-graph?edge={edge_id}"
+
+
+def _parse_node_ref(ref: Optional[str]) -> Optional[tuple[str, str]]:
+    if not ref or ":" not in ref:
+        return None
+    node_type, node_id = ref.split(":", 1)
+    if not node_type or not node_id:
+        return None
+    return node_type, node_id
+
+
+def _format_relation_label(relation: Optional[str]) -> str:
+    if not relation:
+        return "Related to"
+    return relation.replace("_", " ").strip()
+
+
+def _node_display(ref: Optional[str], labels_map: Dict[str, str]) -> str:
+    if not ref:
+        return "Unknown"
+    parsed = _parse_node_ref(ref)
+    if not parsed:
+        return ref
+    node_type, node_id = parsed
+    label = labels_map.get(node_ref_key(node_type, node_id))
+    if label:
+        return label
+    short_id = f"{node_id[:8]}…" if len(node_id) > 8 else node_id
+    type_label = node_type.replace("_", " ").title()
+    return f"{type_label} ({short_id})"
+
+
+def _format_graph_edge_label(entry: Dict[str, Any], labels_map: Dict[str, str]) -> str:
+    relation = _format_relation_label(entry.get("relation"))
+    source = _node_display(entry.get("source"), labels_map)
+    target = _node_display(entry.get("target"), labels_map)
+    return f"{source} · {relation} · {target}"
+
+
+def _refs_from_path_entries(path_entries: List[Dict[str, Any]]) -> List[tuple[str, str]]:
+    refs: List[tuple[str, str]] = []
+    for entry in path_entries:
+        for ref in (entry.get("source"), entry.get("target")):
+            parsed = _parse_node_ref(ref)
+            if parsed:
+                refs.append(parsed)
+    return refs
 
 
 async def build_evidence_pack(
@@ -114,23 +162,43 @@ async def build_evidence_pack(
             )
 
         path_entries = risk.get("path_entries") or []
+        relevant_edges = risk.get("relevant_edges") or []
+        node_labels = await resolve_node_labels(
+            relevant_edges,
+            user=user,
+            extra_refs=_refs_from_path_entries(path_entries),
+        )
         for entry in path_entries[:20]:
             edge_id = entry.get("edge_id")
             if not edge_id:
                 continue
+            edge_label = _format_graph_edge_label(entry, node_labels)
+            src_ref = _parse_node_ref(entry.get("source"))
+            tgt_ref = _parse_node_ref(entry.get("target"))
             graph_edges.append(
                 {
                     "edge_id": edge_id,
                     "relation": entry.get("relation"),
                     "source": entry.get("source"),
                     "target": entry.get("target"),
+                    "source_label": (
+                        node_labels.get(node_ref_key(src_ref[0], src_ref[1]))
+                        if src_ref
+                        else None
+                    ),
+                    "target_label": (
+                        node_labels.get(node_ref_key(tgt_ref[0], tgt_ref[1]))
+                        if tgt_ref
+                        else None
+                    ),
+                    "label": edge_label,
                 }
             )
             citations.append(
                 make_citation(
                     id=str(edge_id),
                     type="graph_edge",
-                    label=f"{entry.get('source')} -[{entry.get('relation')}]-> {entry.get('target')}",
+                    label=edge_label,
                     url_path=_graph_edge_url(str(edge_id), equipment_id),
                 )
             )
@@ -201,10 +269,10 @@ async def build_evidence_pack(
     if graph_edges:
         prompt_parts.append("Graph risk paths (cite edge_id as [cite:<edge_id>]):")
         for edge in graph_edges[:12]:
-            prompt_parts.append(
-                f"  - {edge.get('edge_id')}: {edge.get('source')} "
-                f"-[{edge.get('relation')}]-> {edge.get('target')}"
+            label = edge.get("label") or (
+                f"{edge.get('source')} -[{edge.get('relation')}]-> {edge.get('target')}"
             )
+            prompt_parts.append(f"  - {edge.get('edge_id')}: {label}")
     if open_signals:
         prompt_parts.append(f"Open work signals ({len(open_signals)}):")
         for sig in open_signals[:8]:
