@@ -56,6 +56,13 @@ async def core_chat_process(user_id: str, content: str, session_id: str,
     image_thumbnail = None
     if image_base64:
         image_thumbnail = compress_image(image_base64)
+
+    conv_peek = await read_conv(user_id)
+    if not image_thumbnail and conv_peek.get("pending_image_thumbnail"):
+        image_thumbnail = conv_peek.get("pending_image_thumbnail")
+
+    if image_thumbnail:
+        await write_conv(user_id, pending_image_thumbnail=image_thumbnail)
     
     # 0. Stale control signals — when the conversation is INITIAL (no active prompt),
     # silently swallow command words like "skip", "cancel", "yes", "no", "ok".
@@ -664,7 +671,7 @@ async def core_chat_process(user_id: str, content: str, session_id: str,
             )
             
             # Process the result through finalize_chat_machine_result if observation should be created
-            return await finalize_chat_machine_result(user_id, session_id, detected_lang, None, result, ai_mode)
+            return await finalize_chat_machine_result(user_id, session_id, detected_lang, image_thumbnail, result, ai_mode)
 
     # ------------------------------------------------------------------
     # 6. Process with state machine (equipment / failure mode flow)

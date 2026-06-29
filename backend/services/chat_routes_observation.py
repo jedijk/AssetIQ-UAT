@@ -149,13 +149,15 @@ async def create_observation(
     }
 
     if image_thumbnail:
-        threat_doc["attachments"] = [
-            {
-                "type": "image",
-                "data": image_thumbnail,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ]
+        att: dict = {
+            "type": "image",
+            "data": image_thumbnail,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        caption = (user_description or obs_data.get("original_description") or "").strip()
+        if caption:
+            att["description"] = caption
+        threat_doc["attachments"] = [att]
 
     try:
         from services.work_signal_lifecycle import create_work_signal

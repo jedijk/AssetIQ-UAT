@@ -100,6 +100,7 @@ async def reset_conv(user_id: str):
         awaiting_context_for_threat=None,
         issue_description=None,
         issue_summary=None,
+        pending_image_thumbnail=None,
     )
 
 

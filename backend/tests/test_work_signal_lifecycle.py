@@ -228,3 +228,48 @@ async def test_update_work_signal_skips_graph_when_disabled():
         )
 
     graph_sync.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_work_signal_preserves_chat_attachments():
+    mock_db = MagicMock()
+    mock_db.observations = MagicMock()
+    mock_db.threats = MagicMock()
+    mock_db.observations.insert_one = AsyncMock()
+    mock_db.threats.insert_one = AsyncMock()
+
+    attachment = {
+        "type": "image",
+        "data": "abc123",
+        "description": "Oil leak visible",
+        "created_at": "2026-06-28T00:00:00Z",
+    }
+    signal_doc = {
+        "id": "sig-photo",
+        "title": "Pump - Oil leak",
+        "description": "Oil leak visible",
+        "status": "Open",
+        "linked_equipment_id": "eq-9",
+        "asset": "Pump",
+        "attachments": [attachment],
+    }
+
+    with patch("services.work_signal_lifecycle.db", mock_db), patch(
+        "services.reliability_graph.dispatch_graph_sync",
+        AsyncMock(),
+    ), patch(
+        "services.event_outbox.publish_event",
+        AsyncMock(),
+    ):
+        await create_work_signal(
+            signal_doc,
+            user={"company_id": "co-1", "id": "user-1"},
+            source="chat",
+            graph_label="chat_threat_create",
+        )
+
+    obs = mock_db.observations.insert_one.call_args[0][0]
+    threat = mock_db.threats.insert_one.call_args[0][0]
+    assert obs["attachments"] == [attachment]
+    assert obs["media_urls"][0]["data"] == "abc123"
+    assert threat["attachments"] == [attachment]

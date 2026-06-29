@@ -130,6 +130,7 @@ async def finalize_chat_machine_result(
             awaiting_context_for_threat=new_threat_id,
             issue_description=None,
             issue_summary=None,
+            pending_image_thumbnail=None,
         )
 
         eq_data = result["observation_data"].get("equipment", {})

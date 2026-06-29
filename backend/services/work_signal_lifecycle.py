@@ -128,12 +128,22 @@ async def create_work_signal(
     observation["source"] = source
     observation.pop("legacy_threat_id", None)
 
+    attachments = payload.get("attachments") or []
+    if attachments:
+        observation["attachments"] = attachments
+        if not observation.get("media_urls"):
+            from services.threat_observation_bridge import _attachments_as_media_urls
+
+            observation["media_urls"] = _attachments_as_media_urls(attachments)
+
     threat_projection = observation_to_threat_projection(
         observation,
         user=user,
         extra={k: v for k, v in payload.items() if k not in observation},
     )
     threat_projection["id"] = signal_id
+    if attachments:
+        threat_projection["attachments"] = attachments
 
     await db.observations.insert_one(observation)
     await db.threats.insert_one(threat_projection)

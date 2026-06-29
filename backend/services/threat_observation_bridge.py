@@ -21,6 +21,26 @@ logger = logging.getLogger(__name__)
 OPEN_STATUSES = frozenset({"open", "observation", "in progress", "in_progress", "active"})
 
 
+def _attachments_as_media_urls(attachments: list) -> list:
+    """Map legacy chat attachment blobs to canonical observation media_urls."""
+    out = []
+    for att in attachments:
+        if not isinstance(att, dict):
+            continue
+        data = att.get("data")
+        if not data:
+            continue
+        out.append(
+            {
+                "type": att.get("type") or "image",
+                "data": data,
+                "description": att.get("description"),
+                "created_at": att.get("created_at"),
+            }
+        )
+    return out
+
+
 def threat_to_observation_doc(threat: dict, *, user: Optional[dict] = None) -> Dict[str, Any]:
     """Map a threat document to an observations-collection mirror."""
     now = datetime.now(timezone.utc)
@@ -55,6 +75,10 @@ def threat_to_observation_doc(threat: dict, *, user: Optional[dict] = None) -> D
         "media_urls": [],
         "measured_values": [],
     }
+    attachments = threat.get("attachments") or []
+    if attachments:
+        doc["attachments"] = attachments
+        doc["media_urls"] = _attachments_as_media_urls(attachments)
     return with_tenant_id(doc, user)
 
 
