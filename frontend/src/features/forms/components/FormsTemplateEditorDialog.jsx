@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import LabelPrintConfigPanel from "../../../components/forms/LabelPrintConfigPanel";
 import { EXTRACTION_TEMPLATES } from "../../../components/forms/extractionTemplates";
-import { DISCIPLINES } from "../../../constants/disciplines";
+import { DISCIPLINES, translateDiscipline } from "../../../constants/disciplines";
 import {
   formAPI, FIELD_TYPES, FieldPreview, DocumentManager,
 } from "../../../components/forms";
@@ -91,7 +91,9 @@ export function FormsTemplateEditorDialog({
                     </SelectTrigger>
                     <SelectContent>
                       {DISCIPLINES.map((d) => (
-                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                        <SelectItem key={d.value} value={d.value}>
+                          {translateDiscipline(t, d.value)}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

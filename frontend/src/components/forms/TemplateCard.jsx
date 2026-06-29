@@ -2,7 +2,6 @@
  * TemplateCard Component
  * Displays a single form template - supports both card and compact list view
  */
-import { useState } from "react";
 import {
   FileText,
   Edit,
@@ -24,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { useLanguage } from "../../contexts/LanguageContext";
-import { getDisciplineLabel } from "../../constants/disciplines";
+import { getDisciplineLabel, translateDiscipline } from "../../constants/disciplines";
 
 // Compact list row variant
 export const TemplateRow = ({ template, onEdit, onDelete, onView }) => {
@@ -58,10 +57,10 @@ export const TemplateRow = ({ template, onEdit, onDelete, onView }) => {
       {/* Badges - hidden on mobile */}
       <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
         <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-          {t(`disciplines.${disciplineLabel}`) || disciplineLabel || t("forms.general")}
+          {translateDiscipline(t, template.discipline || disciplineLabel)}
         </Badge>
         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-          {template.fields?.length || 0} {t("forms.fields")}
+          {t("forms.fieldCount", { count: template.fields?.length || 0 })}
         </Badge>
         <Badge className="text-[10px] px-1.5 py-0 bg-slate-100 text-slate-600 border-slate-200">
           v{template.version || 1}
@@ -105,6 +104,9 @@ export const TemplateRow = ({ template, onEdit, onDelete, onView }) => {
 
 // Original card variant
 export const TemplateCard = ({ template, onEdit, onDelete, onView }) => {
+  const { t } = useLanguage();
+  const disciplineLabel = getDisciplineLabel(template.discipline);
+
   return (
     <div 
       className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer group"
@@ -118,7 +120,7 @@ export const TemplateCard = ({ template, onEdit, onDelete, onView }) => {
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold text-slate-900 truncate">{template.name}</h3>
-            <p className="text-sm text-slate-500 line-clamp-2">{template.description || "No description"}</p>
+            <p className="text-sm text-slate-500 line-clamp-2">{template.description || t("forms.noDescription")}</p>
           </div>
         </div>
         <DropdownMenu>
@@ -129,17 +131,17 @@ export const TemplateCard = ({ template, onEdit, onDelete, onView }) => {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView(template); }}>
-              <Eye className="w-4 h-4 mr-2" /> View
+              <Eye className="w-4 h-4 mr-2" /> {t("common.view")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(template); }}>
-              <Edit className="w-4 h-4 mr-2" /> Edit
+              <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               className="text-red-600" 
               onClick={(e) => { e.stopPropagation(); onDelete(template); }}
             >
-              <Trash2 className="w-4 h-4 mr-2" /> Delete
+              <Trash2 className="w-4 h-4 mr-2" /> {t("common.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -148,28 +150,28 @@ export const TemplateCard = ({ template, onEdit, onDelete, onView }) => {
       <div className="mt-4 flex items-center justify-between">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className="text-xs">
-            {template.discipline || "General"}
+            {translateDiscipline(t, template.discipline || disciplineLabel)}
           </Badge>
           <Badge variant="secondary" className="text-xs">
-            {template.fields?.length || 0} fields
+            {t("forms.fieldCount", { count: template.fields?.length || 0 })}
           </Badge>
           <Badge className="text-xs bg-slate-100 text-slate-700 border-slate-200">
             v{template.version || 1}
           </Badge>
           {template.label_print_config?.enabled && (
             <Badge className="text-xs bg-violet-100 text-violet-700 border-violet-200">
-              <LabelIcon className="w-3 h-3 mr-1" /> Label Print
+              <LabelIcon className="w-3 h-3 mr-1" /> {t("forms.print")}
             </Badge>
           )}
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500">
           {template.is_active ? (
             <span className="flex items-center gap-1 text-emerald-600">
-              <CheckCircle2 className="w-3 h-3" /> Active
+              <CheckCircle2 className="w-3 h-3" /> {t("common.active")}
             </span>
           ) : (
             <span className="flex items-center gap-1 text-slate-400">
-              <Clock className="w-3 h-3" /> Inactive
+              <Clock className="w-3 h-3" /> {t("common.inactive")}
             </span>
           )}
         </div>

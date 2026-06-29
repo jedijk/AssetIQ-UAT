@@ -1023,7 +1023,7 @@ const TaskSchedulerPage = () => {
                           <h3 className="font-medium text-slate-900 text-sm truncate">{template.name}</h3>
                           {template.is_adhoc && (
                             <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200">
-                              <Zap className="w-2.5 h-2.5 mr-0.5" /> Ad-hoc
+                              <Zap className="w-2.5 h-2.5 mr-0.5" /> {t("taskScheduler.adhocLabel")}
                             </Badge>
                           )}
                         </div>

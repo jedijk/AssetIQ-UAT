@@ -18,6 +18,7 @@ export const DISCIPLINES = [
   { value: "civil", label: "Civil", color: "bg-orange-100 text-orange-700" },
   { value: "operations", label: "Operations", color: "bg-green-100 text-green-700" },
   { value: "laboratory", label: "Laboratory", color: "bg-cyan-100 text-cyan-700" },
+  { value: "multi_discipline", label: "Multi-discipline", color: "bg-pink-100 text-pink-700" },
 ];
 
 // Simple list of discipline values
@@ -42,6 +43,35 @@ export const getDisciplineLabel = (value) => {
     d.label.toLowerCase() === (value || "").toLowerCase()
   );
   return found?.label || value;
+};
+
+/** Resolve a translated discipline label for UI selects and badges. */
+export const translateDiscipline = (t, discipline) => {
+  if (!discipline) return "";
+  const normalized = normalizeDiscipline(discipline);
+  const found = DISCIPLINES.find(
+    (d) =>
+      d.value === discipline ||
+      d.value === normalized ||
+      d.label.toLowerCase() === String(discipline).toLowerCase()
+  );
+  const keys = [
+    found?.value,
+    found?.label,
+    discipline,
+    normalized,
+    String(discipline).replace(/[\s-]+/g, "_").toLowerCase(),
+  ].filter(Boolean);
+  const seen = new Set();
+  for (const key of keys) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const translated = t(`disciplines.${key}`);
+    if (typeof translated === "string" && translated !== `disciplines.${key}`) {
+      return translated;
+    }
+  }
+  return found?.label || getDisciplineLabel(discipline) || discipline;
 };
 
 // Normalize a discipline value (handle legacy/case variations)
@@ -69,8 +99,8 @@ export const normalizeDiscipline = (value) => {
     "inspection": "laboratory",
     "lab": "laboratory",
     "reliability": "operations",
-    "multi-discipline": "operations",
-    "multi_discipline": "operations",
+    "multi-discipline": "multi_discipline",
+    "multi_discipline": "multi_discipline",
     "engineering": "operations",
   };
   

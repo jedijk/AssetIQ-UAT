@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "../../../components/ui/select";
 import { TabsList, TabsTrigger } from "../../../components/ui/tabs";
-import { DISCIPLINES } from "../../../constants/disciplines";
+import { DISCIPLINES, translateDiscipline } from "../../../constants/disciplines";
 
 export function FormsTabsToolbar({
   embedded,
@@ -22,11 +22,11 @@ export function FormsTabsToolbar({
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <TabsList>
         <TabsTrigger value="templates" data-testid="templates-tab">
-          <Layers className="w-4 h-4 mr-2" /> Templates
+          <Layers className="w-4 h-4 mr-2" /> {t("forms.templates")}
         </TabsTrigger>
         {!embedded && (
           <TabsTrigger value="submissions" data-testid="submissions-tab">
-            <FileText className="w-4 h-4 mr-2" /> Submissions
+            <FileText className="w-4 h-4 mr-2" /> {t("forms.submissions")}
           </TabsTrigger>
         )}
       </TabsList>
@@ -51,7 +51,7 @@ export function FormsTabsToolbar({
             <SelectItem value="all">{t("forms.allDisciplines")}</SelectItem>
             {DISCIPLINES.map((d) => (
               <SelectItem key={d.value} value={d.value}>
-                {t(`disciplines.${d.label}`) || d.label}
+                {translateDiscipline(t, d.value)}
               </SelectItem>
             ))}
           </SelectContent>
