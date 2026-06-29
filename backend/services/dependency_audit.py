@@ -95,7 +95,6 @@ def run_pip_audit(
                 str(req_path),
                 "--format",
                 "json",
-                "-q",
                 "--progress-spinner",
                 "off",
             ],
