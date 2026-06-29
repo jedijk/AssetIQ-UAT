@@ -90,7 +90,6 @@ pillow==12.1.1
 pip-api==0.0.34
 pip-audit==2.10.1
 pip-requirements-parser==32.0.1
-pip_audit==2.10.0
 platformdirs==4.9.2
 pluggy==1.6.0
 propcache==0.4.1
