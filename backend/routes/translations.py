@@ -401,50 +401,25 @@ async def get_batch_translations(
     return {"entity_type": entity_type, "language_code": language_code, "translations": result, "count": len(result)}
 
 
-@router.post("/generate")
-async def generate_translations(
-    request: GenerateTranslationsRequest,
-    background_tasks: BackgroundTasks,
-    current_user: dict = Depends(_library_write)
-):
-    """
-    Generate AI translations for entities
-    """
-    # Create translation job
-    job = TranslationJob(
-        entity_type=request.entity_type,
-        entity_ids=request.entity_ids,
-        target_languages=request.target_languages,
-        fields_to_translate=request.fields or [],
-        created_by=current_user.get("id")
-    )
-    
-    await db.translation_jobs.insert_one(job.model_dump())
-    
-    service = TranslationService(db)
-    entity_type = request.entity_type
-    
+def build_entity_fetcher(entity_type: EntityType):
+    """Build async fetcher for translation job entity IDs."""
+
     async def fetch_entity(entity_id: str) -> Dict[str, Any]:
-        """Fetch entity data based on type"""
         if entity_type == EntityType.MAINTENANCE_TASK_TEMPLATE:
-            # Find task template in any strategy
             async for strategy in db.equipment_type_strategies.find({}):
                 for task in strategy.get("task_templates", []):
                     if task.get("id") == entity_id:
                         return task
             return None
-        elif entity_type == EntityType.FAILURE_MODE:
-            # Failure mode translations are keyed by failure_mode NAME
+        if entity_type == EntityType.FAILURE_MODE:
             fm = await db.failure_modes.find_one({"failure_mode": entity_id})
             if not fm:
                 fm = await db.failure_modes.find_one({"id": entity_id})
             if not fm and entity_id.isdigit():
                 fm = await db.failure_modes.find_one({"legacy_id": int(entity_id)})
             if fm:
-                # Normalize fields for translation
                 actions = fm.get("recommended_actions", [])
                 if isinstance(actions, list):
-                    # Handle both str and dict shapes (some FMs store structured actions)
                     actions_str = ", ".join(
                         a if isinstance(a, str) else (a.get("title") or a.get("action") or a.get("name") or "")
                         for a in actions
@@ -459,19 +434,18 @@ async def generate_translations(
                     "recommended_actions": actions_str,
                 }
             return None
-        elif entity_type == EntityType.EQUIPMENT_TYPE:
+        if entity_type == EntityType.EQUIPMENT_TYPE:
             et = await db.equipment_types.find_one({"id": entity_id})
             if not et:
                 et = await db.custom_equipment_types.find_one({"id": entity_id})
             if not et:
-                # Fallback to built-in iso14224 EQUIPMENT_TYPES static list
                 try:
                     from iso14224_models import EQUIPMENT_TYPES as _BUILTIN_EQ_TYPES
                     et = next((x for x in _BUILTIN_EQ_TYPES if x.get("id") == entity_id), None)
                 except Exception:
                     et = None
             return et
-        elif entity_type == EntityType.OBSERVATION:
+        if entity_type == EntityType.OBSERVATION:
             obs = await db.threats.find_one({"id": entity_id})
             if not obs:
                 obs = await db.observations.find_one({"id": entity_id})
@@ -482,7 +456,7 @@ async def generate_translations(
                     "description": obs.get("description", "") or "",
                 }
             return None
-        elif entity_type == EntityType.ACTION:
+        if entity_type == EntityType.ACTION:
             act = await db.central_actions.find_one({"id": entity_id})
             if act:
                 return {
@@ -491,7 +465,7 @@ async def generate_translations(
                     "description": act.get("description", "") or "",
                 }
             return None
-        elif entity_type == EntityType.INVESTIGATION:
+        if entity_type == EntityType.INVESTIGATION:
             inv = await db.investigations.find_one({"id": entity_id})
             if inv:
                 return {
@@ -500,29 +474,83 @@ async def generate_translations(
                     "description": inv.get("description", "") or "",
                 }
             return None
-        elif entity_type == EntityType.EQUIPMENT_NODE:
+        if entity_type == EntityType.EQUIPMENT_NODE:
             return await db.equipment_nodes.find_one({"id": entity_id})
-        elif entity_type == EntityType.FORM_TEMPLATE:
+        if entity_type == EntityType.FORM_TEMPLATE:
             return await db.form_templates.find_one({"id": entity_id})
         return None
-    
-    # For small jobs, process synchronously
-    if len(request.entity_ids) <= 5:
-        job = await service.process_translation_job(job.id, fetch_entity)
+
+    return fetch_entity
+
+
+async def _start_translation_job(
+    job_id: str,
+    entity_type: EntityType,
+    background_tasks: BackgroundTasks,
+    current_user: dict,
+    *,
+    sync_small: bool,
+    entity_count: int,
+) -> Dict[str, Any]:
+    """Run a translation job immediately (sync for small batches, else background)."""
+    service = TranslationService(db)
+    fetch_entity = build_entity_fetcher(entity_type)
+
+    if sync_small and entity_count <= 5:
+        job = await service.process_translation_job(job_id, fetch_entity)
         job_data = job.model_dump()
         job_data.pop("_id", None) if "_id" in job_data else None
         return {"success": True, "job": job_data}
-    
-    # For larger jobs, process in background (non-blocking)
+
     schedule_tracked_job(
         background_tasks,
         "translation_job",
         service.process_translation_job,
-        job.id,
+        job_id,
         fetch_entity,
         user_id=current_user.get("id"),
     )
-    return {"success": True, "job_id": job.id, "status": "queued", "total": len(request.entity_ids)}
+    return {"success": True, "job_id": job_id, "status": "queued", "total": entity_count}
+
+
+@router.post("/generate")
+async def generate_translations(
+    request: GenerateTranslationsRequest,
+    background_tasks: BackgroundTasks,
+    queue_only: bool = False,
+    current_user: dict = Depends(_library_write)
+):
+    """
+    Generate AI translations for entities.
+    When queue_only=true, create a pending job without starting AI processing.
+    """
+    job = TranslationJob(
+        entity_type=request.entity_type,
+        entity_ids=request.entity_ids,
+        target_languages=request.target_languages,
+        fields_to_translate=request.fields or [],
+        created_by=current_user.get("id"),
+        total_items=len(request.entity_ids) * len(request.target_languages),
+    )
+
+    await db.translation_jobs.insert_one(job.model_dump())
+
+    if queue_only:
+        return {
+            "success": True,
+            "job_id": job.id,
+            "status": "pending",
+            "total": len(request.entity_ids),
+        }
+
+    return await _start_translation_job(
+        job.id,
+        request.entity_type,
+        background_tasks,
+        current_user,
+        sync_small=True,
+        entity_count=len(request.entity_ids),
+    )
 
 
 LEGACY_BULK_ENTITY_TYPES = [
@@ -649,6 +677,7 @@ async def _enqueue_bulk_translation(
     only_missing: bool,
     background_tasks: BackgroundTasks,
     current_user: dict,
+    queue_only: bool = False,
 ) -> Dict[str, Any]:
     entity_ids = await _collect_entity_ids(entity_type)
     if only_missing and entity_ids:
@@ -667,7 +696,9 @@ async def _enqueue_bulk_translation(
         entity_ids=entity_ids,
         target_languages=target_languages,
     )
-    result = await generate_translations(req, background_tasks, current_user)
+    result = await generate_translations(
+        req, background_tasks, queue_only=queue_only, current_user=current_user
+    )
     return {
         "entity_type": entity_type.value,
         "total": result.get("total") or len(entity_ids),
@@ -682,15 +713,22 @@ async def generate_all_translations(
     background_tasks: BackgroundTasks,
     target_languages: List[str] = ["nl", "de"],
     only_missing: bool = True,
+    queue_only: bool = False,
     current_user: dict = Depends(_library_write)
 ):
     """
     Bulk-translate ALL existing entities of a given type to the target languages.
     Useful for legacy data that was created before auto-translation was enabled.
     Set only_missing=false to rebuild translations for every legacy record.
+    Set queue_only=true to enqueue without starting AI processing.
     """
     result = await _enqueue_bulk_translation(
-        entity_type, target_languages, only_missing, background_tasks, current_user
+        entity_type,
+        target_languages,
+        only_missing,
+        background_tasks,
+        current_user,
+        queue_only=queue_only,
     )
     if result.get("status") == "skipped":
         return {"success": True, "message": result["message"], "total": 0}
@@ -707,17 +745,24 @@ async def build_legacy_translations(
     background_tasks: BackgroundTasks,
     target_languages: List[str] = ["nl", "de"],
     only_missing: bool = False,
+    queue_only: bool = False,
     current_user: dict = Depends(_library_write)
 ):
     """
     Queue translation jobs for all legacy entity types in the database.
     Defaults to only_missing=false so every existing record is (re)translated.
+    Set queue_only=true to enqueue without starting AI processing.
     """
     summaries = []
     total_queued = 0
     for entity_type in LEGACY_BULK_ENTITY_TYPES:
         result = await _enqueue_bulk_translation(
-            entity_type, target_languages, only_missing, background_tasks, current_user
+            entity_type,
+            target_languages,
+            only_missing,
+            background_tasks,
+            current_user,
+            queue_only=queue_only,
         )
         summaries.append(result)
         total_queued += result.get("total") or 0
@@ -750,6 +795,40 @@ async def get_translation_jobs(
         jobs.append(job)
     
     return {"jobs": jobs}
+
+
+@router.post("/jobs/process-pending")
+async def process_pending_translation_jobs(
+    background_tasks: BackgroundTasks,
+    limit: int = 10,
+    current_user: dict = Depends(_library_write),
+):
+    """
+    Start AI processing for pending translation jobs (oldest first).
+    """
+    pending_jobs = []
+    async for job in db.translation_jobs.find({"status": "pending"}).sort("created_at", 1).limit(limit):
+        pending_jobs.append(job)
+
+    if not pending_jobs:
+        return {"success": True, "started": 0, "message": "No pending jobs"}
+
+    started_ids = []
+    for job_data in pending_jobs:
+        job_id = job_data["id"]
+        entity_type = EntityType(job_data["entity_type"])
+        entity_count = len(job_data.get("entity_ids") or [])
+        await _start_translation_job(
+            job_id,
+            entity_type,
+            background_tasks,
+            current_user,
+            sync_small=False,
+            entity_count=entity_count,
+        )
+        started_ids.append(job_id)
+
+    return {"success": True, "started": len(started_ids), "job_ids": started_ids, "status": "processing"}
 
 
 @router.get("/jobs/{job_id}")

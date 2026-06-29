@@ -7,6 +7,7 @@ import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { visualManagementPaths } from "../../lib/visualManagementPaths";
 import { getDisplayPairingUrl } from "../../components/visual-boards/DisplayPairingInstructions";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
 import { VisualManagementPageLayout } from "../../components/visual-boards/VisualManagementPageLayout";
@@ -39,7 +40,7 @@ const VisualBoardsPage = () => {
       }),
     onSuccess: (board) => {
       queryClient.invalidateQueries({ queryKey: ["visual-boards"] });
-      navigate(`/visual-management/boards/${board.id}/edit`);
+      navigate(visualManagementPaths.boardEdit(board.id));
     },
     onError: (err) => toast.error(err.response?.data?.detail || "Failed to create board"),
   });
@@ -62,7 +63,7 @@ const VisualBoardsPage = () => {
         </div>
         <div className={VMB_PAGE_ACTIONS_CLASS}>
           <Button asChild variant="outline" size="sm">
-            <Link to="/visual-management/pair-displays">
+            <Link to={visualManagementPaths.pairDisplays}>
               <Tv className="w-4 h-4 mr-1" />
               Pair a TV
             </Link>
@@ -95,7 +96,7 @@ const VisualBoardsPage = () => {
           </p>
         </div>
         <Button asChild size="sm" className="w-full sm:w-auto shrink-0">
-          <Link to="/visual-management/screens">
+          <Link to={visualManagementPaths.screens}>
             <Tv className="w-4 h-4 mr-1" />
             Pair Displays
           </Link>
@@ -127,10 +128,10 @@ const VisualBoardsPage = () => {
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/visual-management/boards/${board.id}/edit`}>Edit</Link>
+                  <Link to={visualManagementPaths.boardEdit(board.id)}>Edit</Link>
                 </Button>
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/visual-management/boards/${board.id}/preview`}>Preview</Link>
+                  <Link to={visualManagementPaths.boardPreview(board.id)}>Preview</Link>
                 </Button>
                 {board.status === "published" && board.public_url && (
                   <Button asChild size="sm" variant="ghost">

@@ -117,7 +117,7 @@ const SETTINGS_SECTIONS = [
     id: "definitions",
     sectionKey: "definitions",
     icon: Sliders,
-    path: "/definitions",
+    path: "/settings/criticality-definitions",
     roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"],
     feature: "equipment",
   },
@@ -125,7 +125,7 @@ const SETTINGS_SECTIONS = [
     id: "visual-management",
     sectionKey: "visualManagement",
     icon: Monitor,
-    path: "/visual-management/boards",
+    path: "/settings/visual-management",
     roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"],
     feature: "visual_boards",
   },
@@ -334,7 +334,11 @@ export default function SettingsPage() {
   const handleSectionClick = (section) => {
     setActiveSection(section.id);
     setShowMobileNav(false);
-    navigate(section.path);
+    const target =
+      section.id === "visual-management"
+        ? "/settings/visual-management/boards"
+        : section.path;
+    navigate(target);
   };
 
   // On mobile, render settings pages directly without the Settings wrapper
@@ -349,7 +353,7 @@ export default function SettingsPage() {
     <div className="h-[calc(100vh-48px)] flex bg-slate-50">
       {/* Left Sidebar - Hidden on mobile when content is shown */}
       <aside className={cn(
-        "bg-white border-r border-slate-200 flex flex-col flex-shrink-0",
+        "bg-white border-r border-slate-200 flex flex-col flex-shrink-0 min-h-0 overflow-hidden",
         "w-full md:w-72 xl:w-80",
         "md:flex",
         showMobileNav ? "flex" : "hidden md:flex"
@@ -376,7 +380,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Navigation */}
-        <ScrollArea className="flex-1" persistKey="settings.sidebar">
+        <ScrollArea className="flex-1 min-h-0" persistKey="settings.sidebar">
           <nav className="p-2 space-y-1">
             {filteredSections.length === 0 && (
               <p className="px-3 py-6 text-sm text-slate-500 text-center">
@@ -434,13 +438,13 @@ export default function SettingsPage() {
           </nav>
         </ScrollArea>
 
-        {/* Sidebar Footer */}
-        <div className="p-3 border-t border-slate-200 bg-slate-50">
+        {/* Sidebar Footer — pinned below scrollable nav */}
+        <div className="flex-shrink-0 p-3 border-t border-slate-200 bg-slate-50">
           <div className="text-xs text-slate-500 text-center space-y-1">
-            <div>
+            <div className="truncate">
               {t("settings.accessLevel").replace("{role}", formatRoleLabel(effectiveRole || user?.role || ""))}
             </div>
-            <div className="text-slate-400">
+            <div className="text-slate-400 truncate">
               {t("settings.version").replace("{version}", APP_VERSION)}
             </div>
           </div>
@@ -458,8 +462,10 @@ export default function SettingsPage() {
         >
           <div className={cn(
             "md:p-6 xl:p-8",
-            // No padding on mobile for user-management - it has its own layout
-            location.pathname.includes('/user-management') ? "p-0" : "p-4"
+            location.pathname.includes('/user-management') ||
+            location.pathname.includes('/settings/visual-management')
+              ? "p-0 h-full"
+              : "p-4"
           )}>
             <Outlet />
           </div>

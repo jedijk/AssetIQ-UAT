@@ -17,6 +17,7 @@ KEY_PREFIX = "aiq_live_"
 KEYS_COLLECTION = "external_api_keys"
 _TOKEN_BODY_PATTERN = re.compile(r"^[0-9a-zA-Z_-]{32,64}$")
 DEFAULT_SCOPES = ["observations:create"]
+ALLOWED_SCOPES = frozenset({"observations:create", "equipment:read"})
 GRACE_COLLECTION_FIELD = "previous_key_hashes"
 
 
@@ -113,13 +114,17 @@ async def create_key(
     key_hash = hash_api_key(raw_key)
     key_id = str(uuid.uuid4())
     now = _iso(_now())
+    scope_list = scopes or DEFAULT_SCOPES
+    invalid = [s for s in scope_list if s not in ALLOWED_SCOPES]
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Invalid scopes: {', '.join(invalid)}")
     doc = {
         "id": key_id,
         "tenant_id": tenant_id,
         "name": name.strip(),
         "key_hash": key_hash,
         "key_prefix": raw_key[:16] + "…",
-        "scopes": scopes or DEFAULT_SCOPES,
+        "scopes": scope_list,
         "enabled": True,
         "rate_limit_per_minute": rate_limit_per_minute,
         "ip_allowlist": ip_allowlist or [],
@@ -130,6 +135,7 @@ async def create_key(
             "total_requests": 0,
             "total_errors": 0,
             "observations_created": 0,
+            "equipment_requests": 0,
             "response_time_ms_total": 0,
         },
         GRACE_COLLECTION_FIELD: [],
@@ -325,6 +331,7 @@ async def record_key_usage(
     success: bool,
     response_ms: float,
     observation_created: bool = False,
+    equipment_request: bool = False,
 ) -> None:
     inc: Dict[str, Any] = {
         "usage.total_requests": 1,
@@ -334,6 +341,8 @@ async def record_key_usage(
         inc["usage.total_errors"] = 1
     if observation_created:
         inc["usage.observations_created"] = 1
+    if equipment_request:
+        inc["usage.equipment_requests"] = 1
     await db[KEYS_COLLECTION].update_one(
         {"id": key_doc["id"]},
         {
@@ -351,6 +360,7 @@ async def get_key_usage(tenant_id: str, key_id: str, *, limit: int = 50) -> Dict
     total_requests = int(usage.get("total_requests") or 0)
     total_errors = int(usage.get("total_errors") or 0)
     observations_created = int(usage.get("observations_created") or 0)
+    equipment_requests = int(usage.get("equipment_requests") or 0)
     ms_total = int(usage.get("response_time_ms_total") or 0)
     avg_ms = round(ms_total / total_requests, 1) if total_requests else None
 
@@ -365,18 +375,21 @@ async def get_key_usage(tenant_id: str, key_id: str, *, limit: int = 50) -> Dict
     else:
         health = "healthy"
 
-    from services.external_api_audit_service import list_recent_requests
+    from services.external_api_audit_service import aggregate_usage_trends, list_recent_requests
 
     recent = await list_recent_requests(tenant_id, key_id, limit=limit)
+    trends = await aggregate_usage_trends(tenant_id, key_id)
     return {
         "key_id": key_id,
         "total_requests": total_requests,
         "total_errors": total_errors,
         "observations_created": observations_created,
+        "equipment_requests": equipment_requests,
         "avg_response_ms": avg_ms,
         "last_request_at": doc.get("last_used_at"),
         "health_status": health,
         "recent_requests": recent,
+        "usage_trends": trends,
     }
 
 

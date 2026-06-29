@@ -252,6 +252,92 @@ async def test_match_equipment_by_tag(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_authenticate_equipment_read_scope(monkeypatch):
+    raw = generate_api_key()
+    doc = {
+        "id": "k1",
+        "tenant_id": "t1",
+        "key_hash": hash_api_key(raw),
+        "enabled": True,
+        "scopes": ["equipment:read"],
+        "ip_allowlist": [],
+    }
+    monkeypatch.setattr("services.external_api_key_service.db", _FakeDb([doc]))
+    result = await authenticate_api_key(raw, required_scope="equipment:read", client_ip=None)
+    assert result["id"] == "k1"
+
+
+@pytest.mark.asyncio
+async def test_authenticate_equipment_scope_missing(monkeypatch):
+    raw = generate_api_key()
+    doc = {
+        "id": "k1",
+        "tenant_id": "t1",
+        "key_hash": hash_api_key(raw),
+        "enabled": True,
+        "scopes": ["observations:create"],
+        "ip_allowlist": [],
+    }
+    monkeypatch.setattr("services.external_api_key_service.db", _FakeDb([doc]))
+    with pytest.raises(HTTPException) as exc:
+        await authenticate_api_key(raw, required_scope="equipment:read", client_ip=None)
+    assert exc.value.status_code == 403
+
+
+def test_build_equipment_path():
+    from services.external_equipment_service import build_equipment_path
+
+    lookup = {
+        "inst": {"id": "inst", "name": "Plant A", "parent_id": None},
+        "sys": {"id": "sys", "name": "Cooling", "parent_id": "inst"},
+        "eq": {"id": "eq", "name": "Pump P-101", "parent_id": "sys"},
+    }
+    assert build_equipment_path(lookup["eq"], lookup) == "Plant A > Cooling > Pump P-101"
+
+
+def test_serialize_criticality_totals():
+    from services.external_equipment_service import serialize_criticality
+
+    crit = serialize_criticality(
+        {
+            "safety_impact": 4,
+            "production_impact": 3,
+            "environmental_impact": 2,
+            "reputation_impact": 1,
+            "classification": "high",
+        }
+    )
+    assert crit["total_score"] == 10
+    assert crit["classification"] == "high"
+    assert crit["safety_critical"] is True
+
+
+def test_serialize_equipment_object_shape():
+    from services.external_equipment_service import serialize_equipment_object
+
+    node = {
+        "id": "eq-1",
+        "name": "Pump",
+        "tag": "P-101",
+        "level": "equipment",
+        "criticality": {"production_impact": 3},
+    }
+    obj = serialize_equipment_object(
+        node,
+        equipment_path="Plant > Pump",
+        depth=2,
+        operational_summary={"open_observation_count": 1, "open_planned_task_count": 0},
+        include_metadata=False,
+        children=[],
+    )
+    assert obj["id"] == "eq-1"
+    assert obj["equipment_path"] == "Plant > Pump"
+    assert obj["operational_summary"]["open_observation_count"] == 1
+    assert obj["children"] == []
+    assert "metadata" not in obj
+
+
+@pytest.mark.asyncio
 async def test_find_duplicate(monkeypatch):
     payloads = MagicMock()
     payloads.find_one = AsyncMock(

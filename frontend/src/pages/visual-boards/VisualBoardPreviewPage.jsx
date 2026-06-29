@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams, useLocation } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
+import { visualManagementPaths, isVisualManagementInSettings } from "../../lib/visualManagementPaths";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
 import { BoardSyncStatus, useBoardSyncState } from "../../components/visual-boards/BoardSyncStatus";
 import { boardSurfaceClass } from "../../components/visual-boards/boardTheme";
@@ -117,7 +118,9 @@ const VisualBoardPreviewPage = () => {
 
   const pageClass = isTvExact
     ? `fixed inset-0 z-40 ${boardSurfaceClass(canvasBoard.theme)}`
-    : "app-page-shell bg-slate-900 flex flex-col";
+    : isVisualManagementInSettings(location.pathname)
+      ? "h-full min-h-0 bg-slate-900 flex flex-col"
+      : "app-page-shell bg-slate-900 flex flex-col";
 
   const canvasPreviewSize = isTvExact ? "fullscreen" : previewSize;
   const hideChrome = snapshotMode && isTvExact;
@@ -132,7 +135,7 @@ const VisualBoardPreviewPage = () => {
         <div className="px-3 sm:px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 min-w-0">
           <div className="flex items-start gap-2 sm:gap-3 min-w-0">
             <Button asChild variant="ghost" size="sm" className="text-slate-300 shrink-0">
-              <Link to={`/visual-management/boards/${boardId}/edit`}>
+              <Link to={visualManagementPaths.boardEdit(boardId)}>
                 <ArrowLeft className="w-4 h-4" />
               </Link>
             </Button>
@@ -176,7 +179,7 @@ const VisualBoardPreviewPage = () => {
             </SelectContent>
           </Select>
           <Button asChild variant="secondary" size="sm" className="h-8 text-xs">
-            <Link to={`/visual-management/boards/${boardId}/edit`}>
+            <Link to={visualManagementPaths.boardEdit(boardId)}>
               <ArrowLeft className="w-3.5 h-3.5 mr-1" />
               Editor
             </Link>

@@ -31,7 +31,7 @@ export function useNearbyDisplayPairing({ enabled }) {
       return undefined;
     }
 
-    if (location.pathname.includes("/visual-management/pair-displays")) {
+    if (location.pathname.includes("pair-displays")) {
       setNearby(null);
       emptyPollStreakRef.current = 0;
       return undefined;

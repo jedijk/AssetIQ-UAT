@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { LayoutTemplate, Loader2, Plus, Trash2 } from "lucide-react";
+import { visualManagementPaths } from "../../lib/visualManagementPaths";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -28,7 +29,7 @@ const VisualBoardTemplatesPage = () => {
       }),
     onSuccess: (board) => {
       toast.success("Board created from template");
-      navigate(`/visual-management/boards/${board.id}/edit`);
+      navigate(visualManagementPaths.boardEdit(board.id));
     },
     onError: (err) => toast.error(err.response?.data?.detail || "Failed to create board"),
   });

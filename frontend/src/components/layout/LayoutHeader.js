@@ -308,24 +308,26 @@ export default function LayoutHeader({
                     <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 max-h-[min(70vh,24rem)] overflow-y-auto">
-                  <DropdownMenuLabel className="text-xs">{t("nav.settings")}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {settingsMenuItems.map((item) => (
-                    <DropdownMenuItem 
-                      key={item.path}
-                      onClick={() => navigate(item.path)}
-                      className="cursor-pointer text-sm"
-                      data-testid={`settings-${item.path.replace(/\//g, '-').replace(/^-/, '')}-menu-item`}
-                    >
-                      <item.icon className="w-3.5 h-3.5 mr-2" />
-                      {item.label}
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <div className="px-2 py-1.5 text-[10px] text-slate-400 flex items-center gap-1">
-                    <Tag className="w-3 h-3" />
-                    Version {APP_VERSION}
+                <DropdownMenuContent align="end" className="w-56 p-0 flex flex-col max-h-[min(70vh,24rem)] overflow-hidden">
+                  <div className="flex-1 min-h-0 overflow-y-auto p-1">
+                    <DropdownMenuLabel className="text-xs">{t("nav.settings")}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {settingsMenuItems.map((item) => (
+                      <DropdownMenuItem 
+                        key={item.path}
+                        onClick={() => navigate(item.path)}
+                        className="cursor-pointer text-sm"
+                        data-testid={`settings-${item.path.replace(/\//g, '-').replace(/^-/, '')}-menu-item`}
+                      >
+                        <item.icon className="w-3.5 h-3.5 mr-2" />
+                        {item.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                  <DropdownMenuSeparator className="m-0" />
+                  <div className="flex-shrink-0 px-2 py-1.5 text-[10px] text-slate-400 flex items-center gap-1 bg-popover border-t border-slate-100">
+                    <Tag className="w-3 h-3 shrink-0" />
+                    <span className="truncate">Version {APP_VERSION}</span>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>

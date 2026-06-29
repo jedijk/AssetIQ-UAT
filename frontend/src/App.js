@@ -22,7 +22,7 @@ import { api } from "./lib/apiClient";
 import { debugLog } from "./lib/debug";
 import { isPublicKioskPath } from "./lib/publicRoutes";
 import "./App.css";
-import { AppShell } from "./components/AppShell";
+import { VisualManagementLegacyRedirect } from "./lib/visualManagementPaths";
 import KioskErrorBoundary from "./components/KioskErrorBoundary";
 import DisplayPairingPage from "./pages/display/DisplayPairingPage";
 import DisplayBoardKioskPage from "./pages/display/DisplayBoardKioskPage";
@@ -543,7 +543,7 @@ function App() {
                 <Route path="dashboard" element={<Suspense fallback={<RouteFallback />}><DashboardPage /></Suspense>} />
                 <Route path="production" element={<Suspense fallback={<RouteFallback />}><DashboardPage initialTab="production" /></Suspense>} />
                 <Route path="reliability" element={<Suspense fallback={<RouteFallback />}><DashboardPage initialTab="reliability" /></Suspense>} />
-                <Route path="definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
+                <Route path="definitions" element={<Navigate to="/settings/criticality-definitions" replace />} />
                 <Route path="observations" element={<Suspense fallback={<RouteFallback />}><ThreatsPage /></Suspense>} />
                 <Route path="observations/:id" element={<RedirectToWorkspace />} />
                 <Route path="observations/:id/workspace" element={<Suspense fallback={<RouteFallback />}><ObservationWorkspacePage /></Suspense>} />
@@ -572,14 +572,7 @@ function App() {
                 <Route path="reliability/cases/:id" element={<Suspense fallback={<RouteFallback />}><RILCaseDetailPage /></Suspense>} />
 
                 {/* Visual Management Studio */}
-                <Route path="visual-management/boards" element={<Suspense fallback={<RouteFallback />}><VisualBoardsPage /></Suspense>} />
-                <Route path="visual-management/boards/:boardId/edit" element={<Suspense fallback={<RouteFallback />}><VisualBoardEditorPage /></Suspense>} />
-                <Route path="visual-management/boards/:boardId/preview" element={<Suspense fallback={<RouteFallback />}><VisualBoardPreviewPage /></Suspense>} />
-                <Route path="visual-management/templates" element={<Suspense fallback={<RouteFallback />}><VisualBoardTemplatesPage /></Suspense>} />
-                <Route path="visual-management/pair-displays" element={<Suspense fallback={<RouteFallback />}><VisualBoardPairDisplaysPage /></Suspense>} />
-                <Route path="visual-management/screens" element={<Suspense fallback={<RouteFallback />}><VisualBoardDevicesListPage /></Suspense>} />
-                <Route path="visual-management/screens/:deviceId" element={<Suspense fallback={<RouteFallback />}><VisualBoardDeviceDetailPage /></Suspense>} />
-                <Route path="visual-management/analytics" element={<Suspense fallback={<RouteFallback />}><VisualBoardAnalyticsPage /></Suspense>} />
+                <Route path="visual-management/*" element={<VisualManagementLegacyRedirect />} />
                 
                 {/* Settings Layout with nested routes */}
                 <Route path="settings" element={<Suspense fallback={<RouteFallback />}><SettingsPage /></Suspense>}>
@@ -602,6 +595,15 @@ function App() {
                   <Route path="insights" element={<Navigate to="/dashboard" replace />} />
                   <Route path="statistics" element={<Suspense fallback={<RouteFallback />}><UserStatisticsPage /></Suspense>} />
                   <Route path="criticality-definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
+                  <Route path="visual-management" element={<Navigate to="/settings/visual-management/boards" replace />} />
+                  <Route path="visual-management/boards" element={<Suspense fallback={<RouteFallback />}><VisualBoardsPage /></Suspense>} />
+                  <Route path="visual-management/boards/:boardId/edit" element={<Suspense fallback={<RouteFallback />}><VisualBoardEditorPage /></Suspense>} />
+                  <Route path="visual-management/boards/:boardId/preview" element={<Suspense fallback={<RouteFallback />}><VisualBoardPreviewPage /></Suspense>} />
+                  <Route path="visual-management/templates" element={<Suspense fallback={<RouteFallback />}><VisualBoardTemplatesPage /></Suspense>} />
+                  <Route path="visual-management/pair-displays" element={<Suspense fallback={<RouteFallback />}><VisualBoardPairDisplaysPage /></Suspense>} />
+                  <Route path="visual-management/screens" element={<Suspense fallback={<RouteFallback />}><VisualBoardDevicesListPage /></Suspense>} />
+                  <Route path="visual-management/screens/:deviceId" element={<Suspense fallback={<RouteFallback />}><VisualBoardDeviceDetailPage /></Suspense>} />
+                  <Route path="visual-management/analytics" element={<Suspense fallback={<RouteFallback />}><VisualBoardAnalyticsPage /></Suspense>} />
                   <Route path="feedback" element={<Suspense fallback={<RouteFallback />}><FeedbackPage /></Suspense>} />
                   <Route path="log-ingestion" element={<Suspense fallback={<RouteFallback />}><SettingsLogIngestionPage /></Suspense>} />
                   <Route path="tenant-management" element={<Suspense fallback={<RouteFallback />}><SettingsTenantManagementPage /></Suspense>} />

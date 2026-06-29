@@ -1,13 +1,14 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutTemplate, Monitor, Tv, BarChart3, Link2 } from "lucide-react";
+import { visualManagementPaths } from "../../lib/visualManagementPaths";
 
 export const VISUAL_MANAGEMENT_TABS = [
-  { path: "/visual-management/boards", label: "Boards", shortLabel: "Boards", icon: Monitor, end: true },
-  { path: "/visual-management/screens", label: "Screens", shortLabel: "Screens", icon: Tv, end: false },
-  { path: "/visual-management/pair-displays", label: "Pair Displays", shortLabel: "Pair", icon: Link2, end: true },
-  { path: "/visual-management/templates", label: "Templates", shortLabel: "Templates", icon: LayoutTemplate, end: true },
-  { path: "/visual-management/analytics", label: "Analytics", shortLabel: "Analytics", icon: BarChart3, end: true },
+  { path: visualManagementPaths.boards, label: "Boards", shortLabel: "Boards", icon: Monitor, end: true },
+  { path: visualManagementPaths.screens, label: "Screens", shortLabel: "Screens", icon: Tv, end: false },
+  { path: visualManagementPaths.pairDisplays, label: "Pair Displays", shortLabel: "Pair", icon: Link2, end: true },
+  { path: visualManagementPaths.templates, label: "Templates", shortLabel: "Templates", icon: LayoutTemplate, end: true },
+  { path: visualManagementPaths.analytics, label: "Analytics", shortLabel: "Analytics", icon: BarChart3, end: true },
 ];
 
 /**

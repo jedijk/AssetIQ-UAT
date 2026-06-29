@@ -5,7 +5,7 @@ import { api } from "../lib/apiClient";
 import { toast } from "sonner";
 import {
   Languages, BookOpen, RefreshCw, Plus, Pencil, Trash2,
-  CheckCircle, AlertTriangle, Loader2, Search, Sparkles, ShieldCheck,
+  CheckCircle, AlertTriangle, Loader2, Search, Sparkles, ShieldCheck, Play,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -75,6 +75,7 @@ function CoverageTab() {
   const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(null); // entity_type id while bulk generation in flight
   const [buildingLegacy, setBuildingLegacy] = useState(false);
+  const [processingQueue, setProcessingQueue] = useState(false);
 
   const { data: covData, isLoading: covLoading, refetch: refetchCov } = useQuery({
     queryKey: ["translation-coverage"],
@@ -89,10 +90,19 @@ function CoverageTab() {
     refetchInterval: 5000,
   });
 
+  const { data: pendingData, refetch: refetchPending } = useQuery({
+    queryKey: ["translation-jobs-pending"],
+    queryFn: async () => (await api.get("/translations/jobs?status=pending&limit=100")).data,
+    staleTime: 1000 * 10,
+    refetchInterval: 5000,
+  });
+
+  const pendingCount = pendingData?.jobs?.length ?? 0;
+
   const generateAll = useMutation({
     mutationFn: async ({ entityType, onlyMissing = true }) => {
       const r = await api.post(
-        `/translations/generate-all/${entityType}?only_missing=${onlyMissing}&target_languages=nl&target_languages=de`
+        `/translations/generate-all/${entityType}?only_missing=${onlyMissing}&queue_only=true&target_languages=nl&target_languages=de`
       );
       return r.data;
     },
@@ -100,23 +110,24 @@ function CoverageTab() {
     onSuccess: (data, { entityType }) => {
       const total = data?.total;
       const msg = total === 0
-        ? `${entityType}: nothing to translate – already up to date`
+        ? `${entityType}: nothing to add – already up to date`
         : total > 0
-          ? `${entityType}: queued ${total} entities`
-          : `${entityType}: translation job started`;
+          ? `${entityType}: added ${total} entities to queue`
+          : `${entityType}: added to queue`;
       toast.success(msg);
       queryClient.invalidateQueries({ queryKey: ["translation-coverage"] });
       queryClient.invalidateQueries({ queryKey: ["translation-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["translation-jobs-pending"] });
     },
     onError: (e, { entityType }) => {
-      toast.error(`Failed to start ${entityType}: ${e.response?.data?.detail || e.message}`);
+      toast.error(`Failed to queue ${entityType}: ${e.response?.data?.detail || e.message}`);
     },
     onSettled: () => setGenerating(null),
   });
 
   const buildLegacy = useMutation({
     mutationFn: async () => {
-      const r = await api.post("/translations/build-legacy?only_missing=false&target_languages=nl&target_languages=de");
+      const r = await api.post("/translations/build-legacy?only_missing=false&queue_only=true&target_languages=nl&target_languages=de");
       return r.data;
     },
     onMutate: () => setBuildingLegacy(true),
@@ -126,15 +137,36 @@ function CoverageTab() {
       if (total === 0) {
         toast.success("All legacy data is already translated");
       } else {
-        toast.success(`Queued ${total} legacy entities across ${ENTITY_TYPES.length - skipped} entity types`);
+        toast.success(`Added ${total} legacy entities to queue across ${ENTITY_TYPES.length - skipped} entity types`);
       }
       queryClient.invalidateQueries({ queryKey: ["translation-coverage"] });
       queryClient.invalidateQueries({ queryKey: ["translation-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["translation-jobs-pending"] });
     },
     onError: (e) => {
-      toast.error(`Failed to build legacy translations: ${e.response?.data?.detail || e.message}`);
+      toast.error(`Failed to queue legacy translations: ${e.response?.data?.detail || e.message}`);
     },
     onSettled: () => setBuildingLegacy(false),
+  });
+
+  const processQueue = useMutation({
+    mutationFn: async () => (await api.post("/translations/jobs/process-pending?limit=10")).data,
+    onMutate: () => setProcessingQueue(true),
+    onSuccess: (data) => {
+      const started = data?.started ?? 0;
+      if (started === 0) {
+        toast.info(data?.message || "No pending jobs to execute");
+      } else {
+        toast.success(`Started processing ${started} queued job${started === 1 ? "" : "s"}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["translation-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["translation-jobs-pending"] });
+      queryClient.invalidateQueries({ queryKey: ["translation-coverage"] });
+    },
+    onError: (e) => {
+      toast.error(`Failed to execute queue: ${e.response?.data?.detail || e.message}`);
+    },
+    onSettled: () => setProcessingQueue(false),
   });
 
   const coverage = covData?.coverage || {};
@@ -148,18 +180,18 @@ function CoverageTab() {
           <div>
             <h3 className="text-sm font-semibold text-slate-900">Build legacy translations</h3>
             <p className="text-xs text-slate-600 mt-0.5">
-              Queue AI translation for every existing record in the database (NL + DE), including records that already have translations.
+              Add AI translation jobs for every existing record (NL + DE) to the queue without running them immediately.
             </p>
           </div>
           <Button
             onClick={() => buildLegacy.mutate()}
-            disabled={buildingLegacy || buildLegacy.isPending}
+            disabled={buildingLegacy || buildLegacy.isPending || processingQueue}
             data-testid="build-legacy-btn"
           >
             {buildingLegacy ? (
-              <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Building…</>
+              <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Adding…</>
             ) : (
-              <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Build all legacy</>
+              <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Add all legacy to queue</>
             )}
           </Button>
         </div>
@@ -169,7 +201,7 @@ function CoverageTab() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-semibold text-slate-900">Coverage by entity type</h3>
-          <Button variant="outline" size="sm" onClick={() => { refetchCov(); refetchJobs(); }} data-testid="refresh-coverage-btn">
+          <Button variant="outline" size="sm" onClick={() => { refetchCov(); refetchJobs(); refetchPending(); }} data-testid="refresh-coverage-btn">
             <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
             Refresh
           </Button>
@@ -188,25 +220,25 @@ function CoverageTab() {
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs"
-                    disabled={generating === et.id || generateAll.isPending || buildingLegacy}
+                    disabled={generating === et.id || generateAll.isPending || buildingLegacy || processingQueue}
                     onClick={() => generateAll.mutate({ entityType: et.id, onlyMissing: true })}
                     data-testid={`generate-all-${et.id}`}
                   >
                     {generating === et.id ? (
-                      <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Queuing…</>
+                      <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Adding…</>
                     ) : (
-                      <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Missing only</>
+                      <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Add missing to queue</>
                     )}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs"
-                    disabled={generating === et.id || generateAll.isPending || buildingLegacy}
+                    disabled={generating === et.id || generateAll.isPending || buildingLegacy || processingQueue}
                     onClick={() => generateAll.mutate({ entityType: et.id, onlyMissing: false })}
                     data-testid={`rebuild-all-${et.id}`}
                   >
-                    Rebuild all
+                    Add all to queue
                   </Button>
                 </div>
               </div>
@@ -217,7 +249,21 @@ function CoverageTab() {
 
       {/* Recent Jobs */}
       <div>
-        <h3 className="text-base font-semibold text-slate-900 mb-3">Recent translation jobs</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h3 className="text-base font-semibold text-slate-900">Translation queue</h3>
+          <Button
+            size="sm"
+            onClick={() => processQueue.mutate()}
+            disabled={processingQueue || processQueue.isPending || pendingCount === 0}
+            data-testid="execute-translation-queue-btn"
+          >
+            {processingQueue ? (
+              <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Executing…</>
+            ) : (
+              <><Play className="w-3.5 h-3.5 mr-1.5" /> Execute queue{pendingCount > 0 ? ` (${pendingCount})` : ""}</>
+            )}
+          </Button>
+        </div>
         {jobs.length === 0 ? (
           <p className="text-sm text-slate-500 italic">No translation jobs yet.</p>
         ) : (
@@ -239,7 +285,8 @@ function CoverageTab() {
                     className={
                       job.status === "completed" ? "bg-emerald-100 text-emerald-700"
                       : job.status === "failed" ? "bg-red-100 text-red-700"
-                      : job.status === "in_progress" ? "bg-blue-100 text-blue-700"
+                      : job.status === "processing" || job.status === "in_progress" ? "bg-blue-100 text-blue-700"
+                      : job.status === "pending" ? "bg-amber-100 text-amber-700"
                       : "bg-slate-100 text-slate-600"
                     }
                   >

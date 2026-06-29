@@ -56,3 +56,7 @@ async def require_external_api_key(
 
 async def external_observations_auth(request: Request) -> dict:
     return await require_external_api_key(request, required_scope="observations:create")
+
+
+async def external_equipment_auth(request: Request) -> dict:
+    return await require_external_api_key(request, required_scope="equipment:read")

@@ -1,4 +1,5 @@
 import html2canvas from "html2canvas";
+import { snapshotCapturePath } from "./visualManagementPaths";
 import { visualBoardAPI } from "./apis/visualBoardAPI";
 
 const CAPTURE_WIDTH = 1920;
@@ -62,7 +63,7 @@ export async function captureAndUploadTvSnapshot(boardId) {
     "border:0",
     "visibility:hidden",
   ].join(";");
-  iframe.src = `/visual-management/boards/${encodeURIComponent(boardId)}/snapshot-capture`;
+  iframe.src = snapshotCapturePath(boardId);
   document.body.appendChild(iframe);
 
   try {

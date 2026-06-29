@@ -107,9 +107,10 @@ const translationsAPI = {
   /**
    * Bulk-translate all entities of a given type
    */
-  generateAll: async (entityType, { onlyMissing = true, targetLanguages = ['nl', 'de'] } = {}) => {
+  generateAll: async (entityType, { onlyMissing = true, targetLanguages = ['nl', 'de'], queueOnly = false } = {}) => {
     const params = new URLSearchParams();
     params.set('only_missing', String(onlyMissing));
+    params.set('queue_only', String(queueOnly));
     targetLanguages.forEach((lang) => params.append('target_languages', lang));
     const response = await api.post(`/translations/generate-all/${entityType}?${params.toString()}`);
     return response.data;
@@ -118,11 +119,20 @@ const translationsAPI = {
   /**
    * Queue translation jobs for all legacy entity types in the database
    */
-  buildLegacy: async ({ onlyMissing = false, targetLanguages = ['nl', 'de'] } = {}) => {
+  buildLegacy: async ({ onlyMissing = false, targetLanguages = ['nl', 'de'], queueOnly = false } = {}) => {
     const params = new URLSearchParams();
     params.set('only_missing', String(onlyMissing));
+    params.set('queue_only', String(queueOnly));
     targetLanguages.forEach((lang) => params.append('target_languages', lang));
     const response = await api.post(`/translations/build-legacy?${params.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Start processing pending translation jobs
+   */
+  processPendingJobs: async (limit = 10) => {
+    const response = await api.post(`/translations/jobs/process-pending?limit=${limit}`);
     return response.data;
   },
   

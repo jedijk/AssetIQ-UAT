@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Eye, Rocket, Loader2, History, Plus, QrCode, Copy, Share2 } from "lucide-react";
+import { visualManagementPaths, visualManagementShellClass } from "../../lib/visualManagementPaths";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import { captureAndUploadTvSnapshot } from "../../lib/visualBoardSnapshotCapture";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
@@ -49,6 +50,7 @@ function resolveBoardDisplayUrl(url) {
 const VisualBoardEditorPage = () => {
   const { boardId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [boardType, setBoardType] = useState("reliability");
@@ -251,7 +253,7 @@ const VisualBoardEditorPage = () => {
 
   const openPreview = () => {
     writeBoardDraft(boardId, { name, layout, widgets, theme, header });
-    navigate(`/visual-management/boards/${boardId}/preview`);
+    navigate(visualManagementPaths.boardPreview(boardId));
   };
 
   const selectedWidget = widgets.find((w) => w.id === selectedWidgetId);
@@ -265,11 +267,11 @@ const VisualBoardEditorPage = () => {
   }
 
   return (
-    <div className="app-page-shell flex flex-col">
+    <div className={visualManagementShellClass(location.pathname)}>
       <div className="border-b bg-white px-3 sm:px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Button asChild variant="ghost" size="sm" className="shrink-0">
-            <Link to="/visual-management/boards">
+            <Link to={visualManagementPaths.boards}>
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </Button>

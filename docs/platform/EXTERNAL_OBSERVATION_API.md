@@ -1,6 +1,11 @@
-# External Observation API
+# External Observation API — Technical Reference
 
 Machine-to-machine ingestion endpoint for third-party systems to create observations in AssetIQ.
+
+**Functional specification:** [`EXTERNAL_API_PLATFORM_FUNCTIONAL_SPEC.md`](./EXTERNAL_API_PLATFORM_FUNCTIONAL_SPEC.md)  
+**Third-party onboarding:** Settings → External API Access → **Download integration guide** (Markdown, no secrets)
+
+---
 
 ## Endpoint
 
@@ -30,7 +35,14 @@ Keys require scope `observations:create`. Optional IP allowlists and per-key rat
 | `equipment_name` | No | Exact or fuzzy name match |
 | `severity` | No | Default `medium` |
 | `observation_type` | No | Default `general` |
+| `media_urls` | No | Related media URLs |
+| `measured_values` | No | Structured readings |
+| `location` | No | Location hint |
+| `tags` | No | Additional labels |
+| `metadata` | No | Opaque metadata stored with payload audit |
 | `idempotency_mode` | No | `return_existing` (default) or `conflict` |
+
+> **Spec note:** The functional specification lists separate *Title* and *Reported Timestamp* fields. Phase 1 uses `description` as the primary text field and sets creation time server-side. Future API versions may add explicit `title` and `reported_at` without breaking existing clients.
 
 ### Duplicate detection
 
@@ -49,6 +61,8 @@ Uniqueness: `tenant_id + source_system + external_reference`.
 
 If no match: observation is created with status `equipment_match_required`.
 
+AI-assisted matching is deferred (see functional spec §15).
+
 ### Processing pipeline
 
 1. Validate payload and authenticate API key
@@ -61,12 +75,35 @@ If no match: observation is created with status `equipment_match_required`.
 
 ### Responses
 
-- **201** — observation created
-- **200** — duplicate, existing observation returned
-- **401** — invalid/missing key
-- **403** — missing scope or IP not allowed
-- **409** — conflicting duplicate
-- **429** — rate limit exceeded
+| Code | Meaning |
+|------|---------|
+| **201** | Observation created |
+| **200** | Duplicate; existing observation returned |
+| **401** | Invalid/missing key |
+| **403** | Missing scope or IP not allowed |
+| **409** | Conflicting duplicate |
+| **422** | Validation error |
+| **429** | Rate limit exceeded |
+
+Example success body:
+
+```json
+{
+  "observation_id": "obs-uuid",
+  "status": "open",
+  "equipment_match": {
+    "equipment_id": "equip-uuid",
+    "tag": "P-101",
+    "name": "Cooling Water Pump",
+    "match_type": "tag_exact",
+    "confidence": 90
+  },
+  "duplicate": false,
+  "created_at": "2026-06-29T12:00:00+00:00"
+}
+```
+
+---
 
 ## Admin API (Settings UI)
 
@@ -84,13 +121,18 @@ Base path: `/api/admin/external-api`
 
 Requires authenticated **owner** or **admin** role.
 
+---
+
 ## Settings UI
 
-**Settings → Integrations → External API Access** (`/settings/external-api`)
+**Settings → External API Access** (`/settings/external-api`)
 
-- Create API keys (show once)
+- Create API keys with scope selection (`observations:create`, `equipment:read`)
 - Enable/disable, revoke, rotate
-- View usage: requests, errors, observations created, health status
+- View usage: requests, errors, observations/equipment counts, health status, **24h/7d/30d/12mo trends**
+- **Download integration guide** — shareable Markdown for third-party vendors (no API keys or tenant secrets; uses current environment base URL)
+
+---
 
 ## MongoDB collections
 
@@ -100,11 +142,41 @@ Requires authenticated **owner** or **admin** role.
 | `external_api_requests` | Per-request audit (no plaintext keys) |
 | `external_observation_payloads` | Original payloads + dedup index |
 
+---
+
 ## OpenAPI
 
-`GET /api/v1/external/openapi-info` returns a summary document. Full OpenAPI metadata is embedded on the POST route via FastAPI.
+- `GET /api/v1/external/openapi-info` — summary document
+- `GET /api/v1/external/openapi.json` — static OpenAPI 3 export (observations + equipment)
+- Full route metadata is embedded on endpoints via FastAPI
 
-## Example
+---
+
+## Equipment read APIs
+
+### Hierarchy
+
+```
+GET /api/v1/external/installations/{installation_id}/hierarchy
+```
+
+Scope: `equipment:read`
+
+Query: `include_inactive` (default true), `include_metadata` (default true), `max_depth`, `flat` (default false), `last_modified_after`
+
+### Detail
+
+```
+GET /api/v1/external/equipment/{equipment_id}
+```
+
+Scope: `equipment:read`
+
+Returns equipment object with `criticality`, `operational_summary`, optional `metadata`, and `maintenance_summary`.
+
+---
+
+## Example (observation)
 
 ```bash
 curl -X POST "$BASE/api/v1/external/observations" \
@@ -119,9 +191,16 @@ curl -X POST "$BASE/api/v1/external/observations" \
   }'
 ```
 
+Replace `$BASE` and `YOUR_KEY` with values from your AssetIQ administrator. Prefer the downloaded integration guide when sharing instructions with external teams.
+
+---
+
 ## Deferred / future
 
-- Optional AI-assisted equipment matching (`ai_execute_grounded`)
+- Additional scopes (`tasks:*`, `forms:submit`, etc.)
+- Optional AI-assisted equipment matching
 - Dedicated external equipment mapping admin UI
 - Webhook callbacks on observation create
-- OpenAPI JSON export at `/api/v1/external/openapi.json`
+- Explicit `title` and `reported_at` payload fields
+
+See [`EXTERNAL_API_PLATFORM_FUNCTIONAL_SPEC.md`](./EXTERNAL_API_PLATFORM_FUNCTIONAL_SPEC.md) for the full roadmap and acceptance criteria.

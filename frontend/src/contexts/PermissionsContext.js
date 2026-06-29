@@ -26,7 +26,7 @@ const FEATURE_PATHS = {
   // "scheduler" is the planner / scheduling UI (route is `/tasks`)
   scheduler: ["/tasks"],
   forms: ["/forms", "/form-submissions", "/granulometry"],
-  equipment: ["/equipment", "/definitions", "/equipment-manager"],
+  equipment: ["/equipment", "/definitions", "/settings/criticality-definitions", "/equipment-manager"],
   library: ["/library"],
   spareiq: ["/spareiq"],
   visual_boards: [
@@ -36,6 +36,7 @@ const FEATURE_PATHS = {
     "/visual-management/screens",
     "/visual-management/pair-displays",
     "/visual-management/analytics",
+    "/settings/visual-management",
   ],
   reliability_intelligence: ["/reliability"],
   // chat is currently a sidebar (no dedicated route), keep mapping empty for now

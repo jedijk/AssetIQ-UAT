@@ -38,8 +38,8 @@ export function buildNavItems(t) {
 
 export function buildSettingsMenuItems(t) {
   return [
-    { path: "/definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "equipment" },
-    { path: "/visual-management/boards", label: t("nav.visualManagement"), icon: Monitor, feature: "visual_boards" },
+    { path: "/settings/criticality-definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "equipment" },
+    { path: "/settings/visual-management/boards", label: t("nav.visualManagement"), icon: Monitor, feature: "visual_boards" },
     { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true, feature: "equipment" },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
     { path: "/settings/preferences", label: "Preferences", icon: Clock, desktopOnly: true },
@@ -65,8 +65,8 @@ export function filterNavItems(items, { isMobileView, canSeeNavItem }) {
 export function filterSettingsMenuItems(items, { isMobileView, user, canSeeNavItem, operatorViewEnabled }) {
   const simpleMode = isMobileView && (user?.role === "operator" || operatorViewEnabled);
   return items.filter((item) => {
-    if (item.path === "/definitions") {
-      return canSeeNavItem("/definitions");
+    if (item.path === "/settings/criticality-definitions") {
+      return canSeeNavItem("/settings/criticality-definitions");
     }
     if (simpleMode) {
       return false;

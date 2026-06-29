@@ -637,8 +637,7 @@ const IntelligenceMapTab = () => {
       {/* Main Content */}
       <div className="space-y-6">
         {/* Primary Intelligence Flow — full width */}
-        <div className="space-y-6">
-          <Card className="border-slate-200">
+        <Card className="border-slate-200">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <GitBranch className="w-4 h-4 text-blue-600" />
@@ -797,15 +796,67 @@ const IntelligenceMapTab = () => {
             </CardContent>
           </Card>
 
-          {/* Insights — full width, directly below the flow thread */}
-          <Card className="border-slate-200">
+        {/* Below flow: PM + Sankey left, Insights stacked vertically on the right */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_minmax(280px,360px)] gap-6 items-start">
+          <div className="space-y-6 min-w-0">
+            {/* PM Import Flow (Secondary) */}
+            <Card className="border-purple-200 bg-purple-50/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-purple-600" />
+                  PM Import Integration
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Accepted PM tasks not connected to failure modes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <FlowCard
+                    icon={Upload}
+                    title="PM Imports"
+                    count={stats?.pm_imports?.accepted_no_fm}
+                    subtitle="Without Failure Mode"
+                    relationship={`${stats?.pm_imports?.sessions || 0} import sessions`}
+                    onClick={navigateToPMImport}
+                    color="purple"
+                    isLoading={statsLoading}
+                  />
+                  <FlowArrow color="purple" value={stats?.relationships?.pm_to_programs?.value} />
+                  <div className="flex items-center gap-2 text-sm text-purple-600">
+                    <ArrowRight className="w-4 h-4" />
+                    <span>Flows into Maintenance Programs → Schedules → Planned Work</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sankey Visualization */}
+            <Card className="border-slate-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-blue-600" />
+                  Data Lineage Visualization
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Flow width matches the Intelligence Flow cards above (programs, active frequencies, planned tasks)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SankeyDiagram data={stats} isLoading={statsLoading} />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Reliability Intelligence Insights — vertical sidebar */}
+          <Card className="border-slate-200 xl:sticky xl:top-4">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-500" />
                 Reliability Intelligence Insights
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+            <CardContent className="flex flex-col gap-3">
               {/* Knowledge Graph */}
               <InsightCard
                 title="Knowledge Graph"
@@ -940,54 +991,6 @@ const IntelligenceMapTab = () => {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* PM Import Flow (Secondary) */}
-          <Card className="border-purple-200 bg-purple-50/30">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Upload className="w-4 h-4 text-purple-600" />
-                PM Import Integration
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Accepted PM tasks not connected to failure modes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <FlowCard
-                  icon={Upload}
-                  title="PM Imports"
-                  count={stats?.pm_imports?.accepted_no_fm}
-                  subtitle="Without Failure Mode"
-                  relationship={`${stats?.pm_imports?.sessions || 0} import sessions`}
-                  onClick={navigateToPMImport}
-                  color="purple"
-                  isLoading={statsLoading}
-                />
-                <FlowArrow color="purple" value={stats?.relationships?.pm_to_programs?.value} />
-                <div className="flex items-center gap-2 text-sm text-purple-600">
-                  <ArrowRight className="w-4 h-4" />
-                  <span>Flows into Maintenance Programs → Schedules → Planned Work</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Sankey Visualization */}
-          <Card className="border-slate-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-blue-600" />
-                Data Lineage Visualization
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Flow width matches the Intelligence Flow cards above (programs, active frequencies, planned tasks)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SankeyDiagram data={stats} isLoading={statsLoading} />
             </CardContent>
           </Card>
         </div>

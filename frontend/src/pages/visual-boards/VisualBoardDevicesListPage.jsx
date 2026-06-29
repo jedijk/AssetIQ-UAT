@@ -2,6 +2,7 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tv, Loader2, RefreshCw, ChevronRight } from "lucide-react";
+import { visualManagementPaths } from "../../lib/visualManagementPaths";
 import { displayDeviceAPI } from "../../lib/apis/displayDeviceAPI";
 import { getDatabaseEnvironment } from "../../lib/databaseEnv";
 import { Button } from "../../components/ui/button";
@@ -55,7 +56,7 @@ const VisualBoardDevicesListPage = () => {
         </div>
         <div className={VMB_PAGE_ACTIONS_CLASS}>
           <Button asChild variant="outline" size="sm">
-            <Link to="/visual-management/pair-displays">Pair a display</Link>
+            <Link to={visualManagementPaths.pairDisplays}>Pair a display</Link>
           </Button>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 mr-1" />
@@ -70,7 +71,7 @@ const VisualBoardDevicesListPage = () => {
         <Card>
           <CardContent className="py-12 text-center text-slate-500">
             No paired devices yet.{" "}
-            <Link to="/visual-management/pair-displays" className="text-blue-600 underline">Pair a display</Link>
+            <Link to={visualManagementPaths.pairDisplays} className="text-blue-600 underline">Pair a display</Link>
             {" "}or open <Link to="/tv" className="text-blue-600 underline" target="_blank" rel="noreferrer">/tv</Link> on a TV.
           </CardContent>
         </Card>
@@ -88,7 +89,7 @@ const VisualBoardDevicesListPage = () => {
             {devices.map((device) => (
               <Link
                 key={device.id}
-                to={`/visual-management/screens/${device.id}`}
+                to={visualManagementPaths.screenDetail(device.id)}
                 className="block hover:bg-slate-50 transition-colors"
               >
                 <div className="flex flex-col gap-2 px-4 py-3 md:grid md:grid-cols-[1.5fr_1fr_100px_120px_100px_32px] md:gap-3 md:items-center min-w-0">

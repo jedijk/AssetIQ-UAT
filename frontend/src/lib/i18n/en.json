@@ -308,7 +308,13 @@
       "actions": "Actions",
       "description": "Description",
       "usageTitle": "Key usage",
-      "usageDesc": "Request counts, errors, and recent activity for this key."
+      "usageDesc": "Request counts, errors, and recent activity for this key.",
+      "downloadGuide": "Download integration guide",
+      "guideDownloaded": "Integration guide downloaded",
+      "guideHint": "Download the integration guide to share setup instructions with third-party vendors. The guide contains no API keys or tenant secrets.",
+      "scopes": "Scopes",
+      "scopeRequired": "Select at least one scope",
+      "usageTrends": "Usage trends"
     },
     "preferences": {
       "title": "Preferences",

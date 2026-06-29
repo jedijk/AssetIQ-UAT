@@ -457,9 +457,9 @@ def test_ril_copilot_dropped_direct_openai_client():
 
 def test_ai_risk_engine_uses_gateway():
     source = (Path(__file__).resolve().parents[1] / "ai_risk_engine.py").read_text()
-    idx = source.index("async def _call_openai")
-    block = source[idx: idx + 500]
-    assert "execute_prompt" in block
+    idx = source.index("async def _call_grounded_json")
+    block = source[idx: idx + 600]
+    assert "execute_grounded" in block
 
 
 def test_ai_helpers_chat_paths_use_gateway():

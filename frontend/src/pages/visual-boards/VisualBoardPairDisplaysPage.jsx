@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Monitor, Loader2, RefreshCw, Trash2, Link2, Search, ChevronRight } from "lucide-react";
+import { visualManagementPaths } from "../../lib/visualManagementPaths";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import { displayDeviceAPI } from "../../lib/apis/displayDeviceAPI";
 import { getDatabaseEnvironment } from "../../lib/databaseEnv";
@@ -127,7 +128,7 @@ const VisualBoardPairDisplaysPage = () => {
         </div>
         <div className={VMB_PAGE_ACTIONS_CLASS}>
           <Button asChild variant="outline" size="sm">
-            <Link to="/visual-management/screens">View screens</Link>
+            <Link to={visualManagementPaths.screens}>View screens</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link to="/tv" target="_blank" rel="noopener noreferrer">
@@ -231,7 +232,7 @@ const VisualBoardPairDisplaysPage = () => {
         <div className="flex items-center justify-between gap-3 mb-3">
           <h2 className="text-lg font-semibold text-slate-900">Paired screens</h2>
           <Button asChild variant="ghost" size="sm">
-            <Link to="/visual-management/screens">Manage all</Link>
+            <Link to={visualManagementPaths.screens}>Manage all</Link>
           </Button>
         </div>
         {pairedDevicesLoading ? (
@@ -247,7 +248,7 @@ const VisualBoardPairDisplaysPage = () => {
             {pairedDevices.map((device) => (
               <Link
                 key={device.id}
-                to={`/visual-management/screens/${device.id}`}
+                to={visualManagementPaths.screenDetail(device.id)}
                 className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
               >
                 <div className="min-w-0">

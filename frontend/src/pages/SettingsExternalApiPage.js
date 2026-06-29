@@ -15,6 +15,7 @@ import {
   Ban,
   RotateCw,
   Activity,
+  Download,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -28,6 +29,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import { Checkbox } from "../components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -54,6 +56,7 @@ import {
   rotateExternalApiKey,
   getExternalApiKeyUsage,
 } from "../lib/apis/externalApi";
+import { downloadExternalObservationIntegrationGuide } from "../lib/externalObservationIntegrationGuide";
 
 function statusBadge(status) {
   const variants = {
@@ -76,6 +79,10 @@ export default function SettingsExternalApiPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyDescription, setNewKeyDescription] = useState("");
+  const [newKeyScopes, setNewKeyScopes] = useState({
+    "observations:create": true,
+    "equipment:read": false,
+  });
   const [createdKeyValue, setCreatedKeyValue] = useState(null);
   const [selectedKeyId, setSelectedKeyId] = useState(null);
   const [usageOpen, setUsageOpen] = useState(false);
@@ -100,6 +107,7 @@ export default function SettingsExternalApiPage() {
       setCreatedKeyValue(data.api_key);
       setNewKeyName("");
       setNewKeyDescription("");
+      setNewKeyScopes({ "observations:create": true, "equipment:read": false });
       queryClient.invalidateQueries({ queryKey: ["external-api-keys"] });
       toast.success(t("settings.externalApi.createSuccess") || "API key created");
     },
@@ -157,6 +165,13 @@ export default function SettingsExternalApiPage() {
     }
   };
 
+  const downloadIntegrationGuide = () => {
+    downloadExternalObservationIntegrationGuide(window.location.origin);
+    toast.success(
+      t("settings.externalApi.guideDownloaded") || "Integration guide downloaded"
+    );
+  };
+
   if (!isAdmin) {
     return (
       <div className="p-6">
@@ -194,7 +209,15 @@ export default function SettingsExternalApiPage() {
         <Button
           variant="outline"
           size="sm"
-          className="ml-auto"
+          onClick={downloadIntegrationGuide}
+          data-testid="external-api-download-guide"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          {t("settings.externalApi.downloadGuide") || "Download integration guide"}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => keysQuery.refetch()}
           disabled={keysQuery.isFetching}
         >
@@ -207,6 +230,7 @@ export default function SettingsExternalApiPage() {
         </Button>
         <Button
           size="sm"
+          className="ml-auto"
           onClick={() => {
             setCreatedKeyValue(null);
             setCreateOpen(true);
@@ -222,13 +246,23 @@ export default function SettingsExternalApiPage() {
           <CardTitle>{t("settings.externalApi.endpointTitle") || "External endpoint"}</CardTitle>
           <CardDescription>
             {t("settings.externalApi.endpointDesc") ||
-              "POST /api/v1/external/observations — authenticate with Bearer or X-API-Key header."}
+              "POST /api/v1/external/observations and GET equipment read APIs — authenticate with Bearer or X-API-Key header."}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <code className="text-sm bg-muted px-2 py-1 rounded">
+        <CardContent className="space-y-3">
+          <code className="text-sm bg-muted px-2 py-1 rounded block w-fit">
             POST /api/v1/external/observations
           </code>
+          <code className="text-sm bg-muted px-2 py-1 rounded block w-fit">
+            GET /api/v1/external/installations/&#123;installation_id&#125;/hierarchy
+          </code>
+          <code className="text-sm bg-muted px-2 py-1 rounded block w-fit">
+            GET /api/v1/external/equipment/&#123;equipment_id&#125;
+          </code>
+          <p className="text-sm text-muted-foreground">
+            {t("settings.externalApi.guideHint") ||
+              "Download the integration guide to share setup instructions with third-party vendors. The guide contains no API keys or tenant secrets."}
+          </p>
         </CardContent>
       </Card>
 
@@ -342,7 +376,7 @@ export default function SettingsExternalApiPage() {
                 ? t("settings.externalApi.keyCreatedDesc") ||
                   "Copy this key now — it will not be shown again."
                 : t("settings.externalApi.createKeyDesc") ||
-                  "Create a tenant-scoped key with observations:create scope."}
+                  "Create a tenant-scoped key. Select scopes for observation ingest and/or equipment read."}
             </DialogDescription>
           </DialogHeader>
 
@@ -378,6 +412,39 @@ export default function SettingsExternalApiPage() {
                   onChange={(e) => setNewKeyDescription(e.target.value)}
                 />
               </div>
+              <div className="space-y-3">
+                <Label>{t("settings.externalApi.scopes") || "Scopes"}</Label>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="scope-observations"
+                    checked={newKeyScopes["observations:create"]}
+                    onCheckedChange={(checked) =>
+                      setNewKeyScopes((prev) => ({
+                        ...prev,
+                        "observations:create": Boolean(checked),
+                      }))
+                    }
+                  />
+                  <Label htmlFor="scope-observations" className="font-normal cursor-pointer">
+                    observations:create
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="scope-equipment"
+                    checked={newKeyScopes["equipment:read"]}
+                    onCheckedChange={(checked) =>
+                      setNewKeyScopes((prev) => ({
+                        ...prev,
+                        "equipment:read": Boolean(checked),
+                      }))
+                    }
+                  />
+                  <Label htmlFor="scope-equipment" className="font-normal cursor-pointer">
+                    equipment:read
+                  </Label>
+                </div>
+              </div>
             </div>
           )}
 
@@ -392,12 +459,23 @@ export default function SettingsExternalApiPage() {
                   {t("common.cancel") || "Cancel"}
                 </Button>
                 <Button
-                  onClick={() =>
+                  onClick={() => {
+                    const scopes = Object.entries(newKeyScopes)
+                      .filter(([, enabled]) => enabled)
+                      .map(([scope]) => scope);
+                    if (scopes.length === 0) {
+                      toast.error(
+                        t("settings.externalApi.scopeRequired") ||
+                          "Select at least one scope"
+                      );
+                      return;
+                    }
                     createMutation.mutate({
                       name: newKeyName.trim(),
                       description: newKeyDescription.trim() || undefined,
-                    })
-                  }
+                      scopes,
+                    });
+                  }}
                   disabled={!newKeyName.trim() || createMutation.isPending}
                 >
                   {createMutation.isPending && (
@@ -424,7 +502,7 @@ export default function SettingsExternalApiPage() {
             <Loader2 className="h-6 w-6 animate-spin" />
           ) : usageQuery.data ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
                 <div>
                   <p className="text-xs text-muted-foreground">Requests</p>
                   <p className="text-xl font-semibold">{usageQuery.data.total_requests}</p>
@@ -440,12 +518,52 @@ export default function SettingsExternalApiPage() {
                   </p>
                 </div>
                 <div>
+                  <p className="text-xs text-muted-foreground">Equipment reads</p>
+                  <p className="text-xl font-semibold">
+                    {usageQuery.data.equipment_requests ?? 0}
+                  </p>
+                </div>
+                <div>
                   <p className="text-xs text-muted-foreground">Health</p>
                   <Badge variant={statusBadge(usageQuery.data.health_status)}>
                     {usageQuery.data.health_status}
                   </Badge>
                 </div>
               </div>
+              {usageQuery.data.usage_trends &&
+                Object.keys(usageQuery.data.usage_trends).length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-2">
+                      {t("settings.externalApi.usageTrends") || "Usage trends"}
+                    </p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Period</TableHead>
+                          <TableHead>Requests</TableHead>
+                          <TableHead>Errors</TableHead>
+                          <TableHead>Observations</TableHead>
+                          <TableHead>Equipment</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {["24h", "7d", "30d", "12mo"].map((period) => {
+                          const trend = usageQuery.data.usage_trends[period];
+                          if (!trend) return null;
+                          return (
+                            <TableRow key={period}>
+                              <TableCell className="font-medium">{period}</TableCell>
+                              <TableCell>{trend.total_requests ?? trend.requests ?? 0}</TableCell>
+                              <TableCell>{trend.total_errors ?? trend.errors ?? 0}</TableCell>
+                              <TableCell>{trend.observations_created ?? 0}</TableCell>
+                              <TableCell>{trend.equipment_reads ?? 0}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               {(usageQuery.data.recent_requests || []).length > 0 && (
                 <Table>
                   <TableHeader>

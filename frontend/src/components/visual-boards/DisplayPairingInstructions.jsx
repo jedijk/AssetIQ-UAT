@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { visualManagementPaths } from "../../lib/visualManagementPaths";
 import { Monitor, Tv } from "lucide-react";
 
 export function getDisplayPairingUrl() {
@@ -138,7 +139,7 @@ export function DisplayPairingInstructions({ variant = "admin", className = "" }
       {!isDisplay && (
         <p className="text-xs text-slate-500 mt-4 pt-3 border-t border-blue-100">
           Tip: Publish your board first under{" "}
-          <Link to="/visual-management/boards" className="text-blue-600 hover:underline">
+          <Link to={visualManagementPaths.boards} className="text-blue-600 hover:underline">
             Settings → Visual Management → Boards
           </Link>
           , then assign it when pairing.

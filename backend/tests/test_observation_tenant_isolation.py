@@ -14,6 +14,14 @@ USER_A = {"company_id": "co-a", "id": "user-a"}
 USER_B = {"company_id": "co-b", "id": "user-b"}
 
 
+@pytest.fixture(autouse=True)
+def migration_safe_tenant(monkeypatch):
+    """These tests assert migration-safe $or tenant clauses; CI may set strict mode."""
+    import services.tenant_schema as ts
+
+    monkeypatch.setattr(ts, "TENANT_STRICT_MODE", False)
+
+
 def _matches_tenant_clause(doc: dict, clause: dict) -> bool:
     if "$or" in clause:
         return any(_matches_tenant_clause(doc, part) for part in clause["$or"])

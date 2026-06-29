@@ -234,8 +234,15 @@ async def create_external_observation(
     if status == EQUIPMENT_MATCH_REQUIRED_STATUS:
         update_fields["status"] = EQUIPMENT_MATCH_REQUIRED_STATUS
 
-    await db.observations.update_one({"id": observation_id}, {"$set": update_fields})
-    await db.threats.update_one({"id": observation_id}, {"$set": update_fields})
+    from services.work_signal_lifecycle import update_work_signal
+
+    await update_work_signal(
+        observation_id,
+        user=user,
+        set_fields=update_fields,
+        graph_label="external_observation_ingest",
+        sync_graph=False,
+    )
 
     store_payload = {k: v for k, v in payload.items() if k != "idempotency_mode"}
     await store_payload_record(

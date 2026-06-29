@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, RefreshCw, Trash2, RotateCw, Ban, CheckCircle } from "lucide-react";
+import { visualManagementPaths } from "../../lib/visualManagementPaths";
 import { displayDeviceAPI } from "../../lib/apis/displayDeviceAPI";
 import { getDatabaseEnvironment } from "../../lib/databaseEnv";
 import { Button } from "../../components/ui/button";
@@ -121,7 +122,7 @@ const VisualBoardDeviceDetailPage = () => {
     onSuccess: () => {
       toast.success("Device deleted");
       queryClient.invalidateQueries({ queryKey: ["display-devices"] });
-      navigate("/visual-management/screens", { replace: true });
+      navigate(visualManagementPaths.screens, { replace: true });
     },
     onError: (err) => toast.error(err.response?.data?.detail || "Delete failed"),
   });
@@ -143,7 +144,7 @@ const VisualBoardDeviceDetailPage = () => {
 
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="sm">
-          <Link to="/visual-management/screens">
+          <Link to={visualManagementPaths.screens}>
             <ArrowLeft className="w-4 h-4 mr-1" />
             Screens
           </Link>
