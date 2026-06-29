@@ -12,7 +12,6 @@ from pydantic import BaseModel
 import time
 import logging
 import os
-import subprocess
 
 try:
     import psutil
@@ -702,69 +701,58 @@ async def get_security_status(
         
         # 6) Dependency hygiene
         #
-        # Do NOT misleadingly report "pass" unless we actually scanned, because the
-        # presence of dependency vulnerabilities cannot be inferred safely here.
-        # Default: report "warning" and recommend CI-based scanning.
-        # Optional: enable a runtime scan (pip-audit) via env for on-demand checks.
-        run_dependency_audit = os.environ.get("RUN_DEPENDENCY_AUDIT", "false").lower() == "true"
+        # Do NOT misleadingly report "pass" unless we actually scanned.
+        # UAT/staging/production default to on-demand runtime scans when pip-audit
+        # is installed; CI should run scripts/run_dependency_audit.py on every PR.
+        from services.dependency_audit import dependency_audit_enabled, run_pip_audit
+
+        env = os.environ.get("ENVIRONMENT", "development").lower()
+        run_dependency_audit = dependency_audit_enabled(env)
         if not run_dependency_audit:
             checks.append({
                 "name": "Dependency Hygiene",
                 "status": "warning",
-                "message": "Runtime dependency vulnerability scan is disabled. Use CI-based scanning (pip-audit/Snyk/GitHub alerts) or set RUN_DEPENDENCY_AUDIT=true for an on-demand check."
+                "message": (
+                    "Runtime dependency vulnerability scan is disabled. "
+                    "CI runs pip-audit on every backend PR; set RUN_DEPENDENCY_AUDIT=true "
+                    "for on-demand checks in deployed environments."
+                ),
             })
         else:
-            pip_audit_paths = ["/root/.venv/bin/pip-audit", "/usr/local/bin/pip-audit", "pip-audit"]
-            pip_audit_found = False
-            audit_vuln_count = None
-            audit_error = None
-
-            for pip_audit_path in pip_audit_paths:
-                try:
-                    if os.path.exists(pip_audit_path) or pip_audit_path == "pip-audit":
-                        result = subprocess.run(
-                            [pip_audit_path, "--format", "json", "-q", "--progress-spinner", "off"],
-                            capture_output=True,
-                            text=True,
-                            timeout=25
-                        )
-                        pip_audit_found = True
-                        import json as json_module
-                        try:
-                            vulns = json_module.loads(result.stdout) if result.stdout else []
-                            audit_vuln_count = len(vulns) if isinstance(vulns, list) else None
-                        except Exception as e:
-                            audit_error = f"Failed to parse audit output: {e}"
-                        break
-                except Exception as e:
-                    audit_error = str(e)
-                    continue
-
-            if not pip_audit_found:
+            audit = run_pip_audit(timeout=25)
+            if not audit.available:
                 checks.append({
                     "name": "Dependency Hygiene",
                     "status": "warning",
-                    "message": "RUN_DEPENDENCY_AUDIT=true but pip-audit is not available in this runtime. Prefer CI-based scanning."
+                    "message": (
+                        "Runtime dependency scan enabled but pip-audit is unavailable. "
+                        "Install pip-audit in the runtime image or rely on CI scanning."
+                    ),
                 })
-            elif audit_error:
+            elif audit.error:
                 checks.append({
                     "name": "Dependency Hygiene",
                     "status": "warning",
-                    "message": f"Dependency scan ran but could not complete reliably: {audit_error}"
+                    "message": f"Dependency scan ran but could not complete reliably: {audit.error}",
+                })
+            elif audit.vulnerability_count > 0:
+                checks.append({
+                    "name": "Dependency Hygiene",
+                    "status": "warning",
+                    "message": (
+                        f"Dependency scan found {audit.vulnerability_count} potential "
+                        "vulnerability finding(s). Review and update packages."
+                    ),
                 })
             else:
-                if audit_vuln_count is not None and audit_vuln_count > 0:
-                    checks.append({
-                        "name": "Dependency Hygiene",
-                        "status": "warning",
-                        "message": f"Dependency scan found {audit_vuln_count} potential vulnerability finding(s). Review and update packages."
-                    })
-                else:
-                    checks.append({
-                        "name": "Dependency Hygiene",
-                        "status": "pass",
-                        "message": "Dependency scan completed (no findings reported by pip-audit)."
-                    })
+                checks.append({
+                    "name": "Dependency Hygiene",
+                    "status": "pass",
+                    "message": (
+                        f"Dependency scan completed — {audit.package_count} package(s) "
+                        "checked, no findings reported by pip-audit."
+                    ),
+                })
         
         # 7) Database access / auth
         try:
@@ -804,7 +792,10 @@ async def get_security_status(
             checks.append({
                 "name": "Secrets",
                 "status": "warning",
-                "message": "JWT secret is weak/missing. Use a long random value (32+ chars) and consider REQUIRE_JWT_SECRET_KEY=true."
+                "message": (
+                    "JWT secret is weak/missing. Set JWT_SECRET_KEY to a random value "
+                    "with at least 32 characters (e.g. openssl rand -base64 48)."
+                ),
             })
         else:
             checks.append({

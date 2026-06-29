@@ -1,6 +1,15 @@
 # API service only. For the background worker sidecar, see ../railway.worker.toml
 # and docs/stabilization/EXTERNAL_WORKER_DEPLOY.md.
 # Set USE_EXTERNAL_BACKGROUND_WORKER=true on this service in UAT/production.
+#
+# Required Railway variables (set in the service Variables tab — never commit secrets):
+#   JWT_SECRET_KEY=<random 32+ chars, e.g. openssl rand -base64 48>
+#   MONGO_URL=<Atlas connection string>
+#   ENVIRONMENT=uat
+#
+# Optional security variables:
+#   RUN_DEPENDENCY_AUDIT=true   # default on for uat/staging/production when unset
+#   REQUIRE_JWT_SECRET_KEY=true # default on for non-dev environments at startup
 
 [build]
 builder = "nixpacks"

@@ -76,3 +76,15 @@ def test_jwt_secret_accepted_for_production():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "xxxxxxxx"
+
+
+def test_jwt_secret_rejects_short_value_for_uat():
+    result = _import_database(
+        {
+            "ENVIRONMENT": "uat",
+            "JWT_SECRET_KEY": "too-short",
+        }
+    )
+    assert result.returncode != 0, result.stderr
+    combined = (result.stderr or "") + (result.stdout or "")
+    assert "32" in combined

@@ -231,6 +231,7 @@ REQUIRE_JWT_SECRET_KEY = os.environ.get(
 _JWT_SECRET_REQUIRED = (not _IS_JWT_FALLBACK_ENV) or REQUIRE_JWT_SECRET_KEY
 
 JWT_SECRET = os.environ.get("JWT_SECRET_KEY")
+_MIN_JWT_SECRET_LENGTH = 32
 if not JWT_SECRET:
     if _JWT_SECRET_REQUIRED:
         raise ValueError(
@@ -243,6 +244,14 @@ if not JWT_SECRET:
         "JWT_SECRET_KEY not set; using insecure default secret for ENVIRONMENT=%s. "
         "Set JWT_SECRET_KEY before deploying to uat/staging/production.",
         ENVIRONMENT,
+    )
+elif (
+    ENVIRONMENT not in _JWT_FALLBACK_ENVIRONMENTS
+    and len(JWT_SECRET) < _MIN_JWT_SECRET_LENGTH
+):
+    raise ValueError(
+        f"JWT_SECRET_KEY must be at least {_MIN_JWT_SECRET_LENGTH} characters "
+        f"when ENVIRONMENT={ENVIRONMENT!r}."
     )
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = int(os.environ.get("JWT_EXPIRATION_HOURS", "24"))
