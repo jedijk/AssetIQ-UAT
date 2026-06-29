@@ -9,6 +9,7 @@ Note: Some metrics may not be available in serverless environments (Vercel, Rail
 from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone
 from pydantic import BaseModel
+import asyncio
 import time
 import logging
 import os
@@ -254,40 +255,35 @@ async def get_system_metrics(
             "message": "System metrics are not available in serverless environments. Database and application health monitoring is still available below." if is_serverless else "psutil not installed - limited metrics available"
         }
     
-    try:
+    def _collect_psutil_metrics():
         # CPU Usage (with 0.1s interval for more accurate reading)
         cpu_percent = psutil.cpu_percent(interval=0.1)
-        
-        # RAM Usage
+
         memory = psutil.virtual_memory()
-        ram_used = round(memory.used / (1024 ** 3), 2)  # Convert to GB
-        ram_total = round(memory.total / (1024 ** 3), 2)  # Convert to GB
+        ram_used = round(memory.used / (1024 ** 3), 2)
+        ram_total = round(memory.total / (1024 ** 3), 2)
         ram_percent = round(memory.percent, 2)
-        
-        # Disk Usage
-        disk = psutil.disk_usage('/')
-        disk_used = round(disk.used / (1024 ** 3), 2)  # Convert to GB
-        disk_total = round(disk.total / (1024 ** 3), 2)  # Convert to GB
+
+        disk = psutil.disk_usage("/")
+        disk_used = round(disk.used / (1024 ** 3), 2)
+        disk_total = round(disk.total / (1024 ** 3), 2)
         disk_percent = round(disk.percent, 2)
-        
-        # Uptime (seconds since boot)
+
         boot_time = psutil.boot_time()
         uptime = int(time.time() - boot_time)
-        
-        # CPU Core count
+
         cpu_count = psutil.cpu_count()
         cpu_count_logical = psutil.cpu_count(logical=True)
-        
-        # Network I/O (optional bonus data)
+
         try:
             net_io = psutil.net_io_counters()
             network = {
                 "bytes_sent": net_io.bytes_sent,
-                "bytes_recv": net_io.bytes_recv
+                "bytes_recv": net_io.bytes_recv,
             }
         except Exception:
             network = None
-        
+
         return {
             "cpu_percent": round(cpu_percent, 2),
             "cpu_count": cpu_count,
@@ -302,9 +298,11 @@ async def get_system_metrics(
             "network": network,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "environment": environment,
-            "serverless": False
+            "serverless": False,
         }
-        
+
+    try:
+        return await asyncio.to_thread(_collect_psutil_metrics)
     except Exception as e:
         logger.error(f"Failed to get system metrics: {str(e)}")
         raise HTTPException(
@@ -704,7 +702,7 @@ async def get_security_status(
         # Do NOT misleadingly report "pass" unless we actually scanned.
         # UAT/staging/production default to on-demand runtime scans when pip-audit
         # is installed; CI should run scripts/run_dependency_audit.py on every PR.
-        from services.dependency_audit import dependency_audit_enabled, run_pip_audit
+        from services.dependency_audit import dependency_audit_enabled, run_pip_audit_cached
 
         env = os.environ.get("ENVIRONMENT", "development").lower()
         run_dependency_audit = dependency_audit_enabled(env)
@@ -719,7 +717,7 @@ async def get_security_status(
                 ),
             })
         else:
-            audit = run_pip_audit(timeout=25)
+            audit = await asyncio.to_thread(run_pip_audit_cached, timeout=25)
             if not audit.available:
                 checks.append({
                     "name": "Dependency Hygiene",
@@ -822,8 +820,8 @@ async def get_security_status(
         
         # 11) Audit logging (security events + transactions)
         try:
-            security_audit_count = await db.security_audit_log.count_documents({})
-            app_audit_count = await db.audit_log.count_documents({})
+            security_audit_count = await db.security_audit_log.estimated_document_count()
+            app_audit_count = await db.audit_log.estimated_document_count()
             checks.append({
                 "name": "Audit Logging",
                 "status": "pass",

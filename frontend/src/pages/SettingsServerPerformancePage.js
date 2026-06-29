@@ -191,7 +191,6 @@ const SettingsServerPerformancePage = () => {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [metrics, setMetrics] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -385,7 +384,6 @@ const SettingsServerPerformancePage = () => {
         message: "Unable to connect to server metrics. This may indicate a serverless environment or network issue."
       });
     } finally {
-      setLoading(false);
       setIsRefreshing(false);
     }
   }, [isOwner]);
@@ -393,7 +391,6 @@ const SettingsServerPerformancePage = () => {
   // Initial fetch and auto-refresh
   useEffect(() => {
     if (!isOwner) {
-      setLoading(false);
       setDbStorageLoading(false);
       setFileStorageLoading(false);
       setSecurityLoading(false);
@@ -404,8 +401,10 @@ const SettingsServerPerformancePage = () => {
     fetchMetrics();
     fetchDbStorage();
     fetchFileStorage();
-    fetchSecurity();
     fetchErrorLogs();
+
+    // Security checks (pip-audit) are slow — load after fast metrics/storage endpoints.
+    const securityTimer = setTimeout(() => fetchSecurity(), 250);
     
     let interval;
     let dbInterval;
@@ -419,6 +418,7 @@ const SettingsServerPerformancePage = () => {
     }
     
     return () => {
+      clearTimeout(securityTimer);
       if (interval) clearInterval(interval);
       if (dbInterval) clearInterval(dbInterval);
       if (fileInterval) clearInterval(fileInterval);
@@ -446,39 +446,6 @@ const SettingsServerPerformancePage = () => {
               )}
             </CardContent>
           </Card>
-        </div>
-      </div>
-    );
-  }
-  
-  // Loading skeleton
-  if (loading && !metrics) {
-    return (
-      <div className={isMobile ? "app-page-shell bg-slate-50" : "min-h-screen bg-slate-50"}>
-        <div className={`${isMobile ? "flex-shrink-0" : "sticky top-0 z-10"} bg-white border-b border-slate-200`}>
-          <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
-            <div className="flex items-center gap-2 sm:gap-4">
-              {isMobile && (
-                <div className="w-8 h-8 bg-slate-200 rounded animate-pulse shrink-0" />
-              )}
-              <div className="w-48 h-6 bg-slate-200 rounded animate-pulse" />
-            </div>
-          </div>
-        </div>
-        <div className={`${isMobile ? "app-page-scroll mobile-scroll-pane flex-1 min-h-0" : ""} max-w-6xl mx-auto px-4 sm:px-6 py-6`}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <Card key={i} className="h-40">
-                <CardContent className="p-4">
-                  <div className="space-y-3">
-                    <div className="w-24 h-4 bg-slate-200 rounded animate-pulse" />
-                    <div className="w-16 h-8 bg-slate-200 rounded animate-pulse" />
-                    <div className="w-full h-2 bg-slate-200 rounded animate-pulse" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         </div>
       </div>
     );

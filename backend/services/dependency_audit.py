@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REQUIREMENTS = BACKEND_ROOT / "requirements.txt"
@@ -27,16 +29,26 @@ class DependencyAuditResult:
 
 def count_vulnerabilities(report: Any) -> int:
     """Count vulnerability entries in pip-audit JSON output."""
-    if not isinstance(report, list):
-        return 0
+    packages = _extract_dependency_entries(report)
     total = 0
-    for package in report:
+    for package in packages:
         if not isinstance(package, dict):
             continue
         vulns = package.get("vulns") or []
         if isinstance(vulns, list):
             total += len(vulns)
     return total
+
+
+def _extract_dependency_entries(report: Any) -> List[Any]:
+    """Normalize pip-audit JSON to a list of dependency entries."""
+    if isinstance(report, list):
+        return report
+    if isinstance(report, dict):
+        dependencies = report.get("dependencies")
+        if isinstance(dependencies, list):
+            return dependencies
+    return []
 
 
 def parse_pip_audit_report(stdout: str) -> DependencyAuditResult:
@@ -56,7 +68,8 @@ def parse_pip_audit_report(stdout: str) -> DependencyAuditResult:
             package_count=0,
             error=f"Failed to parse audit output: {exc}",
         )
-    if not isinstance(report, list):
+    packages = _extract_dependency_entries(report)
+    if not packages and report not in ([], {}):
         return DependencyAuditResult(
             available=True,
             vulnerability_count=0,
@@ -66,8 +79,8 @@ def parse_pip_audit_report(stdout: str) -> DependencyAuditResult:
     return DependencyAuditResult(
         available=True,
         vulnerability_count=count_vulnerabilities(report),
-        package_count=len(report),
-        packages=report,
+        package_count=len(packages),
+        packages=packages,
     )
 
 
@@ -147,6 +160,35 @@ def run_pip_audit(
                 error=stderr,
             )
     return parsed
+
+
+_AUDIT_CACHE: Tuple[Optional[DependencyAuditResult], float] = (None, 0.0)
+
+
+def dependency_audit_cache_ttl_seconds() -> int:
+    raw = os.environ.get("DEPENDENCY_AUDIT_CACHE_TTL", "3600")
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 3600
+
+
+def run_pip_audit_cached(
+    requirements_path: Optional[Path] = None,
+    *,
+    timeout: int = 120,
+    cache_ttl: Optional[int] = None,
+) -> DependencyAuditResult:
+    """Run pip-audit with an in-process TTL cache to avoid blocking every page load."""
+    global _AUDIT_CACHE
+    ttl = dependency_audit_cache_ttl_seconds() if cache_ttl is None else cache_ttl
+    cached, cached_at = _AUDIT_CACHE
+    if ttl > 0 and cached is not None and (time.time() - cached_at) < ttl:
+        return cached
+    result = run_pip_audit(requirements_path, timeout=timeout)
+    if ttl > 0:
+        _AUDIT_CACHE = (result, time.time())
+    return result
 
 
 def dependency_audit_enabled(default_environment: str) -> bool:
