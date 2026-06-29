@@ -739,7 +739,8 @@ async def get_security_status(
                     "status": "warning",
                     "message": (
                         f"Dependency scan found {audit.vulnerability_count} potential "
-                        "vulnerability finding(s). Review and update packages."
+                        "vulnerability finding(s) in production dependencies. "
+                        "Review and update packages in requirements.txt."
                     ),
                 })
             else:
@@ -747,8 +748,8 @@ async def get_security_status(
                     "name": "Dependency Hygiene",
                     "status": "pass",
                     "message": (
-                        f"Dependency scan completed — {audit.package_count} package(s) "
-                        "checked, no findings reported by pip-audit."
+                        f"Dependency scan completed — {audit.package_count} production "
+                        "package(s) checked, no findings reported by pip-audit."
                     ),
                 })
         

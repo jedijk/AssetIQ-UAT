@@ -1,0 +1,10 @@
+# Optional audit tooling for CI and deployed runtime security checks.
+# Installed alongside requirements.txt on Railway; not part of the audited prod surface.
+pip-audit==2.10.1
+pip-api==0.0.34
+pip-requirements-parser==32.0.1
+cyclonedx-python-lib==11.7.0
+packageurl-python==0.17.6
+py-serializable==2.1.0
+boolean.py==5.0
+license-expression==30.4.4

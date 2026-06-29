@@ -64,6 +64,25 @@ def test_dependency_audit_enabled_respects_override(monkeypatch):
     assert dependency_audit_enabled("development") is True
 
 
+def test_prod_requirements_exclude_dev_and_audit_tools():
+    from pathlib import Path
+
+    backend_root = Path(__file__).resolve().parents[1]
+    prod = {
+        line.split("==", 1)[0].strip().lower()
+        for line in (backend_root / "requirements.txt").read_text().splitlines()
+        if line.strip() and not line.startswith("#") and "==" in line
+    }
+    dev_only = {
+        line.split("==", 1)[0].strip().lower()
+        for path in ("requirements-dev.txt", "requirements-audit.txt")
+        for line in (backend_root / path).read_text().splitlines()
+        if line.strip() and not line.startswith("#") and not line.startswith("-r") and "==" in line
+    }
+    overlap = prod & dev_only
+    assert not overlap, f"production requirements overlap dev/audit tools: {sorted(overlap)}"
+
+
 def test_run_pip_audit_cached_reuses_result(monkeypatch):
     calls = {"count": 0}
 

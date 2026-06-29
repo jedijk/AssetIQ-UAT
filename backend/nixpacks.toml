@@ -1,3 +1,9 @@
 # Pin Python for Railway/Nixpacks (mirrors runtime.txt and CI).
 [variables]
 NIXPACKS_PYTHON_VERSION = "3.11"
+
+[phases.install]
+cmds = [
+  "pip install -r requirements.txt",
+  "pip install -r requirements-audit.txt",
+]

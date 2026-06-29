@@ -9,7 +9,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from services.dependency_audit import run_pip_audit  # noqa: E402
+from services.dependency_audit import PROD_REQUIREMENTS, run_pip_audit  # noqa: E402
 
 
 def main() -> int:
@@ -21,8 +21,8 @@ def main() -> int:
         print(f"ERROR: {result.error}", file=sys.stderr)
         return 2
     print(
-        f"pip-audit: scanned {result.package_count} package(s), "
-        f"{result.vulnerability_count} vulnerability finding(s)"
+        f"pip-audit: scanned {result.package_count} production package(s) in "
+        f"{PROD_REQUIREMENTS.name}, {result.vulnerability_count} vulnerability finding(s)"
     )
     if result.vulnerability_count:
         return 1

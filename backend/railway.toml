@@ -10,6 +10,10 @@
 # Optional security variables:
 #   RUN_DEPENDENCY_AUDIT=true   # default on for uat/staging/production when unset
 #   REQUIRE_JWT_SECRET_KEY=true # default on for non-dev environments at startup
+#
+# Production deps: requirements.txt
+# Audit tooling (installed via nixpacks, not audited): requirements-audit.txt
+# Dev/test/lint deps: requirements-dev.txt
 
 [build]
 builder = "nixpacks"

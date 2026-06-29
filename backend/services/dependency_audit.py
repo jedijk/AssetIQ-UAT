@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_REQUIREMENTS = BACKEND_ROOT / "requirements.txt"
+PROD_REQUIREMENTS = BACKEND_ROOT / "requirements.txt"
+DEFAULT_REQUIREMENTS = PROD_REQUIREMENTS
 
 
 @dataclass
