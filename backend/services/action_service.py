@@ -490,7 +490,7 @@ async def update_action(
 
     inv_repo = InvestigationRepository(db)
 
-    action = await find_central_action(action_id, current_user, include_mongo_id=True)
+    action = await find_central_action(action_id, current_user)
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     await assert_action_installation_scope(current_user, action)
@@ -510,11 +510,19 @@ async def update_action(
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     status_changed_to_completed = (
-        update_fields.get("status") == "completed" and action.get("status") != "completed"
+        update_data.get("status") == "completed" and action.get("status") != "completed"
     )
 
-    await _action_repo.update_mongo_doc(action["_id"], {"$set": update_data})
-    updated = await _action_repo.find_by_mongo_id(action["_id"], projection={"_id": 0})
+    update_result = await _action_repo.update_one(
+        {"id": action_id},
+        {"$set": update_data},
+        user=current_user,
+    )
+    if update_result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Action not found")
+    updated = await find_central_action(action_id, current_user)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Action not found")
 
     if spare_requirements is not None:
         from services.spare_part_requirements_service import apply_action_requirements
@@ -600,7 +608,7 @@ async def update_action(
                     effectiveness=updated.get("completion_notes"),
                 )
 
-    response = _json_safe_action(dict(updated))
+    response = _json_safe_action(updated)
     if completion_notification:
         response["completion_notification"] = completion_notification
     return response
@@ -615,7 +623,7 @@ async def set_action_validation(
     validated_by_position: Optional[str] = None,
     validated_by_id: Optional[str] = None,
 ) -> dict:
-    action = await find_central_action(action_id, current_user, include_mongo_id=True)
+    action = await find_central_action(action_id, current_user)
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     await assert_action_installation_scope(current_user, action)
@@ -640,7 +648,13 @@ async def set_action_validation(
             "updated_at": now,
         }
 
-    await _action_repo.update_mongo_doc(action["_id"], {"$set": update_data})
+    update_result = await _action_repo.update_one(
+        {"id": action_id},
+        {"$set": update_data},
+        user=current_user,
+    )
+    if update_result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Action not found")
     result = await find_central_action(action_id, current_user)
     if not result:
         raise HTTPException(status_code=404, detail="Action not found")

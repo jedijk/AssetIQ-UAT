@@ -18,6 +18,20 @@ def _require_owner(current_user: dict) -> None:
         raise HTTPException(status_code=403, detail="Owner access required")
 
 
+def format_recommended_actions_text(actions: Optional[List[Any]]) -> str:
+    """Flatten recommended action objects for translation prompts."""
+    if not actions:
+        return ""
+    parts: List[str] = []
+    for item in actions:
+        if isinstance(item, dict):
+            text = item.get("description") or item.get("action") or item.get("title")
+            parts.append(str(text if text else item))
+        else:
+            parts.append(str(item))
+    return ", ".join(parts)
+
+
 class FailureModeCreate(BaseModel):
     category: str
     equipment: str

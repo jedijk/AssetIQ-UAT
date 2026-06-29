@@ -122,20 +122,19 @@ async def create_failure_mode(
     current_user: dict = Depends(_library_write),
 ):
     result = await svc.create_failure_mode(data, current_user=current_user)
+    fm_id = str(result.get("id") or data.failure_mode)
     fm_data_for_translation = {
         "name": data.failure_mode,
         "description": data.description or "",
         "effects": data.potential_effects or "",
         "causes": data.potential_causes or "",
-        "recommended_actions": ", ".join(data.recommended_actions)
-        if data.recommended_actions
-        else "",
+        "recommended_actions": svc.format_recommended_actions_text(data.recommended_actions),
     }
     schedule_tracked_job(
         background_tasks,
         "translate_failure_mode",
         auto_translate_failure_mode,
-        data.failure_mode,
+        fm_id,
         fm_data_for_translation,
         current_user["id"],
         user_id=current_user["id"],

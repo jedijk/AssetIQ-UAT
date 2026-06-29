@@ -123,8 +123,9 @@ async def update_central_action(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(_actions_write),
 ):
-    response = await action_service.update_action(action_id, current_user, data.dict())
-    if any(k in data.dict(exclude_unset=True) for k in ("title", "description")):
+    payload = data.model_dump(exclude_unset=True)
+    response = await action_service.update_action(action_id, current_user, payload)
+    if any(k in payload for k in ("title", "description")):
         _schedule_translation(background_tasks, action_id, response, current_user["id"])
     return response
 
