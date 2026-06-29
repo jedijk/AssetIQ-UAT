@@ -2,8 +2,7 @@
 [variables]
 NIXPACKS_PYTHON_VERSION = "3.11"
 
-[phases.install]
-cmds = [
-  "pip install -r requirements.txt",
-  "pip install -r requirements-audit.txt",
-]
+# Keep the default install phase (venv + requirements.txt). Add audit tooling after.
+[phases.audit-tools]
+dependsOn = ["install"]
+cmds = [". /opt/venv/bin/activate && pip install -r requirements-audit.txt"]
