@@ -982,9 +982,8 @@ const ThreatsPage = () => {
                         <span className="hidden sm:inline">
                           <RiskBadge level={threat.risk_level} size="sm" />
                         </span>
-                        <span className="text-xs sm:text-sm text-slate-500 truncate">
-                          <span className="sm:hidden">{threat.equipment_name || displayAssetName(threat)}</span>
-                          <span className="hidden sm:inline">{displayAssetName(threat)}</span>
+                        <span className="hidden sm:inline text-xs sm:text-sm text-slate-500 truncate">
+                          {displayAssetName(threat)}
                         </span>
                         {/* Registration Date */}
                         {threat.created_at && (
@@ -1093,9 +1092,8 @@ const ThreatsPage = () => {
                     <RiskBadge level={threat.risk_level} size="sm" />
                   </span>
                   {/* Mobile: Show equipment, Desktop: Show asset */}
-                  <span className="text-xs sm:text-sm text-slate-500 truncate">
-                    <span className="sm:hidden">{displayAssetName(threat) || threat.title}</span>
-                    <span className="hidden sm:inline">{displayAssetName(threat)}</span>
+                  <span className="hidden sm:inline text-xs sm:text-sm text-slate-500 truncate">
+                    {displayAssetName(threat)}
                   </span>
                   {/* Registration Date */}
                   {threat.created_at && (

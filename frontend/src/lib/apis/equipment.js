@@ -179,6 +179,11 @@ export const equipmentHierarchyAPI = {
     return response.data;
   },
 
+  getEquipmentPmCompliance: async (nodeId) => {
+    const response = await api.get(`/equipment-hierarchy/nodes/${nodeId}/pm-compliance`);
+    return response.data;
+  },
+
   // Equipment files
   getEquipmentFiles: async (equipmentId) => {
     const response = await api.get(`/equipment/${equipmentId}/files`);

@@ -48,6 +48,10 @@ export const queryKeys = {
     all: () => ["equipmentHistory"],
     detail: (equipmentId) => ["equipmentHistory", equipmentId],
   },
+  equipmentPmCompliance: {
+    all: () => ["equipmentPmCompliance"],
+    detail: (equipmentId) => ["equipmentPmCompliance", equipmentId],
+  },
   failureModes: {
     list: () => ["failure-modes-list"],
     all: () => ["failure-modes"],

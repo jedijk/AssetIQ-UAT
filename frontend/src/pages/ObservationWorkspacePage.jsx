@@ -378,7 +378,7 @@ const ObservationWorkspacePage = () => {
     );
   }
 
-  const { observation, exposure, timeline, reliability_intelligence, recommended_actions, action_plan, process_journey } = workspace;
+  const { observation, equipment, exposure, timeline, reliability_intelligence, recommended_actions, action_plan, process_journey } = workspace;
 
   const evidencePanelProps = {
     equipmentId: observation?.linked_equipment_id,
@@ -555,8 +555,8 @@ const ObservationWorkspacePage = () => {
 
         {/* Row 2: Equipment Reliability Timeline */}
         <EquipmentReliabilityTimeline 
-          events={timeline?.events} 
-          aiEvidence={timeline?.ai_evidence}
+          events={timeline?.events}
+          equipmentId={equipment?.id || observation?.linked_equipment_id}
         />
 
         {/* Row 3: Main Work Area - 3 Columns on desktop, stacked on mobile */}

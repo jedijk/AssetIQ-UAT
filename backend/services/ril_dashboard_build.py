@@ -9,6 +9,34 @@ from services.reliability_graph_query import count_active_reliability_edges
 from services.tenant_scope import scoped
 
 
+def _json_safe_value(value: Any) -> Any:
+    """Recursively coerce BSON values for JSON responses."""
+    try:
+        from bson import ObjectId
+    except ImportError:
+        ObjectId = ()  # type: ignore[misc, assignment]
+
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc).isoformat()
+        return value.isoformat()
+    if ObjectId and isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, dict):
+        return {str(k): _json_safe_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_value(v) for v in value]
+    return str(value)
+
+
+def _json_safe_doc(doc: dict) -> dict:
+    return _json_safe_value(doc)
+
+
 async def build_ril_executive_payload(
     user: dict,
     owner_id: str,
@@ -136,7 +164,7 @@ async def build_ril_intelligence_payload(user: dict, owner_id: str) -> Dict[str,
         scoped(user, {"owner_id": owner_id, "is_active": True})
     ).sort("created_at", -1).limit(5):
         doc.pop("_id", None)
-        correlations.append(doc)
+        correlations.append(_json_safe_doc(doc))
 
     emerging_risks = []
     async for doc in db.ril_observations.find(scoped(user, {
@@ -145,7 +173,7 @@ async def build_ril_intelligence_payload(user: dict, owner_id: str) -> Dict[str,
         "created_at": {"$gte": seven_days_ago},
     })).sort("risk_score", -1).limit(5):
         doc.pop("_id", None)
-        emerging_risks.append(doc)
+        emerging_risks.append(_json_safe_doc(doc))
 
     pipeline = [
         {"$match": scoped(user, {"owner_id": owner_id})},
@@ -159,7 +187,7 @@ async def build_ril_intelligence_payload(user: dict, owner_id: str) -> Dict[str,
     ]
     fleet_insights = []
     async for doc in db.ril_predictions.aggregate(pipeline):
-        fleet_insights.append(doc)
+        fleet_insights.append(_json_safe_doc(doc))
 
     recommendations = []
     async for doc in db.ril_recommendations.find(scoped(user, {
@@ -167,7 +195,7 @@ async def build_ril_intelligence_payload(user: dict, owner_id: str) -> Dict[str,
         "status": "pending",
     })).sort("created_at", -1).limit(5):
         doc.pop("_id", None)
-        recommendations.append(doc)
+        recommendations.append(_json_safe_doc(doc))
 
     return {
         "correlations": correlations,

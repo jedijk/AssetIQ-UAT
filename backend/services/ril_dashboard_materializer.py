@@ -1,8 +1,9 @@
 """Materialized RIL dashboard snapshots — Wave 4 read model."""
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from database import db
 from services.tenant_schema import tenant_id_from_user
@@ -10,6 +11,24 @@ from services.tenant_schema import tenant_id_from_user
 
 SNAPSHOT_TTL_SECONDS = 300
 COLLECTION = "ril_dashboard_snapshots"
+
+_refresh_locks: Dict[Tuple[str, str], asyncio.Lock] = {}
+_locks_guard = asyncio.Lock()
+
+
+def _snapshot_key(user: dict) -> Optional[Tuple[str, str]]:
+    tid = tenant_id_from_user(user)
+    uid = user.get("id")
+    if not tid or not uid:
+        return None
+    return tid, uid
+
+
+async def _get_refresh_lock(key: Tuple[str, str]) -> asyncio.Lock:
+    async with _locks_guard:
+        if key not in _refresh_locks:
+            _refresh_locks[key] = asyncio.Lock()
+        return _refresh_locks[key]
 
 
 async def refresh_ril_dashboard(user: dict, owner_id: Optional[str] = None) -> Dict[str, Any]:
@@ -58,10 +77,10 @@ async def refresh_ril_dashboard(user: dict, owner_id: Optional[str] = None) -> D
 
 
 async def get_cached_ril_dashboard(user: dict) -> Optional[Dict[str, Any]]:
-    tid = tenant_id_from_user(user)
-    uid = user.get("id")
-    if not tid or not uid:
+    key = _snapshot_key(user)
+    if not key:
         return None
+    tid, uid = key
     doc = await db[COLLECTION].find_one(
         {
             "tenant_id": tid,
@@ -73,8 +92,37 @@ async def get_cached_ril_dashboard(user: dict) -> Optional[Dict[str, Any]]:
     return doc.get("payload") if doc else None
 
 
+async def get_stale_ril_dashboard(user: dict) -> Optional[Dict[str, Any]]:
+    """Return the latest snapshot even when expired (for stale-while-revalidate)."""
+    key = _snapshot_key(user)
+    if not key:
+        return None
+    tid, uid = key
+    doc = await db[COLLECTION].find_one(
+        {"tenant_id": tid, "user_id": uid},
+        {"_id": 0, "payload": 1},
+    )
+    return doc.get("payload") if doc else None
+
+
 async def get_or_compute_ril_dashboard(user: dict, owner_id: Optional[str] = None) -> Dict[str, Any]:
     cached = await get_cached_ril_dashboard(user)
     if cached:
         return cached
-    return await refresh_ril_dashboard(user, owner_id)
+
+    key = _snapshot_key(user)
+    if not key:
+        return await refresh_ril_dashboard(user, owner_id)
+
+    lock = await _get_refresh_lock(key)
+
+    if lock.locked():
+        stale = await get_stale_ril_dashboard(user)
+        if stale:
+            return stale
+
+    async with lock:
+        cached = await get_cached_ril_dashboard(user)
+        if cached:
+            return cached
+        return await refresh_ril_dashboard(user, owner_id)

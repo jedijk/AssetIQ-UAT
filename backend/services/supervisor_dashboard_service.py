@@ -46,6 +46,15 @@ def compute_queue_priority(
     return round(min(100, base + overdue_boost), 1)
 
 
+def priority_tier_from_score(score: float) -> str:
+    """Map internal 0–100 priority to supervisor-facing Low / Medium / High."""
+    if score >= 60:
+        return "high"
+    if score >= 35:
+        return "medium"
+    return "low"
+
+
 def _parse_dt(value: Any) -> Optional[datetime]:
     if not value:
         return None
@@ -127,6 +136,7 @@ def _serialize_threat_item(threat: dict, *, criticality: float = 0) -> dict:
         "risk_level": threat.get("risk_level"),
         "risk_score": threat_score,
         "priority_score": priority,
+        "priority_tier": priority_tier_from_score(priority),
         "drill_down": f"/threats/{tid}/workspace" if tid else "/threats",
     }
 
@@ -146,6 +156,7 @@ def _serialize_pm_item(task: dict, *, criticality: float = 0) -> dict:
         "priority": task.get("priority"),
         "assigned_to": task.get("assigned_technician_name"),
         "priority_score": priority,
+        "priority_tier": priority_tier_from_score(priority),
         "drill_down": "/tasks",
     }
 
@@ -167,6 +178,7 @@ def _serialize_action_item(action: dict, *, criticality: float = 0) -> dict:
         "due_date": action.get("due_date"),
         "status": action.get("status"),
         "priority_score": priority,
+        "priority_tier": priority_tier_from_score(priority),
         "drill_down": f"/actions/{aid}" if aid else "/actions",
     }
 
@@ -182,6 +194,7 @@ def _serialize_investigation_item(inv: dict) -> dict:
         "status": inv.get("status"),
         "threat_id": inv.get("threat_id"),
         "priority_score": priority,
+        "priority_tier": priority_tier_from_score(priority),
         "drill_down": f"/causal-engine?id={iid}" if iid else "/causal-engine",
     }
 
@@ -352,6 +365,7 @@ async def get_supervisor_dashboard(user: dict) -> Dict[str, Any]:
                 100,
                 item["priority_score"] + min(10, graph_high_risk),
             )
+            item["priority_tier"] = priority_tier_from_score(item["priority_score"])
 
     prioritized_queue = sorted(
         queue_candidates,

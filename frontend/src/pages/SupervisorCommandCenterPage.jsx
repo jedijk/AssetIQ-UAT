@@ -21,6 +21,8 @@ import {
 import { rilDashboardAPI } from "../lib/apis/rilAPI";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { useLanguage } from "../contexts/LanguageContext";
+import { translateEnum } from "../lib/translateEnum";
 import {
   Card,
   CardContent,
@@ -35,6 +37,29 @@ const TYPE_META = {
   action: { label: "Action", variant: "outline", icon: ClipboardList },
   investigation: { label: "Investigation", variant: "secondary", icon: GitBranch },
 };
+
+const PRIORITY_TIER_STYLE = {
+  high: "bg-red-100 text-red-800 border-red-200",
+  medium: "bg-amber-100 text-amber-800 border-amber-200",
+  low: "bg-slate-100 text-slate-600 border-slate-200",
+};
+
+function priorityTierFromScore(score) {
+  if (score == null || Number.isNaN(Number(score))) return "low";
+  if (score >= 60) return "high";
+  if (score >= 35) return "medium";
+  return "low";
+}
+
+function PriorityTierBadge({ tier, score, t }) {
+  const resolved = tier || priorityTierFromScore(score);
+  const label = translateEnum(t, resolved === "high" ? "High" : resolved === "medium" ? "Medium" : "Low");
+  return (
+    <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border ${PRIORITY_TIER_STYLE[resolved] || PRIORITY_TIER_STYLE.low}`}>
+      {label}
+    </span>
+  );
+}
 
 function SummaryTile({ label, value, icon: Icon, to }) {
   const content = (
@@ -59,6 +84,7 @@ function SummaryTile({ label, value, icon: Icon, to }) {
 }
 
 function QueueItem({ item }) {
+  const { t } = useLanguage();
   const meta = TYPE_META[item.type] || TYPE_META.action;
   const Icon = meta.icon;
   return (
@@ -77,10 +103,8 @@ function QueueItem({ item }) {
         <Badge variant={meta.variant} className="text-[10px]">
           {meta.label}
         </Badge>
-        {item.priority_score != null && (
-          <span className="text-xs font-semibold text-orange-600">
-            {item.priority_score}
-          </span>
+        {(item.priority_tier || item.priority_score != null) && (
+          <PriorityTierBadge tier={item.priority_tier} score={item.priority_score} t={t} />
         )}
       </div>
       <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-slate-300" />
@@ -152,8 +176,8 @@ export default function SupervisorCommandCenterPage() {
   const summary = data?.summary || {};
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="border-b bg-white">
+    <div className="app-page-shell bg-slate-50" data-testid="supervisor-command-center-page">
+      <div className="flex-shrink-0 border-b bg-white">
         <div className="container mx-auto max-w-6xl px-4 py-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -181,6 +205,7 @@ export default function SupervisorCommandCenterPage() {
         </div>
       </div>
 
+      <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 pb-6">
       <div className="container mx-auto max-w-6xl px-4 py-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-20 text-slate-500">
@@ -230,7 +255,7 @@ export default function SupervisorCommandCenterPage() {
                   <Badge>{data?.prioritized_queue?.count ?? 0}</Badge>
                 </CardTitle>
                 <CardDescription>
-                  Ranked by exposure, criticality, threat score, and graph risk
+                  Sorted by priority — High, Medium, or Low
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -322,6 +347,7 @@ export default function SupervisorCommandCenterPage() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

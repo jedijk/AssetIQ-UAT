@@ -6,6 +6,7 @@ os.environ.setdefault("MONGO_URL", "mongodb://127.0.0.1:27017/assetiq_test")
 
 from services.supervisor_dashboard_service import (
     compute_queue_priority,
+    priority_tier_from_score,
     _is_escalating_threat,
     _is_open_threat,
     get_supervisor_dashboard,
@@ -35,6 +36,14 @@ def test_compute_queue_priority_overdue_boost():
     base = compute_queue_priority(criticality=40)
     boosted = compute_queue_priority(criticality=40, overdue_boost=15)
     assert boosted == base + 15
+
+
+def test_priority_tier_from_score():
+    assert priority_tier_from_score(75) == "high"
+    assert priority_tier_from_score(60) == "high"
+    assert priority_tier_from_score(45) == "medium"
+    assert priority_tier_from_score(35) == "medium"
+    assert priority_tier_from_score(20) == "low"
 
 
 def test_threat_filters():

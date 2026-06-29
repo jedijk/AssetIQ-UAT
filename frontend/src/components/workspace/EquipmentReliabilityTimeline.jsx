@@ -1,22 +1,31 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
   AlertTriangle,
-  Calendar,
-  CircleDot,
+  CheckCircle2,
   Cog,
   Eye,
   FileSearch,
   History,
-  List,
+  Loader2,
+  Sparkles,
   Wrench,
   XCircle,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { translateEnum } from "../../lib/translateEnum";
+import { equipmentHierarchyAPI } from "../../lib/api";
+import { queryKeys } from "../../lib/queryKeys";
 
 const EVENT_TYPE_ENUM = {
   observation: "Observation",
@@ -31,10 +40,18 @@ const EVENT_TYPE_ENUM = {
 
 const getEventTypeLabel = (t, type) => translateEnum(t, EVENT_TYPE_ENUM[type] || "Event");
 
+const STATUS_COLORS = {
+  completed: "bg-green-100 text-green-800",
+  overdue: "bg-red-100 text-red-800",
+  pending: "bg-amber-100 text-amber-800",
+  scheduled: "bg-blue-100 text-blue-800",
+  cancelled: "bg-slate-100 text-slate-600",
+};
+
 function TimelineEventCard({ event, isCurrent }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  
+
   const getEventConfig = (type) => {
     const configs = {
       observation: { icon: AlertTriangle, color: "amber" },
@@ -52,11 +69,9 @@ function TimelineEventCard({ event, isCurrent }) {
 
   const config = getEventConfig(event.event_type);
   const Icon = config.icon;
-  
-  // For actions/work orders, show the action_type (PM, CM, PDM, etc.)
   const isAction = event.event_type === "action" || event.event_type === "work_order";
   const actionType = event.action_type || event.task_type || event.type;
-  
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     try {
@@ -74,77 +89,203 @@ function TimelineEventCard({ event, isCurrent }) {
     }
   };
 
-  // Compose a full tooltip showing all available context for the event.
   const tooltipParts = [];
   if (event.title) tooltipParts.push(event.title);
   if (event.date) {
-    try { tooltipParts.push(format(parseISO(event.date), "PPP")); } catch (_) { tooltipParts.push(event.date); }
+    try {
+      tooltipParts.push(format(parseISO(event.date), "PPP"));
+    } catch {
+      tooltipParts.push(event.date);
+    }
   }
   if (config.label) tooltipParts.push(config.label);
   if (actionType) tooltipParts.push(t("observationWorkspace.eventTypeLabel", { type: actionType }));
   if (event.reference_id) tooltipParts.push(event.reference_id);
-  if (event.status) tooltipParts.push(t("observationWorkspace.statusLabel", { status: translateEnum(t, event.status) }));
+  if (event.status) {
+    tooltipParts.push(t("observationWorkspace.statusLabel", { status: translateEnum(t, event.status) }));
+  }
   if (event.description) tooltipParts.push(event.description);
   const tooltip = tooltipParts.join("\n");
 
   return (
-    <div 
+    <div
       className="flex flex-col items-center cursor-pointer group flex-shrink-0 w-20"
       onClick={handleClick}
       title={tooltip}
     >
-      {/* Date */}
       <div className="text-[10px] text-slate-500 mb-1.5 font-medium h-3.5 leading-3.5">
         {formatDate(event.date)}
       </div>
-      
-      {/* Event Circle — sits above the connector line; bg-white outer ring punches through the rail */}
-      <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center transition-transform group-hover:scale-105 ring-2 ring-white ${
-        isCurrent 
-          ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
-          : `bg-${config.color}-100 text-${config.color}-600`
-      }`}>
+      <div
+        className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center transition-transform group-hover:scale-105 ring-2 ring-white ${
+          isCurrent
+            ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
+            : `bg-${config.color}-100 text-${config.color}-600`
+        }`}
+      >
         <Icon className="w-3 h-3" />
       </div>
-      
-      {/* Action Type Badge (for actions/work orders) */}
       {isAction && actionType && (
         <div className="text-[9px] font-semibold mt-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
           {actionType}
         </div>
       )}
-      
-      {/* Event Title */}
-      <div className={`text-[10px] font-medium ${isAction && actionType ? 'mt-1' : 'mt-1.5'} text-center max-w-[72px] truncate leading-tight ${
-        isCurrent ? "text-blue-700 font-semibold" : "text-slate-700"
-      }`}>
+      <div
+        className={`text-[10px] font-medium ${isAction && actionType ? "mt-1" : "mt-1.5"} text-center max-w-[72px] truncate leading-tight ${
+          isCurrent ? "text-blue-700 font-semibold" : "text-slate-700"
+        }`}
+      >
         {event.title?.substring(0, 22) || config.label}
       </div>
-      
-      {/* Reference ID */}
       {event.reference_id && (
-        <div className="text-[9px] text-slate-400 mt-0.5 leading-none">
-          {event.reference_id}
-        </div>
+        <div className="text-[9px] text-slate-400 mt-0.5 leading-none">{event.reference_id}</div>
       )}
     </div>
   );
-};
+}
+
+function PMComplianceDialog({ open, onOpenChange, equipmentId }) {
+  const { t } = useLanguage();
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: queryKeys.equipmentPmCompliance.detail(equipmentId),
+    queryFn: () => equipmentHierarchyAPI.getEquipmentPmCompliance(equipmentId),
+    enabled: open && !!equipmentId,
+  });
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    try {
+      return format(parseISO(dateStr), "MMM d, yyyy");
+    } catch {
+      return dateStr;
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-blue-600" />
+            {t("observationWorkspace.pmComplianceSummary")}
+            {data?.compliance_pct != null && (
+              <Badge variant="secondary" className="ml-1 font-semibold">
+                {Math.round(data.compliance_pct)}%
+              </Badge>
+            )}
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading && (
+          <div className="flex items-center justify-center py-10 text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            {t("common.loading")}
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-8 text-red-500 text-sm">
+            Failed to load PM compliance data
+          </div>
+        )}
+
+        {data && !isLoading && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-3">
+              <div className="flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+                  {data.ai_summary}
+                </p>
+              </div>
+              {data.overdue_count > 0 && (
+                <p className="text-xs text-red-600 mt-2 ml-6">
+                  {t("observationWorkspace.overduePmTasks", { count: data.overdue_count })}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                {t("observationWorkspace.pmExecutions")}
+                {data.total_count != null && (
+                  <span className="font-normal normal-case ml-1">
+                    ({data.completed_count}/{data.total_count})
+                  </span>
+                )}
+              </h4>
+
+              {!data.executions?.length ? (
+                <p className="text-sm text-slate-500 py-4 text-center">
+                  {t("observationWorkspace.noPmExecutions")}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {data.executions.map((ex) => (
+                    <div
+                      key={ex.id}
+                      className="rounded-lg border border-slate-200 p-3 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-900 truncate">{ex.title}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {ex.task_type}
+                            {ex.scheduled_date && ` · ${formatDate(ex.scheduled_date)}`}
+                            {ex.completed_at && ` · ✓ ${formatDate(ex.completed_at)}`}
+                          </p>
+                        </div>
+                        <Badge
+                          className={`text-[10px] capitalize flex-shrink-0 ${STATUS_COLORS[ex.status] || STATUS_COLORS.pending}`}
+                        >
+                          {translateEnum(t, ex.status)}
+                        </Badge>
+                      </div>
+                      {ex.technician_feedback ? (
+                        <div className="mt-2 pt-2 border-t border-slate-100">
+                          <p className="text-[10px] font-medium text-slate-500 mb-0.5">
+                            {t("observationWorkspace.technicianFeedback")}
+                          </p>
+                          <p className="text-xs text-slate-700 leading-relaxed">
+                            {ex.technician_feedback}
+                          </p>
+                        </div>
+                      ) : ex.status === "completed" ? (
+                        <p className="text-xs text-slate-400 mt-2 italic">
+                          {t("observationWorkspace.noCloseOutFeedback")}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /**
  * Equipment Reliability Timeline
  */
-export function EquipmentReliabilityTimeline({ events, aiEvidence }) {
+export function EquipmentReliabilityTimeline({ events, equipmentId }) {
   const { t } = useLanguage();
-  const [viewMode, setViewMode] = useState("timeline"); // timeline or list
-  const navigate = useNavigate();
+  const [pmDialogOpen, setPmDialogOpen] = useState(false);
 
-  // Find current event
-  const currentEvent = events?.find(e => e.is_current);
+  const { data: pmPreview } = useQuery({
+    queryKey: queryKeys.equipmentPmCompliance.detail(equipmentId),
+    queryFn: () => equipmentHierarchyAPI.getEquipmentPmCompliance(equipmentId),
+    enabled: !!equipmentId,
+    staleTime: 60_000,
+  });
+
+  const compliancePct = pmPreview?.compliance_pct;
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 px-3 py-2">
-      {/* Header — compact */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <History className="w-3.5 h-3.5 text-slate-500" />
@@ -153,110 +294,36 @@ export function EquipmentReliabilityTimeline({ events, aiEvidence }) {
             <span className="text-[10px] text-slate-400">({events.length})</span>
           )}
         </div>
-        
-        {/* View Toggle */}
-        <div className="flex items-center gap-1">
+
+        {equipmentId && (
           <Button
-            variant={viewMode === "timeline" ? "default" : "ghost"}
+            variant="outline"
             size="sm"
-            onClick={() => setViewMode("timeline")}
-            className="h-6 px-2 text-xs"
+            onClick={() => setPmDialogOpen(true)}
+            className="h-6 px-2 text-xs font-semibold text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100"
           >
-            <Calendar className="w-3 h-3 mr-1" />
-            {t("observationWorkspace.timeline")}
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            {t("observationWorkspace.pmCompliance")}
+            {compliancePct != null ? ` ${Math.round(compliancePct)}%` : ""}
           </Button>
-          <Button
-            variant={viewMode === "list" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("list")}
-            className="h-6 px-2 text-xs"
-          >
-            <List className="w-3 h-3 mr-1" />
-            {t("observationWorkspace.list")}
-          </Button>
-        </div>
+        )}
       </div>
 
-      {/* Timeline View */}
-      {viewMode === "timeline" && events && events.length > 0 ? (
+      {events && events.length > 0 ? (
         <div className="relative px-1.5">
-          {/* Horizontal connector — aligned with the centre of the event circles.
-              Position math: date row (14px text + mb-1.5 = 6px) + half of circle (24/2 = 12px) = 32px. */}
-          <div className="pointer-events-none absolute left-0 right-0 h-px bg-slate-200" style={{ top: "32px" }} />
-          
-          {/* Events */}
+          <div
+            className="pointer-events-none absolute left-0 right-0 h-px bg-slate-200"
+            style={{ top: "32px" }}
+          />
           <div className="flex items-start overflow-x-auto pb-1.5 gap-3 scrollbar-thin scrollbar-thumb-slate-300">
             {events.slice(0, 10).map((event, index) => (
-              <TimelineEventCard 
+              <TimelineEventCard
                 key={event.id || index}
-                event={event} 
+                event={event}
                 isCurrent={event.is_current}
               />
             ))}
           </div>
-        </div>
-      ) : viewMode === "list" ? (
-        <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
-          {events?.map((event, index) => {
-            const configBase = {
-              observation: { icon: AlertTriangle, color: "amber" },
-              failure: { icon: XCircle, color: "red" },
-              work_order: { icon: Wrench, color: "blue" },
-              action: { icon: Wrench, color: "blue" },
-              inspection: { icon: Eye, color: "green" },
-              repair: { icon: Wrench, color: "purple" },
-              investigation: { icon: FileSearch, color: "indigo" },
-            }[event.event_type] || { icon: CircleDot, color: "slate" };
-            const config = { ...configBase, label: getEventTypeLabel(t, event.event_type) };
-            const Icon = config.icon;
-            
-            // For actions/work orders, show the action_type (PM, CM, PDM, etc.)
-            const isAction = event.event_type === "action" || event.event_type === "work_order";
-            const actionType = event.action_type || event.task_type || event.type;
-            
-            return (
-              <div 
-                key={event.id || index}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
-                  event.is_current 
-                    ? "border-blue-300 bg-blue-50" 
-                    : "border-slate-200 hover:bg-slate-50"
-                }`}
-                onClick={() => {
-                  if (event.event_type === "observation" && event.id) {
-                    navigate(`/threats/${event.id}`);
-                  }
-                }}
-              >
-                <div className={`p-2 rounded-lg bg-${config.color}-100`}>
-                  <Icon className={`w-4 h-4 text-${config.color}-600`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {isAction && actionType && (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-                        {actionType}
-                      </span>
-                    )}
-                    {!isAction && (
-                      <span className="text-[10px] text-slate-500">{config.label}</span>
-                    )}
-                  </div>
-                  <div className="font-medium text-sm text-slate-900 truncate">{event.title}</div>
-                  <div className="text-xs text-slate-500">
-                    {event.date && format(parseISO(event.date), "MMM d, yyyy")}
-                    {event.reference_id && ` • ${event.reference_id}`}
-                  </div>
-                </div>
-                {event.is_current && (
-                  <Badge className="bg-blue-600 text-xs">{t("observationWorkspace.current")}</Badge>
-                )}
-                {event.status && !event.is_current && (
-                  <Badge variant="outline" className="text-xs capitalize">{translateEnum(t, event.status)}</Badge>
-                )}
-              </div>
-            );
-          })}
         </div>
       ) : (
         <div className="text-center py-8 text-slate-500">
@@ -264,6 +331,12 @@ export function EquipmentReliabilityTimeline({ events, aiEvidence }) {
           <p className="text-sm">{t("observationWorkspace.noHistoricalEvents")}</p>
         </div>
       )}
+
+      <PMComplianceDialog
+        open={pmDialogOpen}
+        onOpenChange={setPmDialogOpen}
+        equipmentId={equipmentId}
+      />
     </div>
   );
-};
+}
