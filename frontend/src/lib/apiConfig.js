@@ -14,6 +14,7 @@
  */
 
 import { getDatabaseEnvironment } from "./databaseEnv";
+import { getActiveTenantHeaders } from "./activeTenant";
 
 // Debug flag - set to true to enable console logging
 const DEBUG_API_CONFIG = false;
@@ -199,6 +200,8 @@ export const getAuthHeaders = (additionalHeaders = {}, method = "GET") => {
   if (dbEnv) {
     headers["X-Database-Environment"] = dbEnv;
   }
+
+  Object.assign(headers, getActiveTenantHeaders());
 
   return headers;
 };

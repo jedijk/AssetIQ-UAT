@@ -2,6 +2,7 @@ import axios from "axios";
 import { getApiUrl, getBackendUrl, AUTH_MODE, getCsrfToken, setCsrfToken } from "./apiConfig";
 import { debugLog } from "./debug";
 import { getDatabaseEnvironment } from "./databaseEnv";
+import { getActiveTenantId } from "./activeTenant";
 import { isPublicKioskPath } from "./publicRoutes";
 
 // Get API URL at initialization for static uses
@@ -16,6 +17,8 @@ function applyCookieAuthHeaders(config) {
   }
   const dbEnv = getDatabaseEnvironment();
   if (dbEnv) config.headers["X-Database-Environment"] = dbEnv;
+  const activeTenant = getActiveTenantId();
+  if (activeTenant) config.headers["X-Active-Tenant"] = activeTenant;
   return config;
 }
 
@@ -24,12 +27,11 @@ function buildSessionCheckHeaders() {
   if (AUTH_MODE !== "cookie") {
     const token = localStorage.getItem("token");
     if (token) headers.Authorization = `Bearer ${token}`;
-    const dbEnv = getDatabaseEnvironment();
-    if (dbEnv) headers["X-Database-Environment"] = dbEnv;
-  } else {
-    const dbEnv = getDatabaseEnvironment();
-    if (dbEnv) headers["X-Database-Environment"] = dbEnv;
   }
+  const dbEnv = getDatabaseEnvironment();
+  if (dbEnv) headers["X-Database-Environment"] = dbEnv;
+  const activeTenant = getActiveTenantId();
+  if (activeTenant) headers["X-Active-Tenant"] = activeTenant;
   return headers;
 }
 
@@ -185,6 +187,10 @@ api.interceptors.request.use((config) => {
     if (dbEnv) {
       config.headers["X-Database-Environment"] = dbEnv;
     }
+    const activeTenant = getActiveTenantId();
+    if (activeTenant) {
+      config.headers["X-Active-Tenant"] = activeTenant;
+    }
   } else {
     applyCookieAuthHeaders(config);
   }
@@ -251,6 +257,10 @@ aiApi.interceptors.request.use((config) => {
     const dbEnv = getDatabaseEnvironment();
     if (dbEnv) {
       config.headers["X-Database-Environment"] = dbEnv;
+    }
+    const activeTenant = getActiveTenantId();
+    if (activeTenant) {
+      config.headers["X-Active-Tenant"] = activeTenant;
     }
   } else {
     applyCookieAuthHeaders(config);

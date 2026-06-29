@@ -4,6 +4,7 @@ import { getApiUrl } from "../lib/apiConfig";
 import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtils";
 import { clearRolePreviewStorage } from "./RolePreviewContext";
 import { enforceDatabaseEnvironmentForRole, getDatabaseEnvironment } from "../lib/databaseEnv";
+import { clearActiveTenantId, enforceActiveTenantForRole, getActiveTenantHeaders } from "../lib/activeTenant";
 import { setCsrfToken, clearCsrfToken } from "../lib/apiConfig";
 import { isPublicKioskPath } from "../lib/publicRoutes";
 import { resetSessionExpiryState } from "../lib/apiClient";
@@ -19,7 +20,10 @@ function getDbEnvHeaders() {
   // to select the active database environment (production vs UAT).
   try {
     const dbEnv = getDatabaseEnvironment();
-    return dbEnv ? { "X-Database-Environment": dbEnv } : {};
+    return {
+      ...(dbEnv ? { "X-Database-Environment": dbEnv } : {}),
+      ...getActiveTenantHeaders(),
+    };
   } catch (_e) {
     return {};
   }
@@ -74,6 +78,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
     clearCsrfToken();
     clearRolePreviewStorage();
+    clearActiveTenantId();
     delete axios.defaults.headers.common["Authorization"];
     setToken(null);
     setUser(null);
@@ -92,6 +97,7 @@ export const AuthProvider = ({ children }) => {
       });
       setUser(response.data);
       enforceDatabaseEnvironmentForRole(response.data?.role);
+      enforceActiveTenantForRole(response.data?.role);
       setMustChangePassword(response.data.must_change_password || false);
 
       // Check if user needs to accept terms (new or updated terms)
@@ -236,6 +242,7 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
     resetSessionExpiryState();
     enforceDatabaseEnvironmentForRole(userData?.role);
+    enforceActiveTenantForRole(userData?.role);
     setLoading(false);
     setMustChangePassword(must_change_password || userData.must_change_password || false);
 
@@ -282,6 +289,7 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       resetSessionExpiryState();
       enforceDatabaseEnvironmentForRole(userData?.role);
+      enforceActiveTenantForRole(userData?.role);
       setLoading(false);
       setMustChangePassword(userData.must_change_password || false);
 
@@ -357,6 +365,7 @@ export const AuthProvider = ({ children }) => {
 
       setUser(meResponse.data);
       enforceDatabaseEnvironmentForRole(meResponse.data?.role);
+      enforceActiveTenantForRole(meResponse.data?.role);
       setMustAcceptTerms(false);
 
       // Now show intro if user hasn't seen it
@@ -397,6 +406,7 @@ export const AuthProvider = ({ children }) => {
     setToken(newToken);
     setUser(userData);
     enforceDatabaseEnvironmentForRole(userData?.role);
+    enforceActiveTenantForRole(userData?.role);
     
     return userData;
   };

@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Menu, X, PanelLeftOpen, PanelLeftClose, Settings, HelpCircle, LogOut, User, Shield, Eye,
+  Menu, X, PanelLeftOpen, PanelLeftClose, Settings, HelpCircle, LogOut, User, Shield, Eye, Building2,
   Info, MessageCircleQuestion, Tag, Sparkles, Route,
 } from "lucide-react";
 import AnimatedDrawer from "../animations/AnimatedDrawer";
@@ -49,6 +49,9 @@ export default function LayoutHeader({
   isPreviewing,
   previewRoleLabel,
   onOpenRolePreview,
+  onOpenTenantSwitcher,
+  isViewingOtherTenant,
+  activeTenantLabel,
   dismissedNotifications,
   setDismissedNotifications,
 }) {
@@ -410,6 +413,21 @@ export default function LayoutHeader({
                     <User className="w-4 h-4 mr-2" />
                     {t("profile.editProfile") || "Edit Profile"}
                   </DropdownMenuItem>
+                  {isOwner && (
+                    <DropdownMenuItem
+                      onClick={onOpenTenantSwitcher}
+                      className="cursor-pointer"
+                      data-testid="tenant-switch-menu-item"
+                    >
+                      <Building2 className="w-4 h-4 mr-2" />
+                      {t("tenantSwitch.menu")}
+                      {isViewingOtherTenant && (
+                        <span className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 truncate max-w-[80px]">
+                          {activeTenantLabel}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  )}
                   {isOwner && (
                     <DropdownMenuItem
                       onClick={onOpenRolePreview}

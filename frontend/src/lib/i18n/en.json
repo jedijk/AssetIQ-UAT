@@ -380,6 +380,18 @@
     "active": "Active",
     "systemRole": "System"
   },
+  "tenantSwitch": {
+    "menu": "Switch tenant",
+    "title": "Switch tenant",
+    "description": "View and manage data as another organization. Your account stays signed in as owner.",
+    "banner": "Viewing tenant {tenant}",
+    "exit": "Return to home tenant",
+    "active": "Active",
+    "loading": "Loading tenants…",
+    "homeTenant": "Home tenant",
+    "switchSuccess": "Tenant switched",
+    "switchFailed": "Could not switch tenant"
+  },
   "permissions": {
     "sections": {
       "dashboards": "Dashboards",

@@ -167,7 +167,7 @@ def create_token(user_id: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def _validate_token(token: str) -> dict:
+async def _validate_token(token: str, request: Optional[Request] = None) -> dict:
     """Internal helper to validate a JWT token and return the user.
     
     Note: Always validates against the production database to ensure
@@ -203,7 +203,9 @@ async def _validate_token(token: str) -> dict:
                 status_code=403,
                 detail="This organization is suspended or archived. Contact your platform administrator.",
             )
-        return user
+        from services.active_tenant import apply_active_tenant_override
+
+        return await apply_active_tenant_override(user, request)
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
@@ -223,7 +225,7 @@ async def get_current_user(
     """
     # Try header first
     if credentials and credentials.credentials:
-        return await _validate_token(credentials.credentials)
+        return await _validate_token(credentials.credentials, request)
 
     # Cookie-based auth (preferred when enabled): HttpOnly cookie cannot be read by JS,
     # reducing XSS blast radius. Works cross-origin with allow_credentials CORS.
@@ -234,14 +236,14 @@ async def get_current_user(
         except Exception:
             cookie_token = None
         if cookie_token:
-            return await _validate_token(cookie_token)
+            return await _validate_token(cookie_token, request)
     
     # Query parameter auth is OFF by default because tokens in URLs can leak via logs,
     # browser history, referrers, and proxy traces. Enable explicitly only if you have
     # a constrained use-case (e.g., short-lived signed URLs for media).
     allow_query_token = os.environ.get("ALLOW_QUERY_TOKEN_AUTH", "false").lower() == "true"
     if allow_query_token and token:
-        return await _validate_token(token)
+        return await _validate_token(token, request)
     
     # No auth provided
     raise HTTPException(status_code=401, detail="Not authenticated")
@@ -268,7 +270,7 @@ async def get_optional_user_from_request(request: Request) -> Optional[dict]:
     if not token:
         return None
     try:
-        return await _validate_token(token)
+        return await _validate_token(token, request)
     except HTTPException:
         return None
 

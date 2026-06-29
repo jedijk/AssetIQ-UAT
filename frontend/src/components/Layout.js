@@ -9,6 +9,9 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { useRolePreview } from "../contexts/RolePreviewContext";
 import RolePreviewBanner from "./layout/RolePreviewBanner";
 import RolePreviewDialog from "./layout/RolePreviewDialog";
+import TenantSwitchBanner from "./layout/TenantSwitchBanner";
+import TenantSwitcherDialog from "./layout/TenantSwitcherDialog";
+import { getActiveTenantId } from "../lib/activeTenant";
 import { getBackendUrl } from "../lib/apiConfig";
 import { api } from "../lib/api";
 import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database, ScrollText, Gauge, Sparkles } from "lucide-react";
@@ -498,6 +501,13 @@ const Layout = () => {
 
   const { isOwner, isPreviewing, previewRoleLabel } = useRolePreview();
   const [rolePreviewDialogOpen, setRolePreviewDialogOpen] = useState(false);
+  const [tenantSwitcherDialogOpen, setTenantSwitcherDialogOpen] = useState(false);
+
+  const activeTenantId = getActiveTenantId();
+  const homeTenantId = user?.home_tenant_id || user?.company_id;
+  const isViewingOtherTenant =
+    isOwner && activeTenantId && activeTenantId !== homeTenantId;
+  const activeTenantLabel = activeTenantId;
 
   // Listen for custom events from OperatorLandingPage
   useEffect(() => {
@@ -611,14 +621,23 @@ const Layout = () => {
         isPreviewing={isPreviewing}
         previewRoleLabel={previewRoleLabel}
         onOpenRolePreview={() => setRolePreviewDialogOpen(true)}
+        onOpenTenantSwitcher={() => setTenantSwitcherDialogOpen(true)}
+        isViewingOtherTenant={isViewingOtherTenant}
+        activeTenantLabel={activeTenantLabel}
         dismissedNotifications={dismissedNotifications}
         setDismissedNotifications={setDismissedNotifications}
       />
 
       <RolePreviewBanner t={t} />
+      <TenantSwitchBanner t={t} activeTenantLabel={activeTenantLabel} />
       <RolePreviewDialog
         open={rolePreviewDialogOpen}
         onOpenChange={setRolePreviewDialogOpen}
+        t={t}
+      />
+      <TenantSwitcherDialog
+        open={tenantSwitcherDialogOpen}
+        onOpenChange={setTenantSwitcherDialogOpen}
         t={t}
       />
 

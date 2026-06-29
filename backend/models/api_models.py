@@ -50,6 +50,9 @@ class UserResponse(BaseModel):
     avatar_url: Optional[str] = None  # URL to fetch user's avatar image
     default_simple_mode: Optional[bool] = False
     terms_accepted_version: Optional[str] = None  # GDPR terms version accepted
+    company_id: Optional[str] = None
+    active_tenant_id: Optional[str] = None
+    home_tenant_id: Optional[str] = None
 
 
 class TokenResponse(BaseModel):

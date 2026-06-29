@@ -309,11 +309,17 @@ async def register(request: Request, user_data: RegisterWithProtection):
 
 
 def _serialize_user_response(user: dict) -> UserResponse:
+    from services.tenant_schema import tenant_id_from_user
+
     created_at = user.get("created_at")
     if hasattr(created_at, "isoformat"):
         created_at = created_at.isoformat()
     elif not isinstance(created_at, str):
         created_at = str(created_at) if created_at else None
+
+    home_tenant_id = user.get("_home_tenant_id") or tenant_id_from_user(user)
+    active_tenant_id = tenant_id_from_user(user)
+
     return UserResponse(
         id=user["id"],
         email=user["email"],
@@ -327,6 +333,9 @@ def _serialize_user_response(user: dict) -> UserResponse:
         has_seen_intro=user.get("has_seen_intro", True),
         default_simple_mode=user.get("default_simple_mode", False),
         terms_accepted_version=user.get("terms_accepted_version"),
+        company_id=active_tenant_id,
+        active_tenant_id=active_tenant_id,
+        home_tenant_id=home_tenant_id,
     )
 
 
@@ -630,28 +639,23 @@ async def get_me(request: Request, response: Response, current_user: dict = Depe
         # Use the backend proxy endpoint so frontend can access it without storage auth
         avatar_url = f"/api/users/{current_user['id']}/avatar"
     
-    # Convert datetime to string for Pydantic model
-    created_at = current_user.get("created_at")
-    if hasattr(created_at, 'isoformat'):
-        created_at = created_at.isoformat()
-    elif not isinstance(created_at, str):
-        created_at = str(created_at) if created_at else None
-    
-    return UserResponse(
-        id=current_user["id"],
-        email=current_user["email"],
-        name=current_user["name"],
-        created_at=created_at,
-        department=current_user.get("department"),
-        position=current_user.get("position"),
-        role=current_user.get("role"),
-        phone=current_user.get("phone"),
-        must_change_password=current_user.get("must_change_password", False),
-        has_seen_intro=current_user.get("has_seen_intro", True),
-        avatar_url=avatar_url,
-        default_simple_mode=current_user.get("default_simple_mode", False),
-        terms_accepted_version=current_user.get("terms_accepted_version")
-    )
+    serialized = _serialize_user_response(current_user)
+    return serialized.model_copy(update={"avatar_url": avatar_url})
+
+
+class SwitchTenantRequest(BaseModel):
+    tenant_id: Optional[str] = None
+
+
+@router.post("/auth/switch-tenant")
+async def switch_tenant(
+    body: SwitchTenantRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Validate tenant switch for owner users (frontend persists choice in localStorage)."""
+    from services.active_tenant import resolve_owner_tenant_switch
+
+    return await resolve_owner_tenant_switch(current_user, body.tenant_id)
 
 
 class ChangePasswordRequest(BaseModel):
