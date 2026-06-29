@@ -11,6 +11,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { BreadcrumbProvider } from "./contexts/BreadcrumbContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Layout from "./components/Layout";
+import { AppShell } from "./components/AppShell";
 import ChangePasswordDialog from "./components/ChangePasswordDialog";
 import TermsAcceptanceDialog from "./components/TermsAcceptanceDialog";
 import FirstLoginFlow from "./components/FirstLoginFlow";
