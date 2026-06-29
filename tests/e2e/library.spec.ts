@@ -5,7 +5,7 @@ test.describe('Failure Mode Library Page', () => {
   test.beforeEach(async ({ page }) => {
     await dismissToasts(page);
     await loginUser(page);
-    await page.goto('/library', { waitUntil: 'domcontentloaded' });
+    await page.goto('/library?tab=failure-modes', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('failure-modes-page')).toBeVisible();
   });
 

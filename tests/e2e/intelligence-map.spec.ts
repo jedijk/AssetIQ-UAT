@@ -8,8 +8,8 @@ test.describe('Intelligence Thread (library)', () => {
     await page.goto('/library', { waitUntil: 'domcontentloaded' });
   });
 
-  test('intelligence thread tab loads', async ({ page }) => {
-    await page.getByTestId('intelligence-map-tab').click();
+  test('intelligence thread tab loads by default', async ({ page }) => {
+    await expect(page.getByTestId('intelligence-map-tab')).toHaveAttribute('data-state', 'active');
     await expect(page.getByText('Intelligence Thread', { exact: false }).first()).toBeVisible();
     await expect(page.getByText('Failure Modes', { exact: false }).first()).toBeVisible();
     await expect(
@@ -18,7 +18,6 @@ test.describe('Intelligence Thread (library)', () => {
   });
 
   test('knowledge graph card opens ontology dialog', async ({ page }) => {
-    await page.getByTestId('intelligence-map-tab').click();
     await page.getByTestId('intelligence-map-reliability-edges').click();
     await expect(page.getByTestId('reliability-knowledge-graph-dialog')).toBeVisible();
     await expect(page.getByTestId('reliability-knowledge-graph-svg')).toBeVisible();

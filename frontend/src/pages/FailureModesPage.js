@@ -128,7 +128,7 @@ const FailureModesPage = () => {
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all"); // generic, customer_specific, all
   const [highSeverityOnly, setHighSeverityOnly] = useState(false); // filter to severity >= 8
-  const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "failure-modes");
+  const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "intelligence-map");
   const [libraryTab, setLibraryTab] = useState("equipment");
   const [strategyEquipmentTypeId, setStrategyEquipmentTypeId] = useState(
     () => searchParams.get("equipment_type_id") || null
