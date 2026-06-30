@@ -300,9 +300,9 @@ export function EquipmentReliabilityTimeline({ events, equipmentId }) {
             variant="outline"
             size="sm"
             onClick={() => setPmDialogOpen(true)}
-            className="h-6 px-2 text-xs font-semibold text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 max-sm:h-3 max-sm:min-h-0 max-sm:px-1 max-sm:text-[9px] max-sm:leading-none max-sm:font-medium max-sm:gap-0 max-sm:[&_svg]:!size-1.5"
+            className="h-6 px-2 text-xs font-semibold text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 max-md:!h-3 max-md:!min-h-[12px] max-md:px-1.5 max-md:py-0 max-md:text-[10px] max-md:leading-3 max-md:font-medium max-md:gap-0.5 max-md:[&_svg]:!size-2.5"
           >
-            <CheckCircle2 className="w-3 h-3 mr-1 max-sm:w-1.5 max-sm:h-1.5 max-sm:mr-0.5" />
+            <CheckCircle2 className="w-3 h-3 mr-1 max-md:w-2.5 max-md:h-2.5 max-md:mr-0" />
             {t("observationWorkspace.pmCompliance")}
             {compliancePct != null ? ` ${Math.round(compliancePct)}%` : ""}
           </Button>
