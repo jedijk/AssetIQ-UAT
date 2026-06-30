@@ -107,6 +107,14 @@ const SETTINGS_SECTIONS = [
     requiresSettings: true,
   },
   {
+    id: "company",
+    sectionKey: "companyProfile",
+    icon: Building2,
+    path: "/settings/company",
+    roles: ["owner", "admin"],
+    requiresSettings: true,
+  },
+  {
     id: "qr",
     sectionKey: "qr",
     icon: QrCode,

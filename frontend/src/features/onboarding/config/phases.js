@@ -6,8 +6,8 @@ export const ONBOARDING_PHASES = [
     what: "This is your company profile.",
     why: "These settings are used throughout the entire platform.",
     demo: "company",
-    ctaLabel: "Configure Company Settings",
-    ctaPath: "/settings/general",
+    ctaLabel: "Configure Company Profile",
+    ctaPath: "/settings/company",
     help: {
       explainAgain: "Your company profile sets the name, language, and timezone AssetIQ uses everywhere.",
       bestPractice: "Use your legal company name and the timezone where most maintenance work is planned.",

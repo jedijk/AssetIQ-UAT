@@ -209,6 +209,10 @@
       "onboardingWorkspace": {
         "label": "Onboarding Workspace",
         "description": "Geführte Self-Service-Implementierung"
+      },
+      "companyProfile": {
+        "label": "Unternehmensprofil",
+        "description": "Firmenname, Logo, Sprache und Zeitzone"
       }
     },
     "maintenanceReadiness": {

@@ -209,6 +209,10 @@
       "onboardingWorkspace": {
         "label": "Onboarding Workspace",
         "description": "Begeleide zelfservice-implementatie"
+      },
+      "companyProfile": {
+        "label": "Bedrijfsprofiel",
+        "description": "Bedrijfsnaam, logo, taal en tijdzone"
       }
     },
     "maintenanceReadiness": {

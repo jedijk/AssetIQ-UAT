@@ -19,12 +19,14 @@ from services.onboarding_constants import (
     VALID_ENTRY_PATHS,
     VALID_PHASES,
 )
-from services.tenant_management_service import _resolve_tenant_doc, _tenant_counts
+from services.tenant_management_service import _resolve_tenant_doc, _tenant_counts, register_legacy_tenant
 from services.tenant_schema import tenant_id_from_user
 
 logger = logging.getLogger(__name__)
 
 COLLECTION = "onboarding_state"
+MAX_COMPANY_LOGO_BYTES = 5 * 1024 * 1024
+ALLOWED_LOGO_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 
 def _now_iso() -> str:
@@ -131,11 +133,13 @@ async def _validate_company(tenant_id: str) -> dict:
         )
     )
 
-    # Logo is optional — stub check
+    # Logo is optional
+    logo_path = (tenant.get("logo_path") or "").strip()
+    has_logo = bool(logo_path or tenant.get("logo_data"))
     checks.append(
         _check(
-            "warning",
-            "Company logo not configured (optional)",
+            "passed" if has_logo else "warning",
+            "Company logo configured" if has_logo else "Company logo not configured (optional)",
             code="company_logo",
         )
     )
@@ -776,6 +780,169 @@ async def run_go_live_validation(user: dict) -> dict:
         "ready": result.get("status") == "passed",
         "checked_at": _now_iso(),
     }
+
+
+def _serialize_company_profile(tenant: dict) -> dict:
+    logo_path = (tenant.get("logo_path") or "").strip()
+    has_logo = bool(logo_path or tenant.get("logo_data"))
+    return {
+        "tenant_id": tenant.get("tenant_id"),
+        "name": tenant.get("name") or "",
+        "default_language": tenant.get("default_language") or "en",
+        "default_timezone": tenant.get("default_timezone") or "UTC",
+        "has_logo": has_logo,
+        "logo_updated_at": tenant.get("logo_updated_at"),
+    }
+
+
+async def _ensure_tenant_doc(tenant_id: str, actor: dict) -> dict:
+    try:
+        return await _resolve_tenant_doc(db, tenant_id)
+    except HTTPException:
+        await register_legacy_tenant(db, tenant_id, actor)
+        return await _resolve_tenant_doc(db, tenant_id)
+
+
+async def get_company_profile(user: dict) -> dict:
+    tenant_id = tenant_id_from_user(user)
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant context for user")
+    tenant = await _ensure_tenant_doc(tenant_id, user)
+    return _serialize_company_profile(tenant)
+
+
+async def update_company_profile(user: dict, payload: dict) -> dict:
+    tenant_id = tenant_id_from_user(user)
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant context for user")
+
+    updates: Dict[str, Any] = {}
+    if "name" in payload and payload["name"] is not None:
+        name = str(payload["name"]).strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Company name is required")
+        updates["name"] = name
+    if "default_language" in payload and payload["default_language"] is not None:
+        lang = str(payload["default_language"]).strip()
+        if lang:
+            updates["default_language"] = lang
+    if "default_timezone" in payload and payload["default_timezone"] is not None:
+        tz = str(payload["default_timezone"]).strip()
+        if tz:
+            updates["default_timezone"] = tz
+
+    if not updates:
+        tenant = await _ensure_tenant_doc(tenant_id, user)
+        return _serialize_company_profile(tenant)
+
+    await _ensure_tenant_doc(tenant_id, user)
+    updates["updated_at"] = _now_iso()
+    await db.tenants.update_one({"tenant_id": tenant_id}, {"$set": updates})
+    tenant = await _ensure_tenant_doc(tenant_id, user)
+    return _serialize_company_profile(tenant)
+
+
+async def upload_company_logo(
+    user: dict,
+    *,
+    content: bytes,
+    content_type: str,
+    filename: str,
+) -> dict:
+    tenant_id = tenant_id_from_user(user)
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant context for user")
+
+    if content_type not in ALLOWED_LOGO_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image type. Allowed: JPEG, PNG, WebP, GIF")
+    if len(content) > MAX_COMPANY_LOGO_BYTES:
+        raise HTTPException(status_code=400, detail="Logo must be 5 MB or smaller")
+
+    ext = "png"
+    if "jpeg" in content_type or "jpg" in content_type:
+        ext = "jpg"
+    elif "webp" in content_type:
+        ext = "webp"
+    elif "gif" in content_type:
+        ext = "gif"
+
+    now = _now_iso()
+    storage_path = f"tenants/{tenant_id}/company-logo.{ext}"
+
+    try:
+        from services.storage_service import is_storage_available, put_object_async
+
+        if is_storage_available():
+            await put_object_async(storage_path, content, content_type)
+            await db.tenants.update_one(
+                {"tenant_id": tenant_id},
+                {
+                    "$set": {
+                        "logo_path": storage_path,
+                        "logo_content_type": content_type,
+                        "logo_storage": "object",
+                        "logo_updated_at": now,
+                        "updated_at": now,
+                    },
+                    "$unset": {"logo_data": ""},
+                },
+            )
+        else:
+            import base64
+
+            await db.tenants.update_one(
+                {"tenant_id": tenant_id},
+                {
+                    "$set": {
+                        "logo_data": base64.b64encode(content).decode("utf-8"),
+                        "logo_content_type": content_type,
+                        "logo_storage": "mongodb",
+                        "logo_updated_at": now,
+                        "updated_at": now,
+                    },
+                    "$unset": {"logo_path": ""},
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Company logo upload failed for tenant %s", tenant_id)
+        raise HTTPException(status_code=500, detail="Failed to upload company logo") from exc
+
+    tenant = await _ensure_tenant_doc(tenant_id, user)
+    return _serialize_company_profile(tenant)
+
+
+async def get_company_logo_response(tenant_id: str):
+    from fastapi.responses import Response
+
+    tenant = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
+    if not tenant:
+        return Response(status_code=204)
+
+    storage_type = tenant.get("logo_storage", "object")
+    if storage_type == "mongodb" and tenant.get("logo_data"):
+        import base64
+
+        try:
+            body = base64.b64decode(tenant["logo_data"])
+            content_type = tenant.get("logo_content_type") or "image/png"
+            return Response(content=body, media_type=content_type)
+        except Exception:
+            return Response(status_code=204)
+
+    logo_path = tenant.get("logo_path")
+    if not logo_path:
+        return Response(status_code=204)
+
+    try:
+        from services.storage_service import get_object_async
+
+        body, content_type = await get_object_async(logo_path)
+        return Response(content=body, media_type=content_type or "image/png")
+    except Exception as exc:
+        logger.warning("Company logo not found for tenant %s: %s", tenant_id, exc)
+        return Response(status_code=204)
 
 
 def _coach_fallback_reply(phase_id: str) -> str:

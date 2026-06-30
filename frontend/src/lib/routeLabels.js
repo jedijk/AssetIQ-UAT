@@ -83,6 +83,7 @@ const staticRouteLabels = {
   '/settings/disciplines': 'Disciplines',
   '/settings/task-generation': 'Task Generation',
   '/settings/onboarding': 'Onboarding Workspace',
+  '/settings/company': 'Company Profile',
   '/user-statistics': 'User Statistics',
 };
 
@@ -147,6 +148,7 @@ const staticRouteIcons = {
   '/settings/translations': Settings,
   '/settings/disciplines': Settings,
   '/settings/onboarding': Rocket,
+  '/settings/company': Building2,
   '/settings/task-generation': Settings,
   '/user-statistics': BarChart3,
 };

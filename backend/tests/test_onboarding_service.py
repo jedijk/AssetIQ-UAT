@@ -129,6 +129,57 @@ async def test_go_live_blocks_when_mandatory_phase_fails():
 
 
 @pytest.mark.asyncio
+async def test_validate_company_logo_passes_when_configured():
+    mock_db = MagicMock()
+
+    with patch("services.onboarding_service.db", mock_db):
+        with patch(
+            "services.onboarding_service._resolve_tenant_doc",
+            new_callable=AsyncMock,
+            return_value={
+                "tenant_id": "Tyromer",
+                "name": "Tyromer",
+                "default_language": "en",
+                "default_timezone": "UTC",
+                "logo_path": "tenants/Tyromer/company-logo.png",
+            },
+        ):
+            result = await validate_phase("Tyromer", "company", persist=False)
+
+    logo_check = next(c for c in result["checks"] if c["code"] == "company_logo")
+    assert logo_check["status"] == "passed"
+
+
+@pytest.mark.asyncio
+async def test_update_company_profile_sets_tenant_fields():
+    mock_db = MagicMock()
+    mock_db.tenants.update_one = AsyncMock()
+
+    tenant_doc = {
+        "tenant_id": "Tyromer",
+        "name": "Old Name",
+        "default_language": "en",
+        "default_timezone": "UTC",
+    }
+
+    with patch("services.onboarding_service.db", mock_db):
+        with patch(
+            "services.onboarding_service._ensure_tenant_doc",
+            new_callable=AsyncMock,
+            side_effect=[tenant_doc, {**tenant_doc, "name": "Tyromer Inc"}],
+        ):
+            from services.onboarding_service import update_company_profile
+
+            result = await update_company_profile(
+                {"id": "u1", "role": "admin", "company_id": "Tyromer"},
+                {"name": "Tyromer Inc"},
+            )
+
+    assert result["name"] == "Tyromer Inc"
+    mock_db.tenants.update_one.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_ask_coach_uses_onboarding_endpoint_not_observation_chat():
     with patch("services.ai_platform.execute_prompt", new_callable=AsyncMock) as mock_prompt:
         mock_prompt.return_value = {"content": "Failure modes describe how equipment can fail."}
