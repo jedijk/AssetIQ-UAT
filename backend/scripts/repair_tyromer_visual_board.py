@@ -5,10 +5,12 @@ Repair Tyromer operations visual boards to the canonical shop-floor TV layout.
 Updates visual_boards, visual_board_templates, and the latest visual_board_versions
 per board so kiosk displays show correct widgets without manual republish.
 
-Usage:
+Usage (local repo — cwd backend/):
   MONGO_URL=... python scripts/repair_tyromer_visual_board.py --dry-run
-  MONGO_URL=... PRIMARY_TENANT_ID=Tyromer python scripts/repair_tyromer_visual_board.py
-  MONGO_URL=... python scripts/repair_tyromer_visual_board.py --tenant-id Tyromer
+
+Usage (UAT/production container — cwd /app):
+  python3 scripts/repair_tyromer_visual_board.py --dry-run
+  PRIMARY_TENANT_ID=Tyromer python3 scripts/repair_tyromer_visual_board.py
 """
 from __future__ import annotations
 
@@ -18,9 +20,11 @@ import os
 import sys
 from typing import Any, Dict, List, Optional
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _BACKEND_ROOT)
 
-from database import db  # noqa: E402
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase  # noqa: E402
+
 from models.visual_board import (  # noqa: E402
     BoardType,
     default_tyromer_operations_layout,
@@ -46,7 +50,9 @@ def _canonical_payload() -> Dict[str, Any]:
     return {"widgets": widgets, "layout": layout, "theme": "light"}
 
 
-async def _latest_version(board_id: str, tenant_id: str) -> Optional[dict]:
+async def _latest_version(
+    db: AsyncIOMotorDatabase, board_id: str, tenant_id: str,
+) -> Optional[dict]:
     return await db[VERSIONS_COLLECTION].find_one(
         {"board_id": board_id, "tenant_id": tenant_id},
         {"_id": 0},
@@ -55,6 +61,7 @@ async def _latest_version(board_id: str, tenant_id: str) -> Optional[dict]:
 
 
 async def repair_tyromer_visual_board(
+    db: AsyncIOMotorDatabase,
     tenant_id: str,
     *,
     dry_run: bool = False,
@@ -89,7 +96,7 @@ async def repair_tyromer_visual_board(
                 },
             )
 
-        version = await _latest_version(board_id, tenant_id)
+        version = await _latest_version(db, board_id, tenant_id)
         if version:
             summary["versions_updated"].append(
                 {
@@ -149,6 +156,25 @@ def _print_summary(summary: Dict[str, Any]) -> None:
         print("  (no matching documents found)")
 
 
+async def _run(args: argparse.Namespace) -> int:
+    mongo_url = os.environ.get("MONGO_URL")
+    db_name = os.environ.get("DB_NAME", "assetiq-UAT").strip('"')
+    if not mongo_url:
+        print("Error: MONGO_URL environment variable is required", file=sys.stderr)
+        return 1
+
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[db_name]
+    try:
+        summary = await repair_tyromer_visual_board(
+            db, args.tenant_id, dry_run=args.dry_run,
+        )
+        _print_summary(summary)
+        return 0
+    finally:
+        client.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Repair Tyromer operations visual board layout")
     parser.add_argument(
@@ -170,8 +196,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    summary = asyncio.run(repair_tyromer_visual_board(args.tenant_id, dry_run=args.dry_run))
-    _print_summary(summary)
+    raise SystemExit(asyncio.run(_run(args)))
 
 
 if __name__ == "__main__":
