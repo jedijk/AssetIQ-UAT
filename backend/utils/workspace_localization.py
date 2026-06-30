@@ -244,6 +244,10 @@ async def localize_workspace_payload(
 
     obs_translate_items: List[tuple] = []
     obs_translate_targets: List[str] = []
+    source_desc = (observation.get("description") or "").strip()
+    source_ctx = (observation.get("user_context") or "").strip()
+    show_user_context = bool(source_ctx and source_ctx != source_desc)
+
     if obs_fields.get("title"):
         observation["title"] = obs_fields["title"]
     elif observation.get("title"):
@@ -265,6 +269,19 @@ async def localize_workspace_payload(
         translated_obs = await _translate_many(service, obs_translate_items, lang, cache, user_id)
         for target, value in zip(obs_translate_targets, translated_obs):
             observation[target] = value
+
+    if not show_user_context:
+        observation.pop("user_context", None)
+    elif source_ctx and source_ctx == source_desc:
+        observation["user_context"] = observation.get("description")
+    elif lang != "en":
+        current_ctx = (observation.get("user_context") or "").strip()
+        if current_ctx == source_ctx and source_ctx:
+            observation.pop("user_context", None)
+
+    observation["show_user_context"] = bool(
+        show_user_context and (observation.get("user_context") or "").strip()
+    )
 
     if fm_fields.get("name"):
         translated_name = fm_fields["name"]

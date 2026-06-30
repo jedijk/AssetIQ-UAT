@@ -336,6 +336,18 @@
     "active": "Aktiv",
     "systemRole": "System"
   },
+  "tenantSwitch": {
+    "menu": "Mandant wechseln",
+    "title": "Mandant wechseln",
+    "description": "Daten einer anderen Organisation anzeigen und verwalten. Sie bleiben als Eigentümer angemeldet.",
+    "banner": "Mandant {tenant} wird angezeigt",
+    "exit": "Zurück zum Heimatmandanten",
+    "active": "Aktiv",
+    "loading": "Mandanten werden geladen…",
+    "homeTenant": "Heimatmandant",
+    "switchSuccess": "Mandant gewechselt",
+    "switchFailed": "Mandantenwechsel fehlgeschlagen"
+  },
   "permissions": {
     "sections": {
       "dashboards": "Dashboards",
@@ -1257,6 +1269,11 @@
     "riskScoreTooltip": "Risikoscore (Rechtsklick auf die Karte unten für Berechnungsdetails)",
     "rpnTooltip": "Risiko-Prioritätszahl",
     "attachmentFallback": "Anhang",
+    "additionalContext": "Zusätzlicher Kontext",
+    "aiPhotoAnalysis": "KI-Fotoanalyse",
+    "visibleDamage": "Sichtbare Schäden",
+    "safetyConcerns": "Sicherheitsbedenken",
+    "analyzedAt": "Analysiert",
     "notLinked": "Nicht verknüpft",
     "addedAtPrefix": "hinzugefügt"
   },

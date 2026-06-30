@@ -152,11 +152,15 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   // Render immediately from workspaceObservation while the detail GET completes.
   const threat = useMemo(() => {
     if (threatData && workspaceObservation) {
+      const showUserContext = workspaceObservation.show_user_context === true;
       return {
         ...threatData,
         title: workspaceObservation.title || threatData.title,
         description: workspaceObservation.description || threatData.description,
-        user_context: workspaceObservation.user_context || threatData.user_context,
+        user_context: showUserContext
+          ? (workspaceObservation.user_context ?? threatData.user_context)
+          : undefined,
+        show_user_context: showUserContext,
         risk_score: workspaceObservation.risk_score ?? threatData.risk_score,
         risk_level: workspaceObservation.risk_level ?? threatData.risk_level,
         criticality_score: workspaceObservation.criticality_score ?? threatData.criticality_score,
@@ -1163,8 +1167,8 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
             a file title opens a preview dialog. No mini-thumbnails. */}
       </div>
 
-      {/* User Context — shows what the user originally typed/dictated if different from the description */}
-      {threat.user_context && threat.user_context !== threat.description && (
+      {/* User Context — original field notes when they differ from the AI-improved description (source language only). */}
+      {threat.show_user_context && threat.user_context && (
         <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-user-context">
           <div className="flex items-center gap-2 mb-2">
             <FileText className="w-4 h-4 text-blue-600" />

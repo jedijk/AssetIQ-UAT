@@ -336,6 +336,18 @@
     "active": "Actief",
     "systemRole": "Systeem"
   },
+  "tenantSwitch": {
+    "menu": "Tenant wisselen",
+    "title": "Tenant wisselen",
+    "description": "Bekijk en beheer gegevens als een andere organisatie. U blijft ingelogd als eigenaar.",
+    "banner": "Tenant {tenant} wordt bekeken",
+    "exit": "Terug naar home-tenant",
+    "active": "Actief",
+    "loading": "Tenants laden…",
+    "homeTenant": "Home-tenant",
+    "switchSuccess": "Tenant gewisseld",
+    "switchFailed": "Tenant wisselen mislukt"
+  },
   "permissions": {
     "sections": {
       "dashboards": "Dashboards",
@@ -1257,6 +1269,11 @@
     "riskScoreTooltip": "Risicoscore (rechtsklik op de kaart hieronder voor berekeningsdetails)",
     "rpnTooltip": "Risico Prioriteitsnummer",
     "attachmentFallback": "Bijlage",
+    "additionalContext": "Aanvullende context",
+    "aiPhotoAnalysis": "AI-fotoanalyse",
+    "visibleDamage": "Zichtbare schade",
+    "safetyConcerns": "Veiligheidsrisico's",
+    "analyzedAt": "Geanalyseerd",
     "notLinked": "Niet gekoppeld",
     "addedAtPrefix": "toegevoegd"
   },
