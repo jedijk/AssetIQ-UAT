@@ -12,6 +12,7 @@ import {
 } from "../ui/dialog";
 import { toast } from "sonner";
 import { failureModesAPI } from "../../lib/apis/failureModes";
+import { useLanguage } from "../../contexts/LanguageContext";
 import FailureModeInformationCard from "./FailureModeInformationCard";
 
 export default function FailureModeInformationCardDialog({
@@ -21,6 +22,7 @@ export default function FailureModeInformationCardDialog({
   failureModeName,
   t,
 }) {
+  const { language } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState(null);
@@ -36,9 +38,10 @@ export default function FailureModeInformationCardDialog({
       setLoading(true);
     }
     try {
+      const params = { language };
       const data = force
-        ? await failureModesAPI.regenerateInformationCard(failureModeId)
-        : await failureModesAPI.getInformationCard(failureModeId);
+        ? await failureModesAPI.regenerateInformationCard(failureModeId, params)
+        : await failureModesAPI.getInformationCard(failureModeId, params);
       setResult(data);
     } catch (err) {
       const message = err?.response?.data?.detail || err?.message || "Failed to load information card";
@@ -47,7 +50,7 @@ export default function FailureModeInformationCardDialog({
       setLoading(false);
       setRegenerating(false);
     }
-  }, [failureModeId]);
+  }, [failureModeId, language]);
 
   useEffect(() => {
     if (open && failureModeId) {

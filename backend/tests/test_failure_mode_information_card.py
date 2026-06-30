@@ -8,11 +8,17 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017/test")
 os.environ.setdefault("DB_NAME", "test")
 
 from services.failure_mode_information_card import (
+    _build_user_prompt,
     compute_input_hash,
+    compute_risk_reduction_if_implemented,
+    enrich_card_json,
     get_likelihood_label,
     get_or_generate_card,
     get_risk_level,
+    localized_likelihood_label,
+    localized_risk_level,
     normalize_failure_mode_for_hash,
+    normalize_language_code,
 )
 
 SAMPLE_FM = {
@@ -117,6 +123,94 @@ def test_get_likelihood_label_bands(occurrence, expected):
     assert get_likelihood_label(occurrence) == expected
 
 
+def test_normalize_language_code_defaults_unknown():
+    assert normalize_language_code("") == "en"
+    assert normalize_language_code("fr") == "en"
+
+
+@pytest.mark.parametrize(
+    "language,expected",
+    [
+        ("en", "Medium"),
+        ("nl", "Gemiddeld"),
+        ("de", "Mittel"),
+    ],
+)
+def test_localized_risk_level(language, expected):
+    assert localized_risk_level(140, language) == expected
+
+
+@pytest.mark.parametrize(
+    "language,expected",
+    [
+        ("en", "Possible"),
+        ("nl", "Mogelijk"),
+        ("de", "Möglich"),
+    ],
+)
+def test_localized_likelihood_label(language, expected):
+    assert localized_likelihood_label(5, language) == expected
+
+
+def test_build_user_prompt_includes_target_language():
+    prompt = _build_user_prompt(SAMPLE_FM, "nl")
+    assert "Target language: nl (Dutch)" in prompt
+    assert "Niet gespecificeerd in huidig faalmodusrecord." in prompt
+    assert "Use overall risk level label: Gemiddeld" in prompt
+    assert "Use likelihood label: Mogelijk" in prompt
+
+
+def test_compute_risk_reduction_if_implemented_projects_scores():
+    actions = [
+        {"risk_component": "Detection", "maintenance_strategy": "PdM"},
+        {"risk_component": "Occurrence", "maintenance_strategy": "PM"},
+    ]
+    result = compute_risk_reduction_if_implemented(SAMPLE_FM, actions, "en")
+    assert result is not None
+    assert result["current_rpn"] == 140
+    assert result["projected_rpn"] == 84
+    assert result["projected_scores"] == {"severity": 7, "occurrence": 4, "detection": 3}
+    assert result["rpn_reduction_pct"] == 40.0
+    assert "2 recommended actions" in result["summary"]
+
+
+def test_compute_risk_reduction_if_implemented_localized_summary():
+    actions = [{"risk_component": "Detection"}]
+    result = compute_risk_reduction_if_implemented(SAMPLE_FM, actions, "nl")
+    assert "aanbevolen acties" in result["summary"]
+
+
+def test_enrich_card_json_adds_projection():
+    card = {"recommended_actions": [{"risk_component": "Detection"}]}
+    enriched = enrich_card_json(SAMPLE_FM, card, "en")
+    assert "risk_reduction_if_implemented" in enriched
+    assert enriched["risk_reduction_if_implemented"]["current_rpn"] == 140
+
+
+@pytest.mark.asyncio
+async def test_get_or_generate_card_includes_risk_reduction_projection():
+    mock_collection = MagicMock()
+    mock_collection.find_one = AsyncMock(return_value=None)
+    mock_collection.update_many = AsyncMock()
+    mock_collection.insert_one = AsyncMock()
+
+    with patch(
+        "services.failure_mode_information_card.get_failure_mode_by_id",
+        new_callable=AsyncMock,
+        return_value=SAMPLE_FM,
+    ), patch(
+        "services.failure_mode_information_card.db",
+        {"failure_mode_information_cards": mock_collection},
+    ), patch(
+        "services.failure_mode_information_card._fm_json",
+        new_callable=AsyncMock,
+        return_value=SAMPLE_CARD,
+    ):
+        result = await get_or_generate_card("abc123", {"id": "u1", "company_id": "c1"})
+
+    assert result["card"]["risk_reduction_if_implemented"]["current_rpn"] == 140
+
+
 SAMPLE_CARD = {
     "header": {
         "title": "Failure Mode Information Card",
@@ -207,7 +301,8 @@ async def test_get_or_generate_card_reuses_matching_hash():
         result = await get_or_generate_card("abc123", {"id": "u1", "company_id": "c1"})
 
     assert result["reused"] is True
-    assert result["card"] == SAMPLE_CARD
+    assert result["card"]["header"] == SAMPLE_CARD["header"]
+    assert result["card"]["risk_reduction_if_implemented"]["current_rpn"] == 140
     mock_collection.find_one.assert_awaited_once()
 
 
@@ -233,5 +328,6 @@ async def test_get_or_generate_card_generates_when_missing():
         result = await get_or_generate_card("abc123", {"id": "u1", "company_id": "c1"})
 
     assert result["reused"] is False
-    assert result["card"] == SAMPLE_CARD
+    assert result["card"]["failure_mode_overview"] == SAMPLE_CARD["failure_mode_overview"]
+    assert result["card"]["risk_reduction_if_implemented"]["projected_rpn"] == 105
     mock_collection.insert_one.assert_awaited_once()

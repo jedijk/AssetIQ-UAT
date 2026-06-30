@@ -27,7 +27,7 @@ function BulletList({ items = [] }) {
   );
 }
 
-function RiskBadge({ level }) {
+function RiskBadge({ level, label }) {
   const colors = {
     Low: "bg-green-100 text-green-800 border-green-200",
     Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -35,9 +35,10 @@ function RiskBadge({ level }) {
     High: "bg-red-100 text-red-800 border-red-200",
     Critical: "bg-red-200 text-red-900 border-red-300",
   };
+  const display = label || level;
   return (
     <span className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold border ${colors[level] || "bg-slate-100 text-slate-700 border-slate-200"}`}>
-      {level || "—"}
+      {display || "—"}
     </span>
   );
 }
@@ -117,6 +118,68 @@ export default function FailureModeInformationCard({ card, t }) {
           </div>
         </div>
       </div>
+
+      {card.risk_reduction_if_implemented && (
+        <div className="px-8 py-5 border-b bg-emerald-50" style={{ borderColor: BORDER }}>
+          <SectionTitle>
+            {t?.("failureModeInfoCard.riskReductionIfImplemented") || "Risk Reduction If All Actions Implemented"}
+          </SectionTitle>
+          <div className="grid grid-cols-2 gap-6 items-center">
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED_TEXT }}>
+                {t?.("failureModeInfoCard.currentRpn") || "Current RPN"}
+              </div>
+              <div className="text-3xl font-bold" style={{ color: PRIMARY_BLUE }}>
+                {card.risk_reduction_if_implemented.current_rpn}
+              </div>
+              <RiskBadge
+                level={card.risk_reduction_if_implemented.current_risk_level_key}
+                label={card.risk_reduction_if_implemented.current_risk_level}
+              />
+            </div>
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED_TEXT }}>
+                {t?.("failureModeInfoCard.projectedRpn") || "Projected RPN"}
+              </div>
+              <div className="text-3xl font-bold text-emerald-700">
+                {card.risk_reduction_if_implemented.projected_rpn}
+              </div>
+              <RiskBadge
+                level={card.risk_reduction_if_implemented.projected_risk_level_key}
+                label={card.risk_reduction_if_implemented.projected_risk_level}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+            <div>
+              <div className="font-medium mb-1">{t?.("failureModeInfoCard.currentScores") || "Current Scores"}</div>
+              <div style={{ color: MUTED_TEXT }}>
+                S {card.risk_reduction_if_implemented.current_scores?.severity} · O{" "}
+                {card.risk_reduction_if_implemented.current_scores?.occurrence} · D{" "}
+                {card.risk_reduction_if_implemented.current_scores?.detection}
+              </div>
+            </div>
+            <div>
+              <div className="font-medium mb-1">{t?.("failureModeInfoCard.projectedScores") || "Projected Scores"}</div>
+              <div style={{ color: MUTED_TEXT }}>
+                S {card.risk_reduction_if_implemented.projected_scores?.severity} · O{" "}
+                {card.risk_reduction_if_implemented.projected_scores?.occurrence} · D{" "}
+                {card.risk_reduction_if_implemented.projected_scores?.detection}
+              </div>
+            </div>
+          </div>
+          {card.risk_reduction_if_implemented.rpn_reduction > 0 && (
+            <div className="mt-3 text-sm font-semibold text-emerald-800">
+              −{card.risk_reduction_if_implemented.rpn_reduction} RPN (
+              {card.risk_reduction_if_implemented.rpn_reduction_pct}%{" "}
+              {t?.("failureModeInfoCard.reduction") || "reduction"})
+            </div>
+          )}
+          <p className="mt-3 text-sm leading-relaxed" style={{ color: DARK_TEXT }}>
+            {card.risk_reduction_if_implemented.summary}
+          </p>
+        </div>
+      )}
 
       <div className="px-8 py-6 space-y-6">
         {/* Overview */}

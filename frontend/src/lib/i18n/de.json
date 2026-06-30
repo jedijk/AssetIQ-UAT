@@ -3292,6 +3292,12 @@
     "justification": "Begründung",
     "riskReduction": "Risikominderung",
     "riskReductionLogic": "Logik der Risikominderung",
+    "riskReductionIfImplemented": "Risikominderung bei Umsetzung aller Maßnahmen",
+    "currentRpn": "Aktuelle RPN",
+    "projectedRpn": "Projizierte RPN",
+    "currentScores": "Aktuelle Werte",
+    "projectedScores": "Projizierte Werte",
+    "reduction": "Reduktion",
     "standardsAlignment": "Normen und Standards"
   }
 }

@@ -3196,6 +3196,12 @@
     "justification": "Justification",
     "riskReduction": "Risk Reduction",
     "riskReductionLogic": "Risk Reduction Logic",
+    "riskReductionIfImplemented": "Risk Reduction If All Actions Implemented",
+    "currentRpn": "Current RPN",
+    "projectedRpn": "Projected RPN",
+    "currentScores": "Current Scores",
+    "projectedScores": "Projected Scores",
+    "reduction": "reduction",
     "standardsAlignment": "Standards Alignment"
   }
 }

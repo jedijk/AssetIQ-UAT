@@ -3293,6 +3293,12 @@
     "justification": "Onderbouwing",
     "riskReduction": "Risicovermindering",
     "riskReductionLogic": "Logica risicovermindering",
+    "riskReductionIfImplemented": "Risicovermindering bij implementatie van alle acties",
+    "currentRpn": "Huidige RPN",
+    "projectedRpn": "Verwachte RPN",
+    "currentScores": "Huidige scores",
+    "projectedScores": "Verwachte scores",
+    "reduction": "reductie",
     "standardsAlignment": "Normen en standaarden"
   }
 }
