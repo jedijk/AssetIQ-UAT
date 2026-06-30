@@ -1,6 +1,7 @@
 """Self-service client onboarding workspace — state, progress, and validation."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -20,6 +21,8 @@ from services.onboarding_constants import (
 )
 from services.tenant_management_service import _resolve_tenant_doc, _tenant_counts
 from services.tenant_schema import tenant_id_from_user
+
+logger = logging.getLogger(__name__)
 
 COLLECTION = "onboarding_state"
 
@@ -772,4 +775,73 @@ async def run_go_live_validation(user: dict) -> dict:
         "outstanding_actions": _outstanding_actions(phase_results),
         "ready": result.get("status") == "passed",
         "checked_at": _now_iso(),
+    }
+
+
+def _coach_fallback_reply(phase_id: str) -> str:
+    label = PHASE_LABELS.get(phase_id, phase_id)
+    return (
+        f"I can help with the {label} step. Use the action button on this page to configure "
+        f"{label.lower()}, then run validation to confirm progress. "
+        "Ask a specific question and I'll explain in plain language."
+    )
+
+
+async def ask_coach(user: dict, phase_id: str, message: str) -> dict:
+    """Onboarding AI coach — guidance only, not the observation chat workflow."""
+    if phase_id not in VALID_PHASES:
+        raise HTTPException(status_code=404, detail="Unknown onboarding phase")
+
+    text = (message or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    tenant_id = tenant_id_from_user(user)
+    phase_label = PHASE_LABELS.get(phase_id, phase_id)
+
+    validation_summary = "not checked"
+    if tenant_id:
+        try:
+            validation = await validate_phase(tenant_id, phase_id, persist=False)
+            validation_summary = f"{validation.get('status', 'unknown')} ({validation.get('score', 0)}%)"
+        except Exception as exc:
+            logger.debug("coach validation snapshot skipped: %s", exc)
+
+    coach_context = (
+        "You are the AssetIQ Self-Service Onboarding AI Coach.\n"
+        f"Current onboarding phase: {phase_label} ({phase_id}).\n"
+        f"Phase validation: {validation_summary}.\n"
+        "Your role:\n"
+        "- Explain AssetIQ concepts in plain language (keep answers concise).\n"
+        "- Suggest best practices for this onboarding step.\n"
+        "- Tell the user what to do next on this phase.\n"
+        "- You must NEVER claim you changed data or executed actions — only guide the user.\n"
+        "- Do NOT treat messages as equipment failure observations.\n"
+        "- Do NOT ask the user to select equipment or create observations."
+    )
+
+    try:
+        from services.ai_platform import execute_prompt
+
+        result = await execute_prompt(
+            "chat.general_assistant",
+            user=user,
+            user_message=text,
+            context=coach_context,
+            endpoint="onboarding.ask_coach",
+            model="gpt-4o-mini",
+            temperature=0.4,
+            max_tokens=600,
+        )
+        reply = (result.get("content") or "").strip()
+        if not reply:
+            reply = _coach_fallback_reply(phase_id)
+    except Exception as exc:
+        logger.warning("Onboarding coach AI failed for phase %s: %s", phase_id, exc)
+        reply = _coach_fallback_reply(phase_id)
+
+    return {
+        "message": reply,
+        "phase_id": phase_id,
+        "phase_label": phase_label,
     }

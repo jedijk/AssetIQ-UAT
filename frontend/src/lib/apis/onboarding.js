@@ -25,4 +25,12 @@ export const onboardingAPI = {
     const response = await api.post("/onboarding/go-live/validate");
     return response.data;
   },
+
+  askCoach: async (phaseId, message) => {
+    const response = await api.post("/onboarding/coach", {
+      phase_id: phaseId,
+      message,
+    });
+    return response.data;
+  },
 };

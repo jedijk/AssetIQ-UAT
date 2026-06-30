@@ -12,6 +12,7 @@ from services.onboarding_service import (
     _compute_overall_progress,
     _compute_readiness_scores,
     _estimate_time_remaining,
+    ask_coach,
     validate_phase,
 )
 
@@ -125,3 +126,20 @@ async def test_go_live_blocks_when_mandatory_phase_fails():
 
     assert result["status"] == "action_required"
     assert result["score"] == 0
+
+
+@pytest.mark.asyncio
+async def test_ask_coach_uses_onboarding_endpoint_not_observation_chat():
+    with patch("services.ai_platform.execute_prompt", new_callable=AsyncMock) as mock_prompt:
+        mock_prompt.return_value = {"content": "Failure modes describe how equipment can fail."}
+        with patch("services.onboarding_service.validate_phase", new_callable=AsyncMock) as mock_validate:
+            mock_validate.return_value = {"status": "warning", "score": 50}
+            result = await ask_coach(
+                {"id": "u1", "role": "admin", "tenant_id": "Tyromer"},
+                "failure_modes",
+                "What are failure modes?",
+            )
+
+    assert "Failure modes" in result["message"]
+    assert result["phase_id"] == "failure_modes"
+    mock_prompt.assert_called_once()

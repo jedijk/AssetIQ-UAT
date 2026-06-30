@@ -4,7 +4,7 @@ import { Bot, Loader2, Send } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { ScrollArea } from "../../../components/ui/scroll-area";
-import { chatAPI } from "../../../lib/apis/chat";
+import { onboardingAPI } from "../../../lib/apis/onboarding";
 import { getPhaseConfig } from "../config/phases";
 
 export function OnboardingAICoach({ phaseId }) {
@@ -19,18 +19,13 @@ export function OnboardingAICoach({ phaseId }) {
 
   const sendMutation = useMutation({
     mutationFn: async (text) => {
-      const context = `[Onboarding Workspace — ${phase?.label || phaseId} phase] ${text}`;
-      return chatAPI.sendMessage(context, null, null, true);
+      return onboardingAPI.askCoach(phaseId, text);
     },
     onSuccess: (data) => {
-      const reply =
-        data?.message ||
-        data?.response ||
-        data?.content ||
-        "I received your question. Review the validation results and use the action button to configure this phase.";
+      const reply = data?.message || "I received your question. Use the action button to configure this phase.";
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: typeof reply === "string" ? reply : JSON.stringify(reply) },
+        { role: "assistant", content: reply },
       ]);
     },
     onError: () => {

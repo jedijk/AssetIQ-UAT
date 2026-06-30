@@ -18,6 +18,11 @@ class EntryPathRequest(BaseModel):
     entry_path: str = Field(..., description="Wizard card selection key")
 
 
+class CoachRequest(BaseModel):
+    phase_id: str = Field(..., description="Onboarding phase id")
+    message: str = Field(..., min_length=1, description="User question for the coach")
+
+
 @router.get("/status")
 async def get_onboarding_status(current_user: dict = Depends(_admin_dep)):
     """Progress, readiness scores, outstanding actions, and time estimate."""
@@ -64,3 +69,11 @@ async def run_phase_validation(
 @router.post("/go-live/validate")
 async def run_go_live_validation(current_user: dict = Depends(_admin_dep)):
     return await svc.run_go_live_validation(current_user)
+
+
+@router.post("/coach")
+async def ask_onboarding_coach(
+    body: CoachRequest,
+    current_user: dict = Depends(_admin_dep),
+):
+    return await svc.ask_coach(current_user, body.phase_id, body.message)
