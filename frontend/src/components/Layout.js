@@ -11,7 +11,7 @@ import RolePreviewBanner from "./layout/RolePreviewBanner";
 import RolePreviewDialog from "./layout/RolePreviewDialog";
 import TenantSwitchBanner from "./layout/TenantSwitchBanner";
 import TenantSwitcherDialog from "./layout/TenantSwitcherDialog";
-import { getActiveTenantId } from "../lib/activeTenant";
+import { getActiveTenantId, getActiveTenantName } from "../lib/activeTenant";
 import { getBackendUrl } from "../lib/apiConfig";
 import { api } from "../lib/api";
 import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database, ScrollText, Gauge, Sparkles } from "lucide-react";
@@ -507,7 +507,7 @@ const Layout = () => {
   const homeTenantId = user?.home_tenant_id || user?.company_id;
   const isViewingOtherTenant =
     isOwner && activeTenantId && activeTenantId !== homeTenantId;
-  const activeTenantLabel = activeTenantId;
+  const activeTenantLabel = getActiveTenantName() || activeTenantId;
 
   // Listen for custom events from OperatorLandingPage
   useEffect(() => {

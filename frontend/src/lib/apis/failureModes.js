@@ -174,5 +174,26 @@ export const failureModesAPI = {
     const response = await api.post("/failure-modes/merge", body);
     return response.data;
   },
+
+  getInformationCard: async (id, params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.language) searchParams.append("language", params.language);
+    if (params.force) searchParams.append("force", params.force);
+    const qs = searchParams.toString();
+    const response = await api.get(
+      `/failure-modes/${id}/information-card${qs ? `?${qs}` : ""}`,
+      { timeout: 180000 },
+    );
+    return response.data;
+  },
+
+  regenerateInformationCard: async (id, body = {}) => {
+    const response = await api.post(
+      `/failure-modes/${id}/information-card/regenerate`,
+      body,
+      { timeout: 180000 },
+    );
+    return response.data;
+  },
 };
 

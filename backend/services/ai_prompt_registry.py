@@ -79,6 +79,7 @@ def _bootstrap() -> None:
         FM_EQUIPMENT_TYPE_MAPPING_PROMPT,
         FM_FAILURE_MODE_MAPPING_PROMPT,
         FM_IMPROVE_FAILURE_MODE_PROMPT,
+        FM_INFORMATION_CARD_PROMPT,
         FM_NEW_EQUIPMENT_TYPE_PROMPT,
         FM_NEW_FAILURE_MODE_PROMPT,
     )
@@ -263,6 +264,14 @@ Rules:
             version="1.0",
             description="Improve a single failure mode record",
             text=FM_IMPROVE_FAILURE_MODE_PROMPT,
+            default_model="gpt-4o",
+            response_format="json",
+        ),
+        PromptSpec(
+            id="fm.information_card",
+            version="1.0",
+            description="Generate failure mode information card JSON",
+            text=FM_INFORMATION_CARD_PROMPT,
             default_model="gpt-4o",
             response_format="json",
         ),

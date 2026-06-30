@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api } from "../../lib/apiClient";
 import { tenantManagementAPI } from "../../lib/apis/tenantManagement";
 import { getActiveTenantId, setActiveTenantId } from "../../lib/activeTenant";
+import { getTenantDisplayName, getTenantSubtitle } from "../../lib/tenantDisplay";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   Dialog,
@@ -28,6 +29,8 @@ export default function TenantSwitcherDialog({ open, onOpenChange, t }) {
   });
 
   const tenants = data?.tenants || data || [];
+  const homeTenant = tenants.find((t) => (t.tenant_id || t.id) === homeTenantId);
+  const homeDisplayName = getTenantDisplayName(homeTenant, homeTenantId);
 
   const handleSelect = async (tenant) => {
     const tenantId = tenant?.tenant_id || tenant?.id;
@@ -47,7 +50,7 @@ export default function TenantSwitcherDialog({ open, onOpenChange, t }) {
       if (isHome) {
         setActiveTenantId(null);
       } else {
-        setActiveTenantId(response.data.tenant_id);
+        setActiveTenantId(response.data.tenant_id, response.data.name);
       }
       toast.success(t("tenantSwitch.switchSuccess"), {
         description: response.data.name || response.data.tenant_id,
@@ -86,9 +89,9 @@ export default function TenantSwitcherDialog({ open, onOpenChange, t }) {
                 data-testid="tenant-switch-home"
               >
                 <div className="flex flex-col items-start gap-0.5 text-left flex-1">
-                  <span className="font-medium">{t("tenantSwitch.homeTenant")}</span>
+                  <span className="font-medium">{homeDisplayName}</span>
                   <span className={`text-xs ${!activeTenantId ? "text-blue-100" : "text-slate-500"}`}>
-                    {homeTenantId}
+                    {t("tenantSwitch.homeTenant")}
                   </span>
                 </div>
                 {!activeTenantId && (
@@ -106,6 +109,8 @@ export default function TenantSwitcherDialog({ open, onOpenChange, t }) {
               .map((tenant) => {
                 const tid = tenant.tenant_id || tenant.id;
                 const isActive = activeTenantId === tid;
+                const displayName = getTenantDisplayName(tenant, tid);
+                const subtitle = getTenantSubtitle(tenant, tid);
                 return (
                   <Button
                     key={tid}
@@ -115,10 +120,12 @@ export default function TenantSwitcherDialog({ open, onOpenChange, t }) {
                     data-testid={`tenant-switch-option-${tid}`}
                   >
                     <div className="flex flex-col items-start gap-0.5 text-left flex-1">
-                      <span className="font-medium">{tenant.name || tid}</span>
-                      <span className={`text-xs ${isActive ? "text-blue-100" : "text-slate-500"}`}>
-                        {tid}
-                      </span>
+                      <span className="font-medium">{displayName}</span>
+                      {subtitle && (
+                        <span className={`text-xs ${isActive ? "text-blue-100" : "text-slate-500"}`}>
+                          {subtitle}
+                        </span>
+                      )}
                     </div>
                     {isActive && (
                       <Badge className="ml-2 bg-white/20 text-white text-[10px]">

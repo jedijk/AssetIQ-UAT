@@ -7,6 +7,7 @@ import {
   Maximize2, Minimize2, Image, Search,
   Wand2,
   Tags,
+  FileText,
 } from "lucide-react";
 import { disciplineColors } from "../failure-modes/disciplineStyles";
 import { getFailureModeCategory, getFailureModeIcon } from "../failure-modes/failureModeIcons";
@@ -61,6 +62,7 @@ export function FailureModeViewPanel({
   onUnvalidate,
   onShowVersionHistory,
   onImproveWithAI,
+  onShowInformationCard,
   onConsolidateActions,
   onMapActionDisciplines,
   onCheckActionDowntime,
@@ -355,6 +357,18 @@ export function FailureModeViewPanel({
                   title="Improve this failure mode with AI (reliability engineer)"
                 >
                   <Wand2 className="w-4 h-4 mr-1" /> Improve with AI
+                </Button>
+              )}
+              {onShowInformationCard && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onShowInformationCard}
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                  data-testid="view-panel-information-card-btn"
+                  title={t("failureModeInfoCard.buttonTitle")}
+                >
+                  <FileText className="w-4 h-4 mr-1" /> {t("failureModeInfoCard.button")}
                 </Button>
               )}
               <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => onDelete(fm.id)} data-testid="view-panel-delete-btn">

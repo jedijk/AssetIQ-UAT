@@ -2,7 +2,7 @@ import { Building2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { api } from "../../lib/apiClient";
-import { clearActiveTenantId, getActiveTenantId } from "../../lib/activeTenant";
+import { clearActiveTenantId, getActiveTenantId, getActiveTenantName } from "../../lib/activeTenant";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function TenantSwitchBanner({ t, activeTenantLabel }) {
@@ -14,7 +14,7 @@ export default function TenantSwitchBanner({ t, activeTenantLabel }) {
 
   if (!isViewingOtherTenant) return null;
 
-  const label = activeTenantLabel || activeTenantId;
+  const label = activeTenantLabel || getActiveTenantName() || activeTenantId;
 
   const handleExit = async () => {
     try {

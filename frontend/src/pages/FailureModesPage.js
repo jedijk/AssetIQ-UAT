@@ -105,6 +105,7 @@ import {
   FailureModeDeleteDialog,
 } from "../components/failure-modes/FailureModesPageDialogs";
 import StrategyIntelligenceFlowBar from "../components/intelligence/StrategyIntelligenceFlowBar";
+import FailureModeInformationCardDialog from "../components/library/FailureModeInformationCardDialog";
 
 
 const FailureModesPage = () => {
@@ -232,8 +233,7 @@ const FailureModesPage = () => {
   const [isConsolidateActionsOpen, setIsConsolidateActionsOpen] = useState(false);
   const [isMapActionDisciplinesOpen, setIsMapActionDisciplinesOpen] = useState(false);
   const [isCheckActionDowntimeOpen, setIsCheckActionDowntimeOpen] = useState(false);
-  
-  // Failure mode dialog state
+  const [isInfoCardOpen, setIsInfoCardOpen] = useState(false);
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
   const [editingFm, setEditingFm] = useState(null);
   const [selectedFm, setSelectedFm] = useState(null); // For view panel
@@ -1078,6 +1078,7 @@ const FailureModesPage = () => {
                 onUnvalidate={handleUnvalidateFm}
                 onShowVersionHistory={handleShowVersionHistory}
                 onImproveWithAI={() => setIsAIImproveOpen(true)}
+                onShowInformationCard={() => setIsInfoCardOpen(true)}
                 onConsolidateActions={
                   canUseAITools ? () => setIsConsolidateActionsOpen(true) : undefined
                 }
@@ -1111,6 +1112,7 @@ const FailureModesPage = () => {
               onUnvalidate={handleUnvalidateFm}
               onShowVersionHistory={handleShowVersionHistory}
               onImproveWithAI={() => setIsAIImproveOpen(true)}
+              onShowInformationCard={() => setIsInfoCardOpen(true)}
               onConsolidateActions={
                 canUseAITools ? () => setIsConsolidateActionsOpen(true) : undefined
               }
@@ -1335,6 +1337,14 @@ const FailureModesPage = () => {
           const fm = failureModes.find((f) => f.id === fmId);
           if (fm) setSelectedFm(fm);
         }}
+      />
+
+      <FailureModeInformationCardDialog
+        open={isInfoCardOpen}
+        onClose={() => setIsInfoCardOpen(false)}
+        failureModeId={selectedFm?.id}
+        failureModeName={selectedFm?.failure_mode}
+        t={t}
       />
     </div>
   );

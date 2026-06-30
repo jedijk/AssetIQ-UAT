@@ -22,6 +22,7 @@ from services.failure_modes_read import (
     scan_similar_failure_modes,
 )
 from services.failure_modes_versions import RollbackRequest, get_failure_mode_versions, rollback_failure_mode
+from services.failure_mode_information_card import get_or_generate_card
 from services.failure_modes_write import (
     FailureModeCreate,
     FailureModeUpdate,
@@ -69,4 +70,15 @@ __all__ = [
     "merge_duplicate_actions",
     "merge_failure_modes",
     "delete_failure_mode",
+    "get_or_generate_information_card",
 ]
+
+
+async def get_or_generate_information_card(
+    mode_id: str,
+    *,
+    current_user: dict,
+    language: str = "en",
+    force: bool = False,
+):
+    return await get_or_generate_card(mode_id, current_user, language=language, force=force)

@@ -189,7 +189,20 @@ async def create_indexes():
     except Exception as e:
         print(f"   ⚠ Text index may already exist: {e}")
     print("   ✓ failure_modes indexes created")
-    
+
+    # ============= FAILURE MODE INFORMATION CARDS =============
+    print("\n📋 Creating indexes for 'failure_mode_information_cards' collection...")
+    await db.failure_mode_information_cards.create_index(
+        [("failure_mode_id", 1), ("is_current", 1)],
+        background=True,
+    )
+    await db.failure_mode_information_cards.create_index(
+        [("failure_mode_id", 1), ("input_hash", 1)],
+        background=True,
+    )
+    await db.failure_mode_information_cards.create_index("tenant_id", background=True)
+    print("   ✓ failure_mode_information_cards indexes created")
+
     # ============= PERMISSIONS COLLECTION =============
     print("\n📋 Creating indexes for 'permissions' collection...")
     await db.permissions.create_index("role", unique=True, sparse=True, background=True)
