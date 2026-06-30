@@ -7,6 +7,7 @@ from routes.chat import router as chat_router
 from routes.threats import router as threats_router
 from routes.stats import router as stats_router
 from routes.failure_modes_routes import router as failure_modes_router
+from routes.failure_mode_information_card_routes import router as failure_mode_information_card_router
 from routes.equipment import router as equipment_router
 from routes.efms import router as efms_router
 from routes.tasks import router as tasks_router
@@ -74,6 +75,7 @@ all_routers = [
     threats_router,
     stats_router,
     failure_modes_router,
+    failure_mode_information_card_router,
     equipment_router,
     efms_router,
     tasks_router,
