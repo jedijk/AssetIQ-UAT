@@ -605,6 +605,7 @@ def tenant_display_user(tenant_id: Optional[str]) -> dict:
     }
     if tenant_id:
         user["company_id"] = tenant_id
+        user["tenant_id"] = tenant_id
     return user
 
 

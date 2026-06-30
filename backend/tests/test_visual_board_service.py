@@ -82,7 +82,7 @@ async def test_create_operations_board_seeds_tyromer_widgets(mock_user, mock_db)
     widget_types = {w.type.value if hasattr(w.type, "value") else w.type for w in result.widgets}
     assert "production_kpi" in widget_types
     assert "mooney_chart" in widget_types
-    assert "information_panel" in widget_types
+    assert "form_submissions_list" in widget_types
     assert "risk_observation_list" in widget_types
 
 

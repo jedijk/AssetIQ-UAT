@@ -73,7 +73,26 @@ async def seed_default_templates(user: dict) -> None:
         existing = await db[TEMPLATES_COLLECTION].find_one(
             merge_tenant_filter({"name": name, "board_type": btype.value}, user),
         )
+        layout = (
+            default_layout(btype).model_dump()
+            if btype == BoardType.OPERATIONS
+            else VisualBoardLayout().model_dump()
+        )
+        theme = "light" if btype == BoardType.OPERATIONS else "dark"
+        widgets_dump = [w.model_dump() for w in widgets]
         if existing:
+            if name == "Tyromer Operations Board":
+                await db[TEMPLATES_COLLECTION].update_one(
+                    merge_tenant_filter({"id": existing["id"]}, user),
+                    {
+                        "$set": {
+                            "widgets": widgets_dump,
+                            "layout": layout,
+                            "theme": theme,
+                            "updated_at": now,
+                        }
+                    },
+                )
             continue
         doc = with_tenant_id(
             {
@@ -81,13 +100,9 @@ async def seed_default_templates(user: dict) -> None:
                 "name": name,
                 "description": f"Default {name.lower()} template",
                 "board_type": btype.value,
-                "widgets": [w.model_dump() for w in widgets],
-                "layout": (
-                    default_layout(btype).model_dump()
-                    if btype == BoardType.OPERATIONS
-                    else VisualBoardLayout().model_dump()
-                ),
-                "theme": "light" if btype == BoardType.OPERATIONS else "dark",
+                "widgets": widgets_dump,
+                "layout": layout,
+                "theme": theme,
                 "created_by": user.get("id"),
                 "created_at": now,
                 "updated_at": now,

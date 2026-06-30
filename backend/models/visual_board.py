@@ -450,10 +450,10 @@ def default_tyromer_operations_widgets() -> List[VisualBoardWidget]:
             position=WidgetPosition(x=0, y=8, w=24, h=8),
         ),
         VisualBoardWidget(
-            id="w_information",
-            type=WidgetType.INFORMATION_PANEL,
-            title="Information",
-            config=WidgetConfig(limit=12, period="today"),
+            id="w_form_submissions",
+            type=WidgetType.FORM_SUBMISSIONS_LIST,
+            title="Recently Completed Tasks",
+            config=WidgetConfig(limit=8),
             position=WidgetPosition(x=0, y=16, w=8, h=8),
         ),
         VisualBoardWidget(
@@ -466,7 +466,7 @@ def default_tyromer_operations_widgets() -> List[VisualBoardWidget]:
         VisualBoardWidget(
             id="w_top_risk",
             type=WidgetType.RISK_OBSERVATION_LIST,
-            title="High Risk Observations",
+            title="Top 10 Highest Risk Observations",
             config=WidgetConfig(limit=10),
             position=WidgetPosition(x=16, y=16, w=8, h=8),
         ),
