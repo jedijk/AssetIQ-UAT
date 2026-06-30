@@ -19,6 +19,7 @@ import {
   Monitor,
   Package,
   Shield,
+  Rocket,
 } from "lucide-react";
 
 export function buildNavItems(t) {
@@ -42,6 +43,7 @@ export function buildSettingsMenuItems(t) {
     { path: "/settings/visual-management/boards", label: t("nav.visualManagement"), icon: Monitor, feature: "visual_boards" },
     { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true, feature: "equipment" },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
+    { path: "/settings/onboarding", label: t("nav.onboardingWorkspace"), icon: Rocket, adminOnly: true },
     { path: "/settings/preferences", label: "Preferences", icon: Clock, desktopOnly: true },
     { path: "/settings/risk-calculation", label: "Risk Calculation", icon: Sliders, adminOnly: true, desktopOnly: true },
     { path: "/settings/server-performance", label: "Server Performance", icon: Server, ownerOnly: true, mobileOwnerOnly: true },

@@ -99,6 +99,14 @@ const SETTINGS_SECTIONS = [
     feature: "users"
   },
   {
+    id: "onboarding",
+    sectionKey: "onboardingWorkspace",
+    icon: Rocket,
+    path: "/settings/onboarding",
+    roles: ["owner", "admin"],
+    requiresSettings: true,
+  },
+  {
     id: "qr",
     sectionKey: "qr",
     icon: QrCode,
@@ -250,14 +258,6 @@ const SETTINGS_SECTIONS = [
     sectionKey: "translations",
     icon: Languages,
     path: "/settings/translations",
-    roles: ["owner", "admin"],
-    requiresSettings: true,
-  },
-  {
-    id: "onboarding",
-    sectionKey: "onboardingWorkspace",
-    icon: Rocket,
-    path: "/settings/onboarding",
     roles: ["owner", "admin"],
     requiresSettings: true,
   },

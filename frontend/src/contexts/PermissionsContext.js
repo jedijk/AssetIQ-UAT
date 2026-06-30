@@ -68,6 +68,9 @@ const FEATURE_PATHS = {
     "/settings/disciplines",
     "/settings/task-generation",
     "/settings/translations",
+    "/settings/onboarding",
+    "/settings/maintenance-readiness",
+    "/settings/tenant-management",
   ],
 };
 
