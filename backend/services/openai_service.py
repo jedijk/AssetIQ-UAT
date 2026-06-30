@@ -103,6 +103,7 @@ def _build_chat_kwargs(
     temperature: float,
     max_tokens: Optional[int],
     response_format: Optional[Dict],
+    seed: Optional[int] = None,
 ) -> Dict[str, Any]:
     kwargs: Dict[str, Any] = {
         "model": model,
@@ -113,6 +114,8 @@ def _build_chat_kwargs(
         kwargs["max_tokens"] = max_tokens
     if response_format:
         kwargs["response_format"] = response_format
+    if seed is not None:
+        kwargs["seed"] = seed
     return kwargs
 
 
@@ -145,6 +148,7 @@ async def chat_completion(
     temperature: float = 0.7,
     max_tokens: Optional[int] = None,
     response_format: Optional[Dict] = None,
+    seed: Optional[int] = None,
     api_key: Optional[str] = None,
     user_id: str = "system",
     company_id: str = "default",
@@ -173,6 +177,7 @@ async def chat_completion(
                 temperature=temperature,
                 max_tokens=max_tokens,
                 response_format=response_format,
+                seed=seed,
             )
         )
         _record_chat_usage(response, model=resolved_model, usage=usage)

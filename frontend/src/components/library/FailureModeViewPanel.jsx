@@ -352,11 +352,14 @@ export function FailureModeViewPanel({
                   size="sm"
                   variant="outline"
                   onClick={onImproveWithAI}
-                  className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                  className="group border-purple-200 text-purple-700 hover:bg-purple-50 px-2 gap-0 hover:gap-1.5 hover:px-3 transition-all duration-200"
                   data-testid="view-panel-improve-ai-btn"
-                  title="Improve this failure mode with AI (reliability engineer)"
+                  title={t("tooltips.improveWithAI") || "Improve this failure mode with AI (reliability engineer)"}
                 >
-                  <Wand2 className="w-4 h-4 mr-1" /> Improve with AI
+                  <Wand2 className="w-4 h-4 shrink-0" />
+                  <span className="max-w-0 overflow-hidden opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100 transition-all duration-200 whitespace-nowrap">
+                    Improve with AI
+                  </span>
                 </Button>
               )}
               {onShowInformationCard && (
@@ -364,11 +367,14 @@ export function FailureModeViewPanel({
                   size="sm"
                   variant="outline"
                   onClick={onShowInformationCard}
-                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                  className="group border-blue-200 text-blue-700 hover:bg-blue-50 px-2 gap-0 hover:gap-1.5 hover:px-3 transition-all duration-200"
                   data-testid="view-panel-information-card-btn"
                   title={t("failureModeInfoCard.buttonTitle")}
                 >
-                  <FileText className="w-4 h-4 mr-1" /> {t("failureModeInfoCard.button")}
+                  <FileText className="w-4 h-4 shrink-0" />
+                  <span className="max-w-0 overflow-hidden opacity-0 group-hover:max-w-[12rem] group-hover:opacity-100 transition-all duration-200 whitespace-nowrap">
+                    {t("failureModeInfoCard.button")}
+                  </span>
                 </Button>
               )}
               <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => onDelete(fm.id)} data-testid="view-panel-delete-btn">
