@@ -21,6 +21,7 @@ from services.tenant_management_service import (
     validate_tenant,
 )
 from services.tenant_registry import MODULE_LABELS
+from services.visual_board_repair import repair_tyromer_visual_board
 
 router = APIRouter(prefix="/admin/tenants", tags=["admin", "tenant-management"])
 
@@ -132,6 +133,16 @@ async def tenant_health(tenant_id: str, current_user: dict = Depends(_read_dep))
 @router.post("/{tenant_id}/validate")
 async def run_tenant_validation(tenant_id: str, current_user: dict = Depends(_write_dep)):
     return await validate_tenant(db, tenant_id, current_user)
+
+
+@router.post("/{tenant_id}/repair-tyromer-visual-board")
+async def repair_tyromer_visual_board_route(
+    tenant_id: str,
+    dry_run: bool = Query(False),
+    current_user: dict = Depends(_admin_dep),
+):
+    """Reset Tyromer operations boards/templates/versions to the canonical TV layout."""
+    return await repair_tyromer_visual_board(db, tenant_id, dry_run=dry_run)
 
 
 @router.patch("/{tenant_id}/modules")

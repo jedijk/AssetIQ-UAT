@@ -1,0 +1,334 @@
+{
+  "widgets": [
+    {
+      "id": "w_total_input",
+      "type": "production_kpi",
+      "title": "Total Input",
+      "config": {
+        "metric": null,
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": "total_input",
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      }
+    },
+    {
+      "id": "w_waste",
+      "type": "production_kpi",
+      "title": "Waste",
+      "config": {
+        "metric": null,
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": "waste",
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      }
+    },
+    {
+      "id": "w_yield",
+      "type": "production_kpi",
+      "title": "Yield",
+      "config": {
+        "metric": null,
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": "yield",
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      }
+    },
+    {
+      "id": "w_avg_mooney",
+      "type": "production_kpi",
+      "title": "Avg Mooney",
+      "config": {
+        "metric": null,
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": "avg_mooney",
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      }
+    },
+    {
+      "id": "w_rsd",
+      "type": "production_kpi",
+      "title": "RSD",
+      "config": {
+        "metric": null,
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": "rsd",
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      }
+    },
+    {
+      "id": "w_runtime",
+      "type": "production_kpi",
+      "title": "Runtime",
+      "config": {
+        "metric": null,
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": "runtime",
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      }
+    },
+    {
+      "id": "w_active_exposure",
+      "type": "kpi_card",
+      "title": "Active Exposure",
+      "config": {
+        "metric": "active_threat_exposure",
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": null,
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 0,
+        "y": 4,
+        "w": 8,
+        "h": 4
+      }
+    },
+    {
+      "id": "w_controlled_exposure",
+      "type": "kpi_card",
+      "title": "Controlled Exposure",
+      "config": {
+        "metric": "critical_active_exposure",
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": null,
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 8,
+        "y": 4,
+        "w": 8,
+        "h": 4
+      }
+    },
+    {
+      "id": "w_page_views",
+      "type": "kpi_card",
+      "title": "Page Views",
+      "config": {
+        "metric": "page_views",
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": null,
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 16,
+        "y": 4,
+        "w": 8,
+        "h": 4
+      }
+    },
+    {
+      "id": "w_mooney_chart",
+      "type": "mooney_chart",
+      "title": "Mooney Viscosity",
+      "config": {
+        "metric": null,
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": null,
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 8
+      }
+    },
+    {
+      "id": "w_form_submissions",
+      "type": "form_submissions_list",
+      "title": "Recently Completed Tasks",
+      "config": {
+        "metric": null,
+        "limit": 8,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": null,
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "id": "w_recent_actions",
+      "type": "action_queue",
+      "title": "Recent Actions",
+      "config": {
+        "metric": null,
+        "limit": 8,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": null,
+        "period": "today",
+        "queue_mode": "recent",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 8,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "id": "w_top_risk",
+      "type": "risk_observation_list",
+      "title": "Top 10 Highest Risk Observations",
+      "config": {
+        "metric": null,
+        "limit": 10,
+        "chart_metric": null,
+        "days": 30,
+        "production_metric": null,
+        "period": "today",
+        "queue_mode": "open",
+        "font_size": "md",
+        "text_content": null,
+        "text_align": "left",
+        "show_title": true,
+        "parts": null
+      },
+      "position": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      }
+    }
+  ],
+  "layout": {
+    "columns": 24,
+    "rows": 24
+  },
+  "theme": "light"
+}

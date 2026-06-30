@@ -1,73 +1,84 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Repair Tyromer operations visual boards to the canonical shop-floor TV layout.
 
-Updates visual_boards, visual_board_templates, and the latest visual_board_versions
-per board so kiosk displays show correct widgets without manual republish.
-
-Usage (local repo — cwd backend/):
-  MONGO_URL=... python scripts/repair_tyromer_visual_board.py --dry-run
+Uses pymongo only (no motor / database.py) so it runs in the Railway API container.
 
 Usage (UAT/production container — cwd /app):
-  python3 scripts/repair_tyromer_visual_board.py --dry-run
-  PRIMARY_TENANT_ID=Tyromer python3 scripts/repair_tyromer_visual_board.py
+  python scripts/repair_tyromer_visual_board.py --dry-run
+  PRIMARY_TENANT_ID=Tyromer python scripts/repair_tyromer_visual_board.py
+
+Use `python`, not `python3` — system python3 may lack app dependencies.
+
+Alternative (owner auth): POST /api/admin/tenants/{tenant_id}/repair-tyromer-visual-board?dry_run=true
 """
 from __future__ import annotations
 
 import argparse
-import asyncio
+import json
 import os
 import sys
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-_BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+_BACKEND_ROOT = os.path.dirname(_SCRIPTS_DIR)
 sys.path.insert(0, _BACKEND_ROOT)
 
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase  # noqa: E402
-
-from models.visual_board import (  # noqa: E402
-    BoardType,
-    default_tyromer_operations_layout,
-    default_tyromer_operations_widgets,
-)
-from services.visual_board_helpers import (  # noqa: E402
-    BOARDS_COLLECTION,
-    TEMPLATES_COLLECTION,
-    VERSIONS_COLLECTION,
-    now_iso,
-)
-
 TYROMER_TEMPLATE_NAME = "Tyromer Operations Board"
+BOARDS_COLLECTION = "visual_boards"
+TEMPLATES_COLLECTION = "visual_board_templates"
+VERSIONS_COLLECTION = "visual_board_versions"
+BOARD_TYPE_OPERATIONS = "operations"
 
 
 def _default_tenant_id() -> Optional[str]:
     return os.environ.get("PRIMARY_TENANT_ID") or os.environ.get("BACKFILL_TENANT_ID")
 
 
-def _canonical_payload() -> Dict[str, Any]:
-    widgets = [w.model_dump() for w in default_tyromer_operations_widgets()]
-    layout = default_tyromer_operations_layout().model_dump()
-    return {"widgets": widgets, "layout": layout, "theme": "light"}
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
-async def _latest_version(
-    db: AsyncIOMotorDatabase, board_id: str, tenant_id: str,
-) -> Optional[dict]:
-    return await db[VERSIONS_COLLECTION].find_one(
-        {"board_id": board_id, "tenant_id": tenant_id},
-        {"_id": 0},
-        sort=[("version", -1)],
-    )
+def _load_canonical() -> Dict[str, Any]:
+    path = os.path.join(_SCRIPTS_DIR, "data", "tyromer_operations_canonical.json")
+    if not os.path.isfile(path):
+        print(f"Error: missing {path}", file=sys.stderr)
+        sys.exit(1)
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
 
 
-async def repair_tyromer_visual_board(
-    db: AsyncIOMotorDatabase,
+def _get_db():
+    try:
+        from pymongo import MongoClient
+    except ImportError:
+        print(
+            "Error: pymongo not found. Use the app Python interpreter:\n"
+            "  python scripts/repair_tyromer_visual_board.py --dry-run\n"
+            "Not: python3 (system Python may lack dependencies).\n"
+            "Or call POST /api/admin/tenants/{tenant_id}/repair-tyromer-visual-board as owner.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    mongo_url = os.environ.get("MONGO_URL")
+    db_name = os.environ.get("DB_NAME", "assetiq-UAT").strip('"')
+    if not mongo_url:
+        print("Error: MONGO_URL environment variable is required", file=sys.stderr)
+        sys.exit(1)
+    client = MongoClient(mongo_url)
+    return client, client[db_name]
+
+
+def repair_tyromer_visual_board_sync(
+    db,
     tenant_id: str,
     *,
     dry_run: bool = False,
 ) -> Dict[str, Any]:
-    canonical = _canonical_payload()
-    now = now_iso()
+    canonical = _load_canonical()
+    now = _now_iso()
     summary: Dict[str, Any] = {
         "tenant_id": tenant_id,
         "dry_run": dry_run,
@@ -76,15 +87,19 @@ async def repair_tyromer_visual_board(
         "versions_updated": [],
     }
 
-    board_query = {"tenant_id": tenant_id, "board_type": BoardType.OPERATIONS.value}
-    boards: List[dict] = await db[BOARDS_COLLECTION].find(board_query, {"_id": 0}).to_list(100)
+    boards = list(
+        db[BOARDS_COLLECTION].find(
+            {"tenant_id": tenant_id, "board_type": BOARD_TYPE_OPERATIONS},
+            {"_id": 0},
+        )
+    )
 
     for board in boards:
         board_id = board["id"]
         board_name = board.get("name", board_id)
         summary["boards_updated"].append({"id": board_id, "name": board_name})
         if not dry_run:
-            await db[BOARDS_COLLECTION].update_one(
+            db[BOARDS_COLLECTION].update_one(
                 {"id": board_id, "tenant_id": tenant_id},
                 {
                     "$set": {
@@ -96,7 +111,11 @@ async def repair_tyromer_visual_board(
                 },
             )
 
-        version = await _latest_version(db, board_id, tenant_id)
+        version = db[VERSIONS_COLLECTION].find_one(
+            {"board_id": board_id, "tenant_id": tenant_id},
+            {"_id": 0},
+            sort=[("version", -1)],
+        )
         if version:
             summary["versions_updated"].append(
                 {
@@ -106,7 +125,7 @@ async def repair_tyromer_visual_board(
                 }
             )
             if not dry_run:
-                await db[VERSIONS_COLLECTION].update_one(
+                db[VERSIONS_COLLECTION].update_one(
                     {"id": version["id"], "tenant_id": tenant_id},
                     {
                         "$set": {
@@ -116,16 +135,20 @@ async def repair_tyromer_visual_board(
                     },
                 )
 
-    template_query = {
-        "tenant_id": tenant_id,
-        "name": TYROMER_TEMPLATE_NAME,
-        "board_type": BoardType.OPERATIONS.value,
-    }
-    templates: List[dict] = await db[TEMPLATES_COLLECTION].find(template_query, {"_id": 0}).to_list(10)
+    templates = list(
+        db[TEMPLATES_COLLECTION].find(
+            {
+                "tenant_id": tenant_id,
+                "name": TYROMER_TEMPLATE_NAME,
+                "board_type": BOARD_TYPE_OPERATIONS,
+            },
+            {"_id": 0},
+        )
+    )
     for tpl in templates:
         summary["templates_updated"].append({"id": tpl["id"], "name": tpl.get("name")})
         if not dry_run:
-            await db[TEMPLATES_COLLECTION].update_one(
+            db[TEMPLATES_COLLECTION].update_one(
                 {"id": tpl["id"], "tenant_id": tenant_id},
                 {
                     "$set": {
@@ -156,25 +179,6 @@ def _print_summary(summary: Dict[str, Any]) -> None:
         print("  (no matching documents found)")
 
 
-async def _run(args: argparse.Namespace) -> int:
-    mongo_url = os.environ.get("MONGO_URL")
-    db_name = os.environ.get("DB_NAME", "assetiq-UAT").strip('"')
-    if not mongo_url:
-        print("Error: MONGO_URL environment variable is required", file=sys.stderr)
-        return 1
-
-    client = AsyncIOMotorClient(mongo_url)
-    db = client[db_name]
-    try:
-        summary = await repair_tyromer_visual_board(
-            db, args.tenant_id, dry_run=args.dry_run,
-        )
-        _print_summary(summary)
-        return 0
-    finally:
-        client.close()
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Repair Tyromer operations visual board layout")
     parser.add_argument(
@@ -196,7 +200,14 @@ def main() -> None:
         )
         sys.exit(1)
 
-    raise SystemExit(asyncio.run(_run(args)))
+    client, db = _get_db()
+    try:
+        summary = repair_tyromer_visual_board_sync(
+            db, args.tenant_id, dry_run=args.dry_run,
+        )
+        _print_summary(summary)
+    finally:
+        client.close()
 
 
 if __name__ == "__main__":
