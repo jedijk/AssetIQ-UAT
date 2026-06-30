@@ -20,6 +20,13 @@ function CheckDetail({ detail }) {
     count: "Count",
     duplicates: "Duplicate tags",
     levels: "Hierarchy levels",
+    in_scope_total: "In scope (subunits + maintainable items)",
+    assessed_count: "Assessed items",
+    subunit_total: "Subunits in scope",
+    subunit_assessed: "Subunits assessed",
+    maintainable_total: "Maintainable items in scope",
+    maintainable_assessed: "Maintainable items assessed",
+    production_assessed_count: "With production impact scored",
   };
 
   return (

@@ -208,6 +208,49 @@ def test_readiness_breakdown_exposes_weighted_components():
 
 
 @pytest.mark.asyncio
+async def test_validate_criticality_only_counts_subunits_and_maintainable_items():
+    class MockCursor:
+        def __init__(self, items):
+            self._items = items
+
+        async def to_list(self, length=None):
+            return self._items
+
+    in_scope = [
+        {"level": "subunit", "criticality": {"production_impact": 3}},
+        {"level": "subunit", "criticality": None},
+        {"level": "maintainable_item", "criticality": {"safety_impact": 2}},
+    ]
+
+    mock_db = MagicMock()
+
+    def mock_find(query, projection):
+        if query.get("level") == "installation":
+            return MockCursor([])
+        if isinstance(query.get("level"), dict) and "$in" in query["level"]:
+            return MockCursor(in_scope)
+        return MockCursor([])
+
+    mock_db.equipment_nodes.find = MagicMock(side_effect=mock_find)
+    mock_db.equipment_nodes.count_documents = AsyncMock(return_value=0)
+    mock_db.risk_settings.count_documents = AsyncMock(return_value=1)
+    mock_db.definitions.count_documents = AsyncMock(return_value=1)
+
+    with patch("services.onboarding_service.db", mock_db):
+        from services.onboarding_service import _validate_criticality
+
+        result = await _validate_criticality("Tyromer")
+
+    coverage_check = next(c for c in result["checks"] if c["code"] == "assessment_coverage")
+    assert coverage_check["detail"]["in_scope_total"] == 3
+    assert coverage_check["detail"]["assessed_count"] == 2
+    assert coverage_check["detail"]["coverage_percent"] == 67
+    scope_check = next(c for c in result["checks"] if c["code"] == "assessment_scope")
+    assert scope_check["detail"]["subunit_total"] == 2
+    assert scope_check["detail"]["maintainable_total"] == 1
+
+
+@pytest.mark.asyncio
 async def test_ask_coach_uses_onboarding_endpoint_not_observation_chat():
     with patch("services.ai_platform.execute_prompt", new_callable=AsyncMock) as mock_prompt:
         mock_prompt.return_value = {"content": "Failure modes describe how equipment can fail."}

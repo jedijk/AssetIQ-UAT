@@ -65,8 +65,8 @@ export const ONBOARDING_PHASES = [
     ctaLabel: "Review Criticality Settings",
     ctaPath: "/settings/risk-calculation",
     help: {
-      explainAgain: "Safety, production, environmental and reputation scores drive risk ranking.",
-      bestPractice: "Review criticality definitions per installation before go-live.",
+      explainAgain: "Criticality is assessed on subunits and maintainable items in Equipment Manager, using safety, production, environmental, and reputation dimensions.",
+      bestPractice: "Review criticality for every subunit and maintainable item in Equipment Manager — higher levels inherit context but are not assessed.",
       example: "criticality",
     },
   },

@@ -20,6 +20,8 @@ from services.onboarding_constants import (
     VALID_PHASES,
 )
 from services.tenant_management_service import _resolve_tenant_doc, _tenant_counts, register_legacy_tenant
+from services.executive_dashboard_exposure import ASSESSMENT_COVERAGE_LEVELS
+from services.production_exposure import production_impact_from_criticality
 from services.tenant_schema import tenant_id_from_user
 
 logger = logging.getLogger(__name__)
@@ -111,7 +113,7 @@ def _phase_score_explanation(result: dict) -> str:
         return ("; ".join(parts) if parts else "No maintenance programs yet") + f" → {score}%"
 
     if phase == "criticality":
-        return f"Risk settings (40%) + criticality definitions (30%) + scored equipment (30%) → {score}%"
+        return f"Risk settings (40%) + criticality definitions (30%) + subunit/maintainable assessment coverage (30%) → {score}%"
 
     if phase == "spare_parts":
         return f"60% when spares exist; +40% when linked to equipment → {score}%"
@@ -255,6 +257,62 @@ async def _equipment_below_installation(tenant_id: str) -> int:
             },
         }
     )
+
+
+def _has_criticality_assessment(criticality: Any) -> bool:
+    """True when equipment has any criticality dimension assessed (Equipment Manager parity)."""
+    if not criticality or not isinstance(criticality, dict):
+        return False
+    if criticality.get("level"):
+        return True
+    for field in (
+        "safety_impact",
+        "production_impact",
+        "environmental_impact",
+        "reputation_impact",
+        "safety",
+        "production",
+        "environmental",
+        "reputation",
+    ):
+        if (criticality.get(field) or 0) > 0:
+            return True
+    return False
+
+
+async def _criticality_assessment_counts(tenant_id: str) -> dict:
+    """Count in-scope nodes (subunit + maintainable_item only) and assessed coverage."""
+    levels = list(ASSESSMENT_COVERAGE_LEVELS)
+    in_scope_nodes = await db.equipment_nodes.find(
+        {"tenant_id": tenant_id, "level": {"$in": levels}},
+        {"_id": 0, "level": 1, "criticality": 1},
+    ).to_list(length=10000)
+
+    by_level = {level: {"total": 0, "assessed": 0} for level in levels}
+    assessed = 0
+    for node in in_scope_nodes:
+        level = node.get("level")
+        if level in by_level:
+            by_level[level]["total"] += 1
+        if _has_criticality_assessment(node.get("criticality")):
+            assessed += 1
+            if level in by_level:
+                by_level[level]["assessed"] += 1
+
+    total = len(in_scope_nodes)
+    coverage = round((assessed / total) * 100) if total else 0
+    return {
+        "in_scope_total": total,
+        "assessed_count": assessed,
+        "coverage_percent": coverage,
+        "subunit_total": by_level.get(ISOLevel.SUBUNIT.value, {}).get("total", 0),
+        "subunit_assessed": by_level.get(ISOLevel.SUBUNIT.value, {}).get("assessed", 0),
+        "maintainable_total": by_level.get(ISOLevel.MAINTAINABLE_ITEM.value, {}).get("total", 0),
+        "maintainable_assessed": by_level.get(ISOLevel.MAINTAINABLE_ITEM.value, {}).get("assessed", 0),
+        "production_assessed_count": sum(
+            1 for n in in_scope_nodes if production_impact_from_criticality(n.get("criticality")) > 0
+        ),
+    }
 
 
 async def _validate_company(tenant_id: str) -> dict:
@@ -433,17 +491,10 @@ async def _validate_criticality(tenant_id: str) -> dict:
         {"tenant_id": tenant_id, "criticality": {"$exists": True, "$ne": None}}
     )
 
-    equipment_with_scores = await db.equipment_nodes.count_documents(
-        {
-            "tenant_id": tenant_id,
-            "$or": [
-                {"criticality.safety": {"$exists": True, "$gt": 0}},
-                {"criticality.production": {"$exists": True, "$gt": 0}},
-                {"safety": {"$exists": True, "$gt": 0}},
-                {"production": {"$exists": True, "$gt": 0}},
-            ],
-        }
-    )
+    assessment = await _criticality_assessment_counts(tenant_id)
+    in_scope = assessment["in_scope_total"]
+    assessed = assessment["assessed_count"]
+    coverage = assessment["coverage_percent"]
 
     checks = [
         _check(
@@ -457,9 +508,37 @@ async def _validate_criticality(tenant_id: str) -> dict:
             code="criticality_definitions",
         ),
         _check(
-            "passed" if equipment_with_scores > 0 else "warning",
-            f"{equipment_with_scores} equipment node(s) with criticality scores",
-            code="equipment_criticality",
+            "passed" if in_scope > 0 else "warning",
+            (
+                f"{in_scope} subunit(s) and maintainable item(s) in scope for criticality assessment"
+                if in_scope
+                else "No subunits or maintainable items yet — expand equipment hierarchy first"
+            ),
+            code="assessment_scope",
+            detail={
+                "subunit_total": assessment["subunit_total"],
+                "maintainable_total": assessment["maintainable_total"],
+                "in_scope_total": in_scope,
+            },
+        ),
+        _check(
+            "passed" if coverage >= 80 else "warning" if assessed > 0 else "action_required" if in_scope else "warning",
+            (
+                f"{assessed} of {in_scope} in-scope items assessed ({coverage}%)"
+                if in_scope
+                else "Assessment coverage pending — add subunits or maintainable items"
+            ),
+            code="assessment_coverage",
+            detail={
+                "assessed_count": assessed,
+                "in_scope_total": in_scope,
+                "coverage_percent": coverage,
+                "subunit_assessed": assessment["subunit_assessed"],
+                "subunit_total": assessment["subunit_total"],
+                "maintainable_assessed": assessment["maintainable_assessed"],
+                "maintainable_total": assessment["maintainable_total"],
+                "production_assessed_count": assessment["production_assessed_count"],
+            },
         ),
     ]
 
@@ -468,11 +547,17 @@ async def _validate_criticality(tenant_id: str) -> dict:
         score += 40
     if criticality_defs > 0:
         score += 30
-    if equipment_with_scores > 0:
-        score += 30
+    if in_scope > 0:
+        score += round(coverage * 0.3)
     score = min(100, score)
 
-    return {"phase": "criticality", "score": score, "status": _status_from_score(score), "checks": checks}
+    return {
+        "phase": "criticality",
+        "score": score,
+        "status": _status_from_score(score),
+        "checks": checks,
+        "assessment_coverage_percent": coverage,
+    }
 
 
 async def _validate_failure_modes(tenant_id: str) -> dict:
