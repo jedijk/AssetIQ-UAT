@@ -8,25 +8,17 @@ import {
   PlayCircle,
   RefreshCw,
   Sparkles,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Badge } from "../../../components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
+import { Card, CardContent, CardHeader } from "../../../components/ui/card";
 import { onboardingAPI } from "../../../lib/apis/onboarding";
 import { getPhaseConfig } from "../config/phases";
 import { OnboardingDemo } from "./OnboardingDemo";
 import { OnboardingProgressSidebar } from "./OnboardingProgressSidebar";
 import { OnboardingAICoach } from "./OnboardingAICoach";
 import { GoLiveCompletion } from "./GoLiveCompletion";
-
-function ValidationIcon({ status }) {
-  if (status === "passed") return <CheckCircle2 className="w-4 h-4 text-emerald-600" />;
-  if (status === "warning") return <AlertTriangle className="w-4 h-4 text-amber-500" />;
-  return <XCircle className="w-4 h-4 text-red-500" />;
-}
+import { ValidationScoreHeader, ValidationChecksList } from "./ValidationBreakdown";
 
 export function OnboardingStepPage({
   phaseId,
@@ -142,31 +134,10 @@ export function OnboardingStepPage({
           </div>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                Score: {validation.score ?? 0}%
-                <Badge
-                  className={
-                    validation.status === "passed"
-                      ? "bg-emerald-100 text-emerald-800"
-                      : validation.status === "warning"
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-red-100 text-red-800"
-                  }
-                >
-                  {validation.status || "pending"}
-                </Badge>
-              </CardTitle>
+              <ValidationScoreHeader validation={validation} />
             </CardHeader>
-            <CardContent className="space-y-2">
-              {(validation.checks || []).map((check) => (
-                <div key={check.code} className="flex items-start gap-2 text-sm">
-                  <ValidationIcon status={check.status} />
-                  <span className="text-slate-700">{check.message}</span>
-                </div>
-              ))}
-              {!validation.checks?.length && (
-                <p className="text-sm text-slate-500">Run validation to check this phase.</p>
-              )}
+            <CardContent>
+              <ValidationChecksList checks={validation.checks} />
             </CardContent>
           </Card>
         </section>

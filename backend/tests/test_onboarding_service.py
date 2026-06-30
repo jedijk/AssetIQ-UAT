@@ -11,6 +11,7 @@ from services.onboarding_constants import PHASE_WEIGHTS
 from services.onboarding_service import (
     _compute_overall_progress,
     _compute_readiness_scores,
+    _enrich_validation,
     _estimate_time_remaining,
     ask_coach,
     validate_phase,
@@ -177,6 +178,33 @@ async def test_update_company_profile_sets_tenant_fields():
 
     assert result["name"] == "Tyromer Inc"
     mock_db.tenants.update_one.assert_awaited_once()
+
+
+def test_enrich_validation_adds_score_explanation_and_tally():
+    result = _enrich_validation(
+        {
+            "phase": "company",
+            "score": 75,
+            "status": "warning",
+            "checks": [
+                {"code": "a", "status": "passed", "message": "ok", "detail": {}},
+                {"code": "b", "status": "passed", "message": "ok", "detail": {}},
+                {"code": "c", "status": "warning", "message": "warn", "detail": {}},
+                {"code": "d", "status": "action_required", "message": "fix", "detail": {}},
+            ],
+        }
+    )
+    assert result["check_tally"]["passed"] == 2
+    assert result["check_tally"]["warning"] == 1
+    assert "75%" in result["score_explanation"]
+
+
+def test_readiness_breakdown_exposes_weighted_components():
+    results = {phase: _phase_result(50) for phase in PHASE_WEIGHTS}
+    scores = _compute_readiness_scores(results)
+    assert "breakdown" in scores
+    assert scores["breakdown"]["overall"]["components"]
+    assert scores["breakdown"]["reliability"]["formula"]
 
 
 @pytest.mark.asyncio

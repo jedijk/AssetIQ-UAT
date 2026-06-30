@@ -15,15 +15,34 @@ import { Badge } from "../../../components/ui/badge";
 import { onboardingAPI } from "../../../lib/apis/onboarding";
 import { BuildMyPlantWizard } from "../components/BuildMyPlantWizard";
 import { ONBOARDING_PHASES } from "../config/phases";
+import { ReadinessBreakdownPanel } from "../components/ValidationBreakdown";
 
-function ReadinessCard({ label, value, description }) {
+const READINESS_KEYS = {
+  "Reliability Readiness": "reliability",
+  "Maintenance Readiness": "maintenance",
+  "Data Quality": "data_quality",
+  "Go-Live Readiness": "go_live",
+};
+
+function ReadinessCard({ label, value, readiness }) {
+  const breakdownKey = READINESS_KEYS[label];
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardDescription>{label}</CardDescription>
         <CardTitle className="text-3xl">{value ?? 0}%</CardTitle>
       </CardHeader>
-      {description && <CardContent className="text-xs text-slate-500 pt-0">{description}</CardContent>}
+      {breakdownKey && (
+        <CardContent className="pt-0">
+          <ReadinessBreakdownPanel
+            title={label}
+            score={value}
+            breakdownKey={breakdownKey}
+            readiness={readiness}
+          />
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -112,23 +131,40 @@ export default function OnboardingWorkspacePage() {
       </div>
 
       <Card className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0">
-        <CardContent className="pt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <p className="text-emerald-100 text-sm">Overall completion</p>
-            <p className="text-4xl font-bold">{readiness.overall ?? 0}%</p>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <p className="text-emerald-100 text-sm">Overall completion</p>
+              <p className="text-4xl font-bold">{readiness.overall ?? 0}%</p>
+            </div>
+            <div className="flex items-center gap-2 text-emerald-50">
+              <Clock className="w-5 h-5" />
+              <span>~{data?.estimated_time_remaining_minutes ?? 0} min remaining</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-emerald-50">
-            <Clock className="w-5 h-5" />
-            <span>~{data?.estimated_time_remaining_minutes ?? 0} min remaining</span>
-          </div>
+          {readiness.breakdown?.overall && (
+            <div className="rounded-lg bg-white/10 px-4 py-3 text-sm text-emerald-50">
+              <p className="font-medium mb-2">{readiness.breakdown.overall.formula}</p>
+              <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-emerald-100/90">
+                {readiness.breakdown.overall.components
+                  ?.filter((c) => c.weight_percent > 0)
+                  .map((c) => (
+                    <li key={c.phase_id} className="flex justify-between gap-2">
+                      <span>{c.label} ({c.weight_percent}%)</span>
+                      <span>{c.score}% → +{c.contribution}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <ReadinessCard label="Reliability Readiness" value={readiness.reliability} />
-        <ReadinessCard label="Maintenance Readiness" value={readiness.maintenance} />
-        <ReadinessCard label="Data Quality" value={readiness.data_quality} />
-        <ReadinessCard label="Go-Live Readiness" value={readiness.go_live} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <ReadinessCard label="Reliability Readiness" value={readiness.reliability} readiness={readiness} />
+        <ReadinessCard label="Maintenance Readiness" value={readiness.maintenance} readiness={readiness} />
+        <ReadinessCard label="Data Quality" value={readiness.data_quality} readiness={readiness} />
+        <ReadinessCard label="Go-Live Readiness" value={readiness.go_live} readiness={readiness} />
       </div>
 
       {(data?.outstanding_actions?.length ?? 0) > 0 && (
@@ -175,6 +211,9 @@ export default function OnboardingWorkspacePage() {
               >
                 <p className="font-medium text-slate-900">{phase.label}</p>
                 <p className="text-sm text-slate-500 mt-1">{live.score ?? 0}% · {live.status || "pending"}</p>
+                {live.score_explanation && (
+                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">{live.score_explanation}</p>
+                )}
               </button>
             );
           })}
