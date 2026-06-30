@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   Rocket,
   Clock,
@@ -9,10 +9,10 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
-import { onboardingAPI } from "../../lib/apis/onboarding";
+import { Button } from "../../../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../../components/ui/card";
+import { Badge } from "../../../components/ui/badge";
+import { onboardingAPI } from "../../../lib/apis/onboarding";
 import { BuildMyPlantWizard } from "../components/BuildMyPlantWizard";
 import { ONBOARDING_PHASES } from "../config/phases";
 

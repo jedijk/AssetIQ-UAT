@@ -10,16 +10,17 @@ export default function OnboardingPhasePage() {
   const { phaseId } = useParams();
   const { user } = useAuth();
   const isAdmin = user?.role === "owner" || user?.role === "admin";
-
-  if (!getPhaseConfig(phaseId)) {
-    return <Navigate to="/settings/onboarding" replace />;
-  }
+  const phaseConfig = getPhaseConfig(phaseId);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["onboarding", "phase", phaseId],
     queryFn: () => onboardingAPI.getPhase(phaseId),
-    enabled: isAdmin && Boolean(phaseId),
+    enabled: isAdmin && Boolean(phaseId) && Boolean(phaseConfig),
   });
+
+  if (!phaseConfig) {
+    return <Navigate to="/settings/onboarding" replace />;
+  }
 
   if (!isAdmin) {
     return (
