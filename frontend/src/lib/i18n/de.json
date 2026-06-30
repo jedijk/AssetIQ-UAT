@@ -204,6 +204,10 @@
       "maintenanceReadiness": {
         "label": "Wartungsbereitschaft",
         "description": "UAT-Cutover-Snapshot und Warteschlangenstatus"
+      },
+      "onboardingWorkspace": {
+        "label": "Onboarding Workspace",
+        "description": "Geführte Self-Service-Implementierung"
       }
     },
     "maintenanceReadiness": {

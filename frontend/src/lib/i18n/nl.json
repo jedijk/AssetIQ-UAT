@@ -204,6 +204,10 @@
       "maintenanceReadiness": {
         "label": "Onderhoudsgereedheid",
         "description": "UAT-cutovermomentopname en wachtrijstatus"
+      },
+      "onboardingWorkspace": {
+        "label": "Onboarding Workspace",
+        "description": "Begeleide zelfservice-implementatie"
       }
     },
     "maintenanceReadiness": {

@@ -29,6 +29,7 @@ import {
   Monitor,
   Building2,
   Plug,
+  Rocket,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -249,6 +250,14 @@ const SETTINGS_SECTIONS = [
     sectionKey: "translations",
     icon: Languages,
     path: "/settings/translations",
+    roles: ["owner", "admin"],
+    requiresSettings: true,
+  },
+  {
+    id: "onboarding",
+    sectionKey: "onboardingWorkspace",
+    icon: Rocket,
+    path: "/settings/onboarding",
     roles: ["owner", "admin"],
     requiresSettings: true,
   },

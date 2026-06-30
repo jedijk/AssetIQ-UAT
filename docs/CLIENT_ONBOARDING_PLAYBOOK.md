@@ -2,6 +2,8 @@
 
 Official runbook for operators and platform owners onboarding a new client (tenant) into AssetIQ. Follow phases in order unless a specific integration is explicitly out of scope.
 
+For the in-app self-service onboarding experience (guided workspace, AI Coach, interactive demos, and customer-facing phases), see [`SELF_SERVICE_ONBOARDING_WORKSPACE_SPEC.md`](./SELF_SERVICE_ONBOARDING_WORKSPACE_SPEC.md). This playbook is the consultant/operator implementation guide; the spec defines the product vision and UX for customers configuring their own environment.
+
 ---
 
 ## 1. Overview

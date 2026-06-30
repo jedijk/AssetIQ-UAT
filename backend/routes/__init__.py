@@ -67,6 +67,7 @@ from routes.files import router as files_router
 from routes.files_admin import router as files_admin_router
 from routes.external_v1 import router as external_v1_router
 from routes.external_api_admin import router as external_api_admin_router
+from routes.onboarding import router as onboarding_router
 
 all_routers = [
     auth_router,
@@ -135,4 +136,5 @@ all_routers = [
     files_admin_router,
     external_v1_router,
     external_api_admin_router,
+    onboarding_router,
 ]

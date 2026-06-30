@@ -88,6 +88,8 @@ const SettingsTranslationsPage = lazy(() => import("./pages/SettingsTranslations
 const SettingsDisciplinesConfiguratorPage = lazy(() => import("./pages/SettingsDisciplinesConfiguratorPage"));
 const SettingsTaskGenerationPage = lazy(() => import("./pages/SettingsTaskGenerationPage"));
 const SettingsAuditLogPage = lazy(() => import("./pages/SettingsAuditLogPage"));
+const OnboardingWorkspacePage = lazy(() => import("./features/onboarding/pages/OnboardingWorkspacePage"));
+const OnboardingPhasePage = lazy(() => import("./features/onboarding/pages/OnboardingPhasePage"));
 const GranulometryPage = lazy(() => import("./pages/GranulometryPage"));
 
 // RIL (Reliability Intelligence Layer) Pages
@@ -614,6 +616,8 @@ function App() {
                   <Route path="translations" element={<Suspense fallback={<RouteFallback />}><SettingsTranslationsPage /></Suspense>} />
                   <Route path="disciplines" element={<Suspense fallback={<RouteFallback />}><SettingsDisciplinesConfiguratorPage /></Suspense>} />
                   <Route path="task-generation" element={<Suspense fallback={<RouteFallback />}><SettingsTaskGenerationPage /></Suspense>} />
+                  <Route path="onboarding" element={<Suspense fallback={<RouteFallback />}><OnboardingWorkspacePage /></Suspense>} />
+                  <Route path="onboarding/phases/:phaseId" element={<Suspense fallback={<RouteFallback />}><OnboardingPhasePage /></Suspense>} />
                 </Route>
                 
                 <Route path="user-statistics" element={<Suspense fallback={<RouteFallback />}><UserStatisticsPage /></Suspense>} />

@@ -19,6 +19,7 @@ import {
   Sliders,
   Sparkles,
   Plug,
+  Rocket,
 } from 'lucide-react';
 
 /**
@@ -81,6 +82,7 @@ const staticRouteLabels = {
   '/settings/translations': 'Translations',
   '/settings/disciplines': 'Disciplines',
   '/settings/task-generation': 'Task Generation',
+  '/settings/onboarding': 'Onboarding Workspace',
   '/user-statistics': 'User Statistics',
 };
 
@@ -94,6 +96,7 @@ const dynamicRoutePatterns = [
   { pattern: /^\/spareiq\/([^/]+)$/, label: 'Spare Part', icon: Package },
   { pattern: /^\/equipment\/([^/]+)\/trace$/, label: 'Reliability Trace', icon: GitBranch },
   { pattern: /^\/equipment\/([^/]+)\/reliability$/, label: 'Reliability Profile', icon: Sparkles },
+  { pattern: /^\/settings\/onboarding\/phases\/([^/]+)$/, label: 'Onboarding Phase', icon: Rocket },
   { pattern: /^\/reliability\/cases\/([^/]+)$/, label: 'Case Detail', icon: Sparkles },
 ];
 
@@ -143,6 +146,7 @@ const staticRouteIcons = {
   '/settings/consent-management': Settings,
   '/settings/translations': Settings,
   '/settings/disciplines': Settings,
+  '/settings/onboarding': Rocket,
   '/settings/task-generation': Settings,
   '/user-statistics': BarChart3,
 };

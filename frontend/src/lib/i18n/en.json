@@ -204,6 +204,10 @@
       "maintenanceReadiness": {
         "label": "Maintenance Readiness",
         "description": "UAT cutover snapshot and queue health"
+      },
+      "onboardingWorkspace": {
+        "label": "Onboarding Workspace",
+        "description": "Guided self-service implementation journey"
       }
     },
     "maintenanceReadiness": {
