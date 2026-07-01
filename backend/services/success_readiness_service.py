@@ -17,7 +17,7 @@ from services.success_readiness_registers import (
     list_register_entries,
     update_register_entry,
 )
-from services.tenant_schema import tenant_id_from_user
+from services.tenant_schema import merge_tenant_filter, tenant_id_from_user, with_tenant_id
 
 
 async def get_dashboard(user: dict) -> Dict[str, Any]:
@@ -64,8 +64,7 @@ async def get_kpi_detail(user: dict, kpi_id: str) -> Optional[Dict[str, Any]]:
 
 
 async def get_registers(user: dict, register_type: str) -> List[Dict[str, Any]]:
-    tenant_id = tenant_id_from_user(user)
-    return await list_register_entries(register_type, tenant_id)
+    return await list_register_entries(register_type, user)
 
 
 async def create_register(user: dict, register_type: str, payload: dict) -> Dict[str, Any]:
@@ -78,8 +77,7 @@ async def update_register(user: dict, entry_id: str, payload: dict) -> Optional[
 
 async def list_assessments(user: dict) -> List[Dict[str, Any]]:
     """Manual assessment templates — stub list for foundation."""
-    tenant_id = tenant_id_from_user(user)
-    query = {"tenant_id": tenant_id} if tenant_id else {}
+    query = merge_tenant_filter({}, user)
     cursor = db.success_readiness_assessments.find(query).sort("updated_at", -1).limit(50)
     rows: List[Dict[str, Any]] = []
     async for doc in cursor:
@@ -91,12 +89,8 @@ async def list_assessments(user: dict) -> List[Dict[str, Any]]:
 
 
 async def list_evidence(user: dict, kpi_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    tenant_id = tenant_id_from_user(user)
-    query: Dict[str, Any] = {}
-    if tenant_id:
-        query["tenant_id"] = tenant_id
-    if kpi_id:
-        query["kpi_id"] = kpi_id
+    base: Dict[str, Any] = {"kpi_id": kpi_id} if kpi_id else {}
+    query = merge_tenant_filter(base, user)
     cursor = db.success_readiness_evidence.find(query).sort("created_at", -1).limit(100)
     rows: List[Dict[str, Any]] = []
     async for doc in cursor:
@@ -106,8 +100,7 @@ async def list_evidence(user: dict, kpi_id: Optional[str] = None) -> List[Dict[s
 
 
 async def list_history(user: dict, limit: int = 50) -> List[Dict[str, Any]]:
-    tenant_id = tenant_id_from_user(user)
-    query = {"tenant_id": tenant_id} if tenant_id else {}
+    query = merge_tenant_filter({}, user)
     cursor = db.success_readiness_history.find(query).sort("recorded_at", -1).limit(limit)
     rows: List[Dict[str, Any]] = []
     async for doc in cursor:
@@ -141,10 +134,7 @@ async def get_ai_recommendations(user: dict) -> Dict[str, Any]:
 
 
 async def get_configuration(user: dict) -> Dict[str, Any]:
-    tenant_id = tenant_id_from_user(user)
-    query = {"type": "success_readiness_config"}
-    if tenant_id:
-        query["tenant_id"] = tenant_id
+    query = merge_tenant_filter({"type": "success_readiness_config"}, user)
     doc = await db.success_readiness_config.find_one(query)
     if doc:
         doc["id"] = str(doc.pop("_id"))
@@ -158,9 +148,6 @@ async def get_configuration(user: dict) -> Dict[str, Any]:
 
 
 async def update_configuration(user: dict, payload: dict) -> Dict[str, Any]:
-    from services.tenant_schema import with_tenant_id
-
-    tenant_id = tenant_id_from_user(user)
     doc = {
         "type": "success_readiness_config",
         "targets_locked": payload.get("targets_locked", False),
@@ -170,9 +157,7 @@ async def update_configuration(user: dict, payload: dict) -> Dict[str, Any]:
     if "pillar_weights" in payload:
         doc["pillar_weights"] = payload["pillar_weights"]
     with_tenant_id(doc, user)
-    query = {"type": "success_readiness_config"}
-    if tenant_id:
-        query["tenant_id"] = tenant_id
+    query = merge_tenant_filter({"type": "success_readiness_config"}, user)
     await db.success_readiness_config.update_one(query, {"$set": doc}, upsert=True)
     return await get_configuration(user)
 

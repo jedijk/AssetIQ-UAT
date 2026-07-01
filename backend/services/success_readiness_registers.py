@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 from services.success_readiness_models import REGISTER_TYPES, RegisterType
-from services.tenant_schema import with_tenant_id
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 
 
 def _now_iso() -> str:
@@ -15,12 +15,10 @@ def _now_iso() -> str:
 
 async def list_register_entries(
     register_type: RegisterType,
-    tenant_id: Optional[str],
+    user: dict,
     limit: int = 100,
 ) -> List[Dict[str, Any]]:
-    query: Dict[str, Any] = {"register_type": register_type}
-    if tenant_id:
-        query["tenant_id"] = tenant_id
+    query = merge_tenant_filter({"register_type": register_type}, user)
     cursor = db.success_readiness_registers.find(query).sort("updated_at", -1).limit(limit)
     rows: List[Dict[str, Any]] = []
     async for doc in cursor:
@@ -70,7 +68,7 @@ async def update_register_entry(
         updates["completion_pct"] = min(100, max(0, int(payload["completion_pct"])))
 
     result = await db.success_readiness_registers.find_one_and_update(
-        {"_id": ObjectId(entry_id)},
+        merge_tenant_filter({"_id": ObjectId(entry_id)}, user),
         {"$set": updates},
         return_document=True,
     )
