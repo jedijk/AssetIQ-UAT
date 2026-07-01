@@ -5,7 +5,7 @@ import { Button } from "../../../components/ui/button";
 import { successReadinessAPI } from "../../../lib/apis/successReadiness";
 import { SuccessReadinessLoading } from "../components/SuccessReadinessLayout";
 import { KpiTable, ScoreDisplay } from "../components/SuccessReadinessShared";
-import { SuccessReadinessSnowflakeGrid } from "../components/SuccessReadinessSnowflake";
+import { SuccessReadinessSnowflakeChart } from "../components/SuccessReadinessSnowflake";
 
 export default function SuccessReadinessDashboardPage() {
   const queryClient = useQueryClient();
@@ -38,8 +38,6 @@ export default function SuccessReadinessDashboardPage() {
     );
   }
 
-  const pillars = data?.pillars || {};
-
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
@@ -67,9 +65,9 @@ export default function SuccessReadinessDashboardPage() {
       <div>
         <h2 className="text-base font-semibold text-slate-900 mb-1">Readiness snowflake</h2>
         <p className="text-sm text-slate-500 mb-4">
-          KPI scores per segment — People, Process, and Technology.
+          All fifteen KPIs across People, Process, and Technology.
         </p>
-        <SuccessReadinessSnowflakeGrid kpis={data?.kpis} pillars={pillars} />
+        <SuccessReadinessSnowflakeChart kpis={data?.kpis} overallScore={data?.overall_score} />
       </div>
 
       {data?.generated_at && (
