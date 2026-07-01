@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Database, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../../../components/ui/button";
 import { successReadinessAPI } from "../../../lib/apis/successReadiness";
 import { PILLAR_LABELS, PILLAR_WEIGHTS } from "../config/nav";
@@ -7,9 +8,21 @@ import { SuccessReadinessLoading } from "../components/SuccessReadinessLayout";
 import { KpiTable, PillarCard, ScoreDisplay } from "../components/SuccessReadinessShared";
 
 export default function SuccessReadinessDashboardPage() {
+  const queryClient = useQueryClient();
   const { data, isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ["success-readiness", "dashboard"],
     queryFn: successReadinessAPI.getDashboard,
+  });
+
+  const collectMutation = useMutation({
+    mutationFn: successReadinessAPI.collectMeasurements,
+    onSuccess: (result) => {
+      queryClient.setQueryData(["success-readiness", "dashboard"], result);
+      toast.success(
+        `Measurements collected (${result.collection?.history_records || 0} history records)`
+      );
+    },
+    onError: () => toast.error("Failed to collect measurements"),
   });
 
   if (isLoading) return <SuccessReadinessLoading />;
@@ -34,10 +47,21 @@ export default function SuccessReadinessDashboardPage() {
           <p className="text-sm text-slate-500">Overall readiness</p>
           <ScoreDisplay score={data?.overall_score} />
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => collectMutation.mutate()}
+            disabled={collectMutation.isPending || isFetching}
+          >
+            <Database className={`w-4 h-4 mr-2 ${collectMutation.isPending ? "animate-pulse" : ""}`} />
+            Collect measurements
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -50,6 +74,10 @@ export default function SuccessReadinessDashboardPage() {
           />
         ))}
       </div>
+
+      {data?.generated_at && (
+        <p className="text-xs text-slate-500">Last calculated: {new Date(data.generated_at).toLocaleString()}</p>
+      )}
 
       {data?.kpi_summary && (
         <div className="flex flex-wrap gap-3 text-sm text-slate-600">

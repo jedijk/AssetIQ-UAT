@@ -30,6 +30,7 @@ API_TO_UI_FEATURE: Dict[str, str] = {
     "analytics": "statistics",
     "decision_engine": "reliability_intelligence",
     "vmb": "visual_boards",
+    "success_readiness": "success_readiness",
 }
 
 # Permissions with no UI matrix row — always use static ROLES fallback.

@@ -49,7 +49,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "name": "Role Coverage",
         "weight": 0.20,
         "target": 80,
-        "source": "stub",
+        "source": "automatic",
         "description": "Critical roles staffed and permissioned",
     },
     {
@@ -58,7 +58,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "name": "Change Readiness",
         "weight": 0.20,
         "target": 70,
-        "source": "stub",
+        "source": "manual",
         "description": "Stakeholder readiness for rollout milestones",
     },
     # Process
@@ -95,7 +95,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "name": "Workflow Adoption",
         "weight": 0.20,
         "target": 70,
-        "source": "stub",
+        "source": "automatic",
         "description": "Observations, actions, and tasks used as designed",
     },
     {
@@ -104,7 +104,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "name": "Reliability Process",
         "weight": 0.20,
         "target": 75,
-        "source": "stub",
+        "source": "automatic",
         "description": "RCM / FMEA / strategy coverage on critical assets",
     },
     # Technology
@@ -114,7 +114,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "name": "Platform Utilization",
         "weight": 0.20,
         "target": 65,
-        "source": "stub",
+        "source": "automatic",
         "description": "Breadth of modules used across the tenant",
     },
     {
@@ -123,7 +123,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "name": "Integration Health",
         "weight": 0.20,
         "target": 80,
-        "source": "stub",
+        "source": "automatic",
         "description": "External API, imports, and connector status",
     },
     {
@@ -132,7 +132,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "name": "Data Quality",
         "weight": 0.20,
         "target": 80,
-        "source": "stub",
+        "source": "automatic",
         "description": "Duplicates, orphans, and validation failures",
     },
     {
@@ -150,7 +150,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "name": "AI Readiness",
         "weight": 0.20,
         "target": 60,
-        "source": "stub",
+        "source": "automatic",
         "description": "AI features enabled with acceptable usage guardrails",
     },
 ]

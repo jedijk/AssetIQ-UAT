@@ -95,6 +95,12 @@ const OnboardingPhasePage = lazy(() => import("./features/onboarding/pages/Onboa
 const SuccessReadinessLayout = lazy(() => import("./features/success-readiness/components/SuccessReadinessLayout"));
 const SuccessReadinessDashboardPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessDashboardPage"));
 const SuccessReadinessPillarPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessPillarPage"));
+const SuccessReadinessAssessmentsPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessAssessmentsPage"));
+const SuccessReadinessRegistersPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessRegistersPage"));
+const PulseSurveysDashboardPage = lazy(() => import("./features/success-readiness/pages/PulseSurveysDashboardPage"));
+const PulseSurveyCreatePage = lazy(() => import("./features/success-readiness/pages/PulseSurveyCreatePage"));
+const PulseSurveyDetailPage = lazy(() => import("./features/success-readiness/pages/PulseSurveyDetailPage"));
+const PulseSurveyRespondPage = lazy(() => import("./features/success-readiness/pages/PulseSurveyRespondPage"));
 const SuccessReadinessShellPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessShellPage"));
 const SettingsCompanyProfilePage = lazy(() => import("./pages/SettingsCompanyProfilePage"));
 const GranulometryPage = lazy(() => import("./pages/GranulometryPage"));
@@ -632,7 +638,12 @@ function App() {
                     <Route path="people" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessPillarPage pillar="people" /></Suspense>} />
                     <Route path="process" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessPillarPage pillar="process" /></Suspense>} />
                     <Route path="technology" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessPillarPage pillar="technology" /></Suspense>} />
-                    <Route path="assessments" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="assessments" /></Suspense>} />
+                    <Route path="assessments" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessAssessmentsPage /></Suspense>} />
+                    <Route path="registers" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessRegistersPage /></Suspense>} />
+                    <Route path="pulse-surveys" element={<Suspense fallback={<RouteFallback />}><PulseSurveysDashboardPage /></Suspense>} />
+                    <Route path="pulse-surveys/new" element={<Suspense fallback={<RouteFallback />}><PulseSurveyCreatePage /></Suspense>} />
+                    <Route path="pulse-surveys/:surveyId/respond" element={<Suspense fallback={<RouteFallback />}><PulseSurveyRespondPage /></Suspense>} />
+                    <Route path="pulse-surveys/:surveyId" element={<Suspense fallback={<RouteFallback />}><PulseSurveyDetailPage /></Suspense>} />
                     <Route path="evidence" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="evidence" /></Suspense>} />
                     <Route path="history" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="history" /></Suspense>} />
                     <Route path="ai-recommendations" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="ai-recommendations" /></Suspense>} />

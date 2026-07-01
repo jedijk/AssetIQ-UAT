@@ -90,6 +90,8 @@ const staticRouteLabels = {
   '/settings/success-readiness/process': 'Process',
   '/settings/success-readiness/technology': 'Technology',
   '/settings/success-readiness/assessments': 'Assessments',
+  '/settings/success-readiness/registers': 'Registers',
+  '/settings/success-readiness/pulse-surveys': 'Pulse Surveys',
   '/settings/success-readiness/evidence': 'Evidence',
   '/settings/success-readiness/history': 'History',
   '/settings/success-readiness/ai-recommendations': 'AI Recommendations',

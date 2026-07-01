@@ -80,6 +80,8 @@ const FEATURE_PATHS = {
     "/settings/success-readiness/process",
     "/settings/success-readiness/technology",
     "/settings/success-readiness/assessments",
+    "/settings/success-readiness/registers",
+    "/settings/success-readiness/pulse-surveys",
     "/settings/success-readiness/evidence",
     "/settings/success-readiness/history",
     "/settings/success-readiness/ai-recommendations",

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 from services.success_readiness_models import REGISTER_TYPES, RegisterType
+from services.success_readiness_register_scoring import derive_register_completion_pct
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
 
 
@@ -40,13 +41,13 @@ async def create_register_entry(
         "title": payload.get("title", "").strip() or "Untitled",
         "description": payload.get("description", ""),
         "status": payload.get("status", "draft"),
-        "completion_pct": min(100, max(0, int(payload.get("completion_pct", 0)))),
         "owner": payload.get("owner") or user.get("name"),
         "metadata": payload.get("metadata") or {},
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
         "created_by": user.get("id") or user.get("user_id"),
     }
+    doc["completion_pct"] = derive_register_completion_pct(register_type, {**payload, **doc})
     with_tenant_id(doc, user)
     result = await db.success_readiness_registers.insert_one(doc)
     doc["id"] = str(result.inserted_id)
@@ -64,7 +65,18 @@ async def update_register_entry(
     for field in ("title", "description", "status", "owner", "metadata"):
         if field in payload:
             updates[field] = payload[field]
-    if "completion_pct" in payload:
+    merged = {**updates, **payload}
+    if "metadata" in payload or any(k in payload for k in ("status", "completion_pct")):
+        existing = await db.success_readiness_registers.find_one(
+            merge_tenant_filter({"_id": ObjectId(entry_id)}, user)
+        )
+        if existing:
+            merged = {**existing, **updates}
+            updates["completion_pct"] = derive_register_completion_pct(
+                existing.get("register_type", ""),
+                merged,
+            )
+    elif "completion_pct" in payload:
         updates["completion_pct"] = min(100, max(0, int(payload["completion_pct"])))
 
     result = await db.success_readiness_registers.find_one_and_update(

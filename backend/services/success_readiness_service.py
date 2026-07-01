@@ -6,6 +6,12 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 
+from services.success_readiness_assessments import list_assessments, submit_assessment
+from services.success_readiness_collector import (
+    _apply_trends,
+    _previous_scores,
+    collect_measurements,
+)
 from services.success_readiness_kpi_engine import (
     build_kpi_results,
     overall_score,
@@ -23,6 +29,8 @@ from services.tenant_schema import merge_tenant_filter, tenant_id_from_user, wit
 async def get_dashboard(user: dict) -> Dict[str, Any]:
     tenant_id = tenant_id_from_user(user)
     kpis = await build_kpi_results(user, tenant_id)
+    previous = await _previous_scores(user, [k["id"] for k in kpis])
+    kpis = _apply_trends(kpis, previous)
     pillars = {
         pillar: {
             "weight": weight,
@@ -45,6 +53,10 @@ async def get_dashboard(user: dict) -> Dict[str, Any]:
     }
 
 
+async def collect_and_persist(user: dict) -> Dict[str, Any]:
+    return await collect_measurements(user, record_history=True)
+
+
 async def get_kpis(user: dict, pillar: Optional[str] = None) -> List[Dict[str, Any]]:
     tenant_id = tenant_id_from_user(user)
     kpis = await build_kpi_results(user, tenant_id)
@@ -60,6 +72,11 @@ async def get_kpi_detail(user: dict, kpi_id: str) -> Optional[Dict[str, Any]]:
     tenant_id = tenant_id_from_user(user)
     kpis = await build_kpi_results(user, tenant_id)
     match = next((k for k in kpis if k.get("id") == kpi_id), None)
+    if not match:
+        return None
+    evidence = await list_evidence(user, kpi_id=kpi_id)
+    match = dict(match)
+    match["evidence"] = evidence
     return match
 
 
@@ -75,19 +92,6 @@ async def update_register(user: dict, entry_id: str, payload: dict) -> Optional[
     return await update_register_entry(entry_id, payload, user)
 
 
-async def list_assessments(user: dict) -> List[Dict[str, Any]]:
-    """Manual assessment templates — stub list for foundation."""
-    query = merge_tenant_filter({}, user)
-    cursor = db.success_readiness_assessments.find(query).sort("updated_at", -1).limit(50)
-    rows: List[Dict[str, Any]] = []
-    async for doc in cursor:
-        doc["id"] = str(doc.pop("_id"))
-        rows.append(doc)
-    if rows:
-        return rows
-    return _default_assessment_stubs()
-
-
 async def list_evidence(user: dict, kpi_id: Optional[str] = None) -> List[Dict[str, Any]]:
     base: Dict[str, Any] = {"kpi_id": kpi_id} if kpi_id else {}
     query = merge_tenant_filter(base, user)
@@ -97,6 +101,23 @@ async def list_evidence(user: dict, kpi_id: Optional[str] = None) -> List[Dict[s
         doc["id"] = str(doc.pop("_id"))
         rows.append(doc)
     return rows
+
+
+async def create_evidence(user: dict, payload: dict) -> Dict[str, Any]:
+    doc = {
+        "kpi_id": payload.get("kpi_id"),
+        "title": payload.get("title") or "Evidence",
+        "description": payload.get("description") or "",
+        "source": payload.get("source") or "manual",
+        "attachment_url": payload.get("attachment_url"),
+        "created_at": _iso_now(),
+        "updated_at": _iso_now(),
+        "created_by": user.get("id") or user.get("user_id"),
+    }
+    with_tenant_id(doc, user)
+    result = await db.success_readiness_evidence.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    return doc
 
 
 async def list_history(user: dict, limit: int = 50) -> List[Dict[str, Any]]:
@@ -110,7 +131,6 @@ async def list_history(user: dict, limit: int = 50) -> List[Dict[str, Any]]:
 
 
 async def get_ai_recommendations(user: dict) -> Dict[str, Any]:
-    """Stub — returns prioritized actions from lowest-scoring KPIs."""
     dashboard = await get_dashboard(user)
     kpis = sorted(
         [k for k in dashboard.get("kpis", []) if k.get("score") is not None],
@@ -118,18 +138,21 @@ async def get_ai_recommendations(user: dict) -> Dict[str, Any]:
     )
     recommendations = []
     for kpi in kpis[:5]:
+        gap = (kpi.get("target") or 0) - (kpi.get("score") or 0)
         recommendations.append({
             "kpi_id": kpi["id"],
             "pillar": kpi["pillar"],
             "title": f"Improve {kpi['name']}",
-            "priority": "high" if (kpi.get("score") or 0) < 60 else "medium",
+            "priority": "high" if gap > 25 else "medium" if gap > 10 else "low",
             "rationale": f"Current score {kpi.get('score')}% vs target {kpi.get('target')}%",
-            "status": "stub",
+            "estimated_impact": min(15, max(2, gap // 2)),
+            "evidence": kpi.get("auto_detail") or {},
+            "recommended_action": _recommended_action_for_kpi(kpi["id"]),
+            "responsible_role": _owner_role_for_pillar(kpi.get("pillar")),
         })
     return {
         "recommendations": recommendations,
         "ai_enabled": False,
-        "todo": "TODO: wire AI coach for personalized recommendations",
     }
 
 
@@ -143,7 +166,6 @@ async def get_configuration(user: dict) -> Dict[str, Any]:
         "targets_locked": False,
         "pillar_weights": PILLAR_WEIGHTS,
         "notification_enabled": True,
-        "todo": "TODO: persist configuration per tenant",
     }
 
 
@@ -162,30 +184,28 @@ async def update_configuration(user: dict, payload: dict) -> Dict[str, Any]:
     return await get_configuration(user)
 
 
-def _default_assessment_stubs() -> List[Dict[str, Any]]:
-    return [
-        {
-            "id": "stub-training",
-            "title": "Training readiness assessment",
-            "status": "not_started",
-            "kpi_ids": ["training_completion"],
-            "todo": "TODO: implement assessment workflow",
-        },
-        {
-            "id": "stub-governance",
-            "title": "Governance maturity assessment",
-            "status": "not_started",
-            "kpi_ids": ["governance_maturity"],
-            "todo": "TODO: implement assessment workflow",
-        },
-        {
-            "id": "stub-infrastructure",
-            "title": "Infrastructure readiness assessment",
-            "status": "not_started",
-            "kpi_ids": ["infrastructure_readiness"],
-            "todo": "TODO: implement assessment workflow",
-        },
-    ]
+def _recommended_action_for_kpi(kpi_id: str) -> str:
+    actions = {
+        "training_completion": "Schedule refresher training for outstanding users.",
+        "champion_program": "Assign an AssetIQ champion for each department.",
+        "governance_maturity": "Complete the monthly governance checklist.",
+        "procedure_coverage": "Update SOPs to reference AssetIQ workflows.",
+        "infrastructure_readiness": "Complete the infrastructure readiness review.",
+        "user_adoption": "Run a short adoption campaign for inactive users.",
+        "core_data_readiness": "Complete equipment hierarchy and criticality data.",
+        "workflow_adoption": "Close the loop from observations to actions.",
+    }
+    return actions.get(kpi_id, "Review KPI evidence and assign an improvement owner.")
+
+
+def _owner_role_for_pillar(pillar: Optional[str]) -> str:
+    if pillar == "people":
+        return "admin"
+    if pillar == "process":
+        return "reliability_engineer"
+    if pillar == "technology":
+        return "admin"
+    return "admin"
 
 
 def _iso_now() -> str:
