@@ -21,6 +21,9 @@ PHASE_WEIGHTS: Dict[str, float] = {
 # Sites is a guided step without its own weight; completion feeds equipment readiness.
 UNWEIGHTED_PHASES = {"sites"}
 
+# Phases that may be skipped without blocking go-live.
+OPTIONAL_PHASES = {"external_api"}
+
 PHASE_ORDER: List[str] = [
     "company",
     "sites",

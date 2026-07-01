@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Camera, Loader2, Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
 import {
   Select,
   SelectContent,
@@ -13,6 +12,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { SettingsSection, SettingsCard, SettingsRow } from "./SettingsPage";
+import CompanyLogoUpload from "../components/settings/CompanyLogoUpload";
 import { onboardingAPI } from "../lib/apis/onboarding";
 
 const TIMEZONES = [
@@ -35,13 +35,11 @@ const LANGUAGES = [
 
 export default function SettingsCompanyProfilePage() {
   const queryClient = useQueryClient();
-  const fileInputRef = useRef(null);
   const [form, setForm] = useState({
     name: "",
     default_language: "en",
     default_timezone: "UTC",
   });
-  const [logoPreview, setLogoPreview] = useState(null);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["company-profile"],
@@ -57,28 +55,6 @@ export default function SettingsCompanyProfilePage() {
     });
   }, [profile]);
 
-  useEffect(() => {
-    let objectUrl;
-    if (!profile?.has_logo) {
-      setLogoPreview(null);
-      return undefined;
-    }
-    onboardingAPI
-      .getCompanyLogoBlob()
-      .then((blob) => {
-        if (blob?.size) {
-          objectUrl = URL.createObjectURL(blob);
-          setLogoPreview(objectUrl);
-        } else {
-          setLogoPreview(null);
-        }
-      })
-      .catch(() => setLogoPreview(null));
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [profile?.has_logo, profile?.logo_updated_at]);
-
   const saveMutation = useMutation({
     mutationFn: () => onboardingAPI.updateCompanyProfile(form),
     onSuccess: () => {
@@ -90,29 +66,6 @@ export default function SettingsCompanyProfilePage() {
       toast.error(error.response?.data?.detail || "Failed to save company profile");
     },
   });
-
-  const logoMutation = useMutation({
-    mutationFn: (file) => onboardingAPI.uploadCompanyLogo(file),
-    onSuccess: () => {
-      toast.success("Company logo uploaded");
-      queryClient.invalidateQueries({ queryKey: ["company-profile"] });
-      queryClient.invalidateQueries({ queryKey: ["onboarding"] });
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.detail || "Failed to upload logo");
-    },
-  });
-
-  const onLogoSelected = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file");
-      return;
-    }
-    logoMutation.mutate(file);
-    event.target.value = "";
-  };
 
   if (isLoading) {
     return (
@@ -127,50 +80,7 @@ export default function SettingsCompanyProfilePage() {
       title="Company Profile"
       description="Your organization name, branding, language, and timezone used across AssetIQ"
     >
-      <SettingsCard title="Branding" description="Logo appears on reports and customer-facing views (optional)">
-        <div className="flex flex-col sm:flex-row items-center gap-6">
-          <div className="relative group">
-            <div className="w-28 h-28 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
-              {logoPreview ? (
-                <img src={logoPreview} alt="Company logo" className="w-full h-full object-contain" />
-              ) : (
-                <Building2 className="w-10 h-10 text-slate-300" />
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={logoMutation.isPending}
-              className="absolute inset-0 rounded-xl bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="Upload company logo"
-            >
-              {logoMutation.isPending ? (
-                <Loader2 className="w-6 h-6 text-white animate-spin" />
-              ) : (
-                <Camera className="w-6 h-6 text-white" />
-              )}
-            </button>
-          </div>
-          <div className="space-y-2 text-center sm:text-left">
-            <p className="text-sm text-slate-600">Upload PNG, JPEG, WebP, or GIF (max 5 MB)</p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={logoMutation.isPending}
-            >
-              {logoMutation.isPending ? "Uploading…" : "Upload logo"}
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="hidden"
-              onChange={onLogoSelected}
-            />
-          </div>
-        </div>
-      </SettingsCard>
+      <CompanyLogoUpload />
 
       <SettingsCard title="Organization" description="Tenant-wide defaults for your company">
         <div className="space-y-4">

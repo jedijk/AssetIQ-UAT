@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 from database import db
 from iso14224_models import ISOLevel
-from services.onboarding_constants import PHASE_ORDER, PHASE_WEIGHTS, VALID_PHASES
+from services.onboarding_constants import OPTIONAL_PHASES, PHASE_ORDER, PHASE_WEIGHTS, VALID_PHASES
 from services.onboarding_helpers import check, enrich_validation, now_iso, status_from_score
 from services.onboarding_criticality_scope import (
     count_criticality_definitions_for_scope,
@@ -563,25 +563,41 @@ async def _validate_external_api(tenant_id: str) -> dict:
         )
     )
 
-    checks = [
-        check(
-            "passed" if active_keys > 0 else "action_required",
-            f"{active_keys} active API key(s)",
-            code="api_keys",
-        ),
-        check(
-            "warning",
-            "Connection test requires live integration (stubbed for MVP)",
-            code="connection_test",
-        ),
-    ]
+    if active_keys == 0:
+        checks = [
+            check(
+                "passed",
+                "No API keys configured (optional — skip if not needed)",
+                code="api_keys",
+                detail={"skipped": True, "active_keys": 0},
+            ),
+            check(
+                "warning",
+                "Connection test requires live integration (stubbed for MVP)",
+                code="connection_test",
+            ),
+        ]
+        score = 100
+    else:
+        checks = [
+            check(
+                "passed",
+                f"{active_keys} active API key(s)",
+                code="api_keys",
+            ),
+            check(
+                "warning",
+                "Connection test requires live integration (stubbed for MVP)",
+                code="connection_test",
+            ),
+        ]
+        score = 80
 
-    score = 80 if active_keys > 0 else 0
     return {"phase": "external_api", "score": score, "status": status_from_score(score), "checks": checks}
 
 
 async def _validate_go_live(tenant_id: str, phase_results: Dict[str, dict]) -> dict:
-    mandatory = [p for p in PHASE_ORDER if p != "go_live"]
+    mandatory = [p for p in PHASE_ORDER if p != "go_live" and p not in OPTIONAL_PHASES]
     blocking = [p for p in mandatory if phase_results.get(p, {}).get("status") == "action_required"]
     warnings = [p for p in mandatory if phase_results.get(p, {}).get("status") == "warning"]
 

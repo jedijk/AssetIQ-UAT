@@ -4,6 +4,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { authAPI } from "../lib/api";
 import { toast } from "sonner";
+import CompanyLogoUpload from "../components/settings/CompanyLogoUpload";
 import {
   Globe,
   Clock,
@@ -53,6 +54,7 @@ export default function SettingsGeneralPage() {
   const { user, setUser } = useAuth();
   const { language, setLanguage } = useLanguage();
   const queryClient = useQueryClient();
+  const canManageCompany = user?.role === "owner" || user?.role === "admin";
   
   const [preferences, setPreferences] = useState({
     timezone: user?.preferences?.timezone || "UTC",
@@ -114,6 +116,8 @@ export default function SettingsGeneralPage() {
       title="General Settings"
       description="Customize your app experience and preferences"
     >
+      {canManageCompany && <CompanyLogoUpload />}
+
       {/* Language & Region */}
       <SettingsCard title="Language & Region" description="Set your preferred language and timezone">
         <div className="space-y-4">

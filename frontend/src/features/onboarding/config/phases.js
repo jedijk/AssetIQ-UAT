@@ -148,14 +148,17 @@ export const ONBOARDING_PHASES = [
   {
     id: "external_api",
     label: "External API",
-    what: "The External API allows other systems to exchange information with AssetIQ.",
-    why: "It prevents duplicate data entry.",
+    optional: true,
+    what: "The External API allows other systems to exchange information with AssetIQ (optional).",
+    why: "Skip this step if you do not need integrations; it prevents duplicate data entry when you do.",
     demo: "external_api",
     ctaLabel: "Generate API Key",
     ctaPath: "/settings/external-api",
     help: {
-      explainAgain: "API keys let PLCs, CMMS, or custom apps send observations to AssetIQ.",
-      bestPractice: "Create a dedicated key per integration and share the integration guide with vendors.",
+      explainAgain:
+        "API keys let PLCs, CMMS, or custom apps send observations to AssetIQ. You can skip this phase if no external systems will connect.",
+      bestPractice:
+        "Create a dedicated key per integration and share the integration guide with vendors — only when you need integrations.",
       example: "external_api",
     },
   },

@@ -78,7 +78,7 @@ const SETTINGS_SECTIONS = [
     id: "general",
     sectionKey: "general",
     icon: Settings,
-    path: "/settings/preferences",
+    path: "/settings/general",
     roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"],
     personal: true,
   },

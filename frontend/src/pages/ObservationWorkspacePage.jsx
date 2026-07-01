@@ -47,6 +47,7 @@ import {
   CircleDot,
   Pencil,
   Trash2,
+  Search,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -409,6 +410,24 @@ const ObservationWorkspacePage = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <RiskBadge level={observation?.risk_level} size="sm" />
+                  {observation?.equipment_tag && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent("open-hierarchy-with-search", {
+                            detail: { query: observation.equipment_tag },
+                          })
+                        )
+                      }
+                      className="lg:hidden text-[10px] text-slate-600 font-mono bg-slate-100 px-1.5 py-0.5 rounded hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer flex items-center gap-1"
+                      title={t("observationWorkspace.clickToFindInHierarchy")}
+                      data-testid="hero-equipment-tag"
+                    >
+                      <Search className="w-2.5 h-2.5" />
+                      {observation.equipment_tag}
+                    </button>
+                  )}
                   <span className="text-[11px] text-slate-400 font-mono">
                     {observation?.threat_number}
                   </span>

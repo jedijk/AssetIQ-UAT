@@ -94,6 +94,22 @@ async def test_validate_sites_passes_with_site():
 
 
 @pytest.mark.asyncio
+async def test_validate_external_api_passes_when_skipped():
+    mock_db = MagicMock()
+    mock_db.external_api_keys.count_documents = AsyncMock(return_value=0)
+
+    with patch("services.onboarding_validation.db", mock_db):
+        result = await validate_phase("tenant-1", "external_api", persist=False)
+
+    assert result["score"] == 100
+    assert result["status"] == "passed"
+    api_keys_check = next(c for c in result["checks"] if c["code"] == "api_keys")
+    assert api_keys_check["status"] == "passed"
+    assert api_keys_check["detail"]["skipped"] is True
+    assert api_keys_check["detail"]["active_keys"] == 0
+
+
+@pytest.mark.asyncio
 async def test_validate_external_api_stub_connection_check():
     mock_db = MagicMock()
     mock_db.external_api_keys.count_documents = AsyncMock(return_value=1)
@@ -134,6 +150,24 @@ async def test_go_live_blocks_when_mandatory_phase_fails():
 
     assert result["status"] == "action_required"
     assert result["score"] == 0
+
+
+@pytest.mark.asyncio
+async def test_go_live_not_blocked_by_optional_external_api():
+    from services.onboarding_validation import _validate_go_live
+
+    phase_results = {phase: _phase_result(100, "passed") for phase in [
+        "company", "sites", "equipment", "users", "criticality",
+        "failure_modes", "maintenance_strategy", "spare_parts",
+        "forms", "visual_boards", "external_api",
+    ]}
+    phase_results["external_api"] = _phase_result(0, "action_required")
+
+    result = await _validate_go_live("t1", phase_results)
+
+    assert result["status"] != "action_required"
+    blocking = next(c for c in result["checks"] if c["code"] == "mandatory_phases")
+    assert "external_api" not in blocking["detail"]["blocking_phases"]
 
 
 @pytest.mark.asyncio

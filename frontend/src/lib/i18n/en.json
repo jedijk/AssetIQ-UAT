@@ -112,7 +112,7 @@
     "sections": {
       "general": {
         "label": "General",
-        "description": "App preferences and display settings"
+        "description": "App preferences, company logo, and display settings"
       },
       "privacy": {
         "label": "Privacy & Data",
