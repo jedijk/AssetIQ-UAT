@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from iso14224_models import ISOLevel
-from services.tenant_schema import merge_tenant_filter
+from services.tenant_schema import TENANT_STRICT_MODE, merge_tenant_filter
 
 OPERATIONAL_LEVELS = (
     ISOLevel.PLANT_UNIT.value,
@@ -21,6 +21,17 @@ def _tenant_user(tenant_id: str) -> dict:
 
 def _tenant_query(tenant_id: str, query: Dict[str, Any]) -> Dict[str, Any]:
     return merge_tenant_filter(query, _tenant_user(tenant_id))
+
+
+def _tenant_membership_filter(tenant_id: str) -> Dict[str, Any]:
+    """Match tenant-owned records via tenant_id or legacy company_id."""
+    clauses: List[Dict[str, Any]] = [
+        {"tenant_id": tenant_id},
+        {"company_id": tenant_id},
+    ]
+    if not TENANT_STRICT_MODE:
+        clauses.append({"tenant_id": {"$exists": False}})
+    return {"$or": clauses}
 
 
 def _scope_pipeline(tenant_id: str, pipeline: List[dict]) -> List[dict]:

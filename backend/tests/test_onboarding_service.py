@@ -232,22 +232,55 @@ async def test_validate_criticality_only_counts_subunits_and_maintainable_items(
     mock_db = MagicMock()
 
     def mock_find(query, projection):
+        level = query.get("level")
+        if isinstance(query.get("$and"), list):
+            for clause in query["$and"]:
+                if clause.get("level") == "installation":
+                    level = "installation"
+                    break
+        if level == "installation" or (query.get("level") == "installation"):
+            return MockCursor([{"id": "site-1", "name": "Plant A"}])
         body = _query_body(query)
-        if body.get("level") == "installation":
-            return MockCursor([])
         if isinstance(body.get("level"), dict) and "$in" in body["level"]:
             return MockCursor(in_scope)
         return MockCursor([])
 
     mock_db.equipment_nodes.find = MagicMock(side_effect=mock_find)
     mock_db.equipment_nodes.count_documents = AsyncMock(return_value=0)
-    mock_db.risk_settings.count_documents = AsyncMock(return_value=1)
-    mock_db.definitions.count_documents = AsyncMock(return_value=1)
+    mock_db.equipment_nodes.distinct = AsyncMock(side_effect=lambda field, query=None: {
+        "installation_id": ["site-1"],
+        "id": ["site-1", "eq-1"],
+    }.get(field, []))
+
+    async def risk_count(query):
+        values = set()
+        if query.get("installation_id", {}).get("$in"):
+            values.update(query["installation_id"]["$in"])
+        if query.get("$or"):
+            for clause in query["$or"]:
+                values.update(clause.get("installation_id", {}).get("$in", []))
+        return 1 if "site-1" in values or "Plant A" in values else 0
+
+    async def definitions_count(query):
+        if query.get("$and"):
+            equipment_clause = query["$and"][0]
+            values = set()
+            if equipment_clause.get("equipment_id", {}).get("$in"):
+                values.update(equipment_clause["equipment_id"]["$in"])
+            if equipment_clause.get("$or"):
+                for clause in equipment_clause["$or"]:
+                    values.update(clause.get("equipment_id", {}).get("$in", []))
+            return 1 if values.intersection({"site-1", "Plant A", "eq-1"}) else 0
+        return 0
+
+    mock_db.risk_settings.count_documents = AsyncMock(side_effect=risk_count)
+    mock_db.definitions.count_documents = AsyncMock(side_effect=definitions_count)
 
     with patch("services.onboarding_validation.db", mock_db):
-        from services.onboarding_validation import _validate_criticality
+        with patch("services.onboarding_criticality_scope.db", mock_db):
+            from services.onboarding_validation import _validate_criticality
 
-        result = await _validate_criticality("Tyromer")
+            result = await _validate_criticality("Tyromer")
 
     coverage_check = next(c for c in result["checks"] if c["code"] == "assessment_coverage")
     assert coverage_check["detail"]["in_scope_total"] == 3
@@ -256,6 +289,12 @@ async def test_validate_criticality_only_counts_subunits_and_maintainable_items(
     scope_check = next(c for c in result["checks"] if c["code"] == "assessment_scope")
     assert scope_check["detail"]["subunit_total"] == 2
     assert scope_check["detail"]["maintainable_total"] == 1
+    risk_check = next(c for c in result["checks"] if c["code"] == "risk_settings")
+    assert risk_check["status"] == "passed"
+    assert risk_check["detail"]["customized_count"] == 1
+    defs_check = next(c for c in result["checks"] if c["code"] == "criticality_definitions")
+    assert defs_check["status"] == "passed"
+    assert defs_check["detail"]["customized_count"] == 1
 
 
 @pytest.mark.asyncio
