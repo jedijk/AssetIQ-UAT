@@ -10,11 +10,11 @@ import {
 
 export default function SuccessReadinessLayout() {
   const { user } = useAuth();
-  const { canRead } = usePermissions();
+  const { hasPermission } = usePermissions();
   const location = useLocation();
   const isOwner = user?.role === "owner";
 
-  if (!canRead("success_readiness")) {
+  if (!hasPermission("success_readiness", "read")) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] text-center px-6">
         <Target className="w-12 h-12 text-slate-300 mb-4" />
