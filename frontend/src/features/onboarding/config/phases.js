@@ -79,8 +79,10 @@ export const ONBOARDING_PHASES = [
     ctaLabel: "Import PM Plan",
     ctaPath: "/library",
     help: {
-      explainAgain: "Customer-specific failure modes capture your plant's reliability knowledge.",
-      bestPractice: "Use PM Import from the Strategy library — it links tasks to equipment automatically.",
+      explainAgain:
+        "Failure modes are linked to equipment types — assign types on equipment, then add or import failure modes per type.",
+      bestPractice:
+        "Cover every equipment type in use with at least one failure mode; use PM Import from the Strategy library to link tasks by type.",
       example: "failure_modes",
     },
   },
@@ -107,8 +109,10 @@ export const ONBOARDING_PHASES = [
     ctaLabel: "Import Spare Parts",
     ctaPath: "/spareiq",
     help: {
-      explainAgain: "SpareIQ links parts to equipment tags so work orders show what to bring.",
-      bestPractice: "Import spares after equipment hierarchy is in place.",
+      explainAgain:
+        "SpareIQ links each spare to equipment via equipment_links — work orders then show which parts to bring for that asset.",
+      bestPractice:
+        "Import spares after the equipment hierarchy is in place, then link each part to the relevant equipment tags.",
       example: "spare_parts",
     },
   },

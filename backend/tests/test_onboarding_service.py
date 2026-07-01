@@ -3,7 +3,7 @@ import os
 
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017/test")
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
@@ -20,6 +20,13 @@ from services.onboarding_service import (
 
 def _phase_result(score: int, status: str = "passed") -> dict:
     return {"score": score, "status": status, "checks": []}
+
+
+def _query_body(query: dict) -> dict:
+    """Unwrap merge_tenant_filter $and shape for test mocks."""
+    if isinstance(query.get("$and"), list) and query["$and"]:
+        return query["$and"][0]
+    return query
 
 
 def test_compute_overall_progress_weighted():
@@ -66,7 +73,7 @@ async def test_validate_sites_requires_installation():
     mock_db = MagicMock()
     mock_db.equipment_nodes.count_documents = AsyncMock(return_value=0)
 
-    with patch("services.onboarding_service.db", mock_db):
+    with patch("services.onboarding_validation.db", mock_db):
         result = await validate_phase("tenant-1", "sites", persist=False)
 
     assert result["phase"] == "sites"
@@ -79,7 +86,7 @@ async def test_validate_sites_passes_with_site():
     mock_db = MagicMock()
     mock_db.equipment_nodes.count_documents = AsyncMock(return_value=2)
 
-    with patch("services.onboarding_service.db", mock_db):
+    with patch("services.onboarding_validation.db", mock_db):
         result = await validate_phase("tenant-1", "sites", persist=False)
 
     assert result["score"] == 100
@@ -91,7 +98,7 @@ async def test_validate_external_api_stub_connection_check():
     mock_db = MagicMock()
     mock_db.external_api_keys.count_documents = AsyncMock(return_value=1)
 
-    with patch("services.onboarding_service.db", mock_db):
+    with patch("services.onboarding_validation.db", mock_db):
         result = await validate_phase("tenant-1", "external_api", persist=False)
 
     assert result["score"] == 80
@@ -121,7 +128,7 @@ async def test_go_live_blocks_when_mandatory_phase_fails():
                 "visual_boards": _phase_result(100),
                 "external_api": _phase_result(100),
             }
-            from services.onboarding_service import _validate_go_live
+            from services.onboarding_validation import _validate_go_live
 
             result = await _validate_go_live("t1", mock_all.return_value)
 
@@ -133,9 +140,9 @@ async def test_go_live_blocks_when_mandatory_phase_fails():
 async def test_validate_company_logo_passes_when_configured():
     mock_db = MagicMock()
 
-    with patch("services.onboarding_service.db", mock_db):
+    with patch("services.onboarding_validation.db", mock_db):
         with patch(
-            "services.onboarding_service._resolve_tenant_doc",
+            "services.onboarding_validation._resolve_tenant_doc",
             new_callable=AsyncMock,
             return_value={
                 "tenant_id": "Tyromer",
@@ -225,9 +232,10 @@ async def test_validate_criticality_only_counts_subunits_and_maintainable_items(
     mock_db = MagicMock()
 
     def mock_find(query, projection):
-        if query.get("level") == "installation":
+        body = _query_body(query)
+        if body.get("level") == "installation":
             return MockCursor([])
-        if isinstance(query.get("level"), dict) and "$in" in query["level"]:
+        if isinstance(body.get("level"), dict) and "$in" in body["level"]:
             return MockCursor(in_scope)
         return MockCursor([])
 
@@ -236,8 +244,8 @@ async def test_validate_criticality_only_counts_subunits_and_maintainable_items(
     mock_db.risk_settings.count_documents = AsyncMock(return_value=1)
     mock_db.definitions.count_documents = AsyncMock(return_value=1)
 
-    with patch("services.onboarding_service.db", mock_db):
-        from services.onboarding_service import _validate_criticality
+    with patch("services.onboarding_validation.db", mock_db):
+        from services.onboarding_validation import _validate_criticality
 
         result = await _validate_criticality("Tyromer")
 
@@ -248,6 +256,118 @@ async def test_validate_criticality_only_counts_subunits_and_maintainable_items(
     scope_check = next(c for c in result["checks"] if c["code"] == "assessment_scope")
     assert scope_check["detail"]["subunit_total"] == 2
     assert scope_check["detail"]["maintainable_total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_validate_failure_modes_uses_equipment_type_coverage():
+    class MockAggregateCursor:
+        def __init__(self, items):
+            self._items = items
+
+        def to_list(self, length=None):
+            return _async_return(self._items)
+
+    async def _async_return(value):
+        return value
+
+    types_in_use = ["type-a", "type-b", "type-c"]
+    types_with_fm = [{"_id": "type-a"}, {"_id": "type-b"}]
+
+    mock_db = MagicMock()
+    mock_db.equipment_nodes.distinct = AsyncMock(return_value=types_in_use)
+
+    async def count_documents(query):
+        body = _query_body(query)
+        if body.get("failure_mode_type") == "customer_specific":
+            return 4
+        if body.get("equipment_type_ids"):
+            return 8
+        equipment_type_filter = body.get("equipment_type_id")
+        if isinstance(equipment_type_filter, dict) and "$in" in equipment_type_filter:
+            in_list = set(equipment_type_filter["$in"])
+            if in_list == set(types_in_use):
+                return 6
+            if in_list == {"type-a", "type-b"}:
+                return 4
+        return 0
+
+    mock_db.failure_modes.count_documents = AsyncMock(side_effect=count_documents)
+    mock_db.failure_modes.aggregate = MagicMock(return_value=MockAggregateCursor(types_with_fm))
+    mock_db.equipment_nodes.count_documents = AsyncMock(side_effect=count_documents)
+
+    with patch("services.onboarding_validation.db", mock_db):
+        from services.onboarding_validation import _validate_failure_modes
+
+        result = await _validate_failure_modes("Tyromer")
+
+    type_check = next(c for c in result["checks"] if c["code"] == "type_coverage")
+    assert type_check["detail"]["types_in_use"] == 3
+    assert type_check["detail"]["types_with_failure_modes"] == 2
+    assert type_check["detail"]["type_coverage_percent"] == 67
+    assert type_check["detail"]["asset_coverage_percent"] == 67
+    assert type_check["detail"]["equipment_with_type"] == 6
+    assert type_check["detail"]["equipment_with_failure_modes"] == 4
+    assert result["score"] == min(100, 50 + 67 // 2)
+
+
+@pytest.mark.asyncio
+async def test_validate_spare_parts_uses_equipment_links():
+    class MockAggregateCursor:
+        def __init__(self, items):
+            self._items = items
+
+        def to_list(self, length=None):
+            return _async_return(self._items)
+
+    async def _async_return(value):
+        return value
+
+    linked_equipment_ids = ["eq-1", "eq-2", "eq-3", "eq-4"]
+
+    mock_db = MagicMock()
+
+    async def spare_count_documents(query):
+        body = _query_body(query)
+        if body.get("equipment_links"):
+            return 3
+        return 5
+
+    mock_db.spare_parts.count_documents = AsyncMock(side_effect=spare_count_documents)
+    mock_db.spare_parts.aggregate = MagicMock(
+        return_value=MockAggregateCursor([{"_id": eid} for eid in linked_equipment_ids])
+    )
+
+    async def equipment_count_documents(query):
+        body = _query_body(query)
+        level_filter = body.get("level")
+        if isinstance(level_filter, dict) and "$in" in level_filter:
+            if body.get("id", {}).get("$in"):
+                return 4
+            return 10
+        return 0
+
+    mock_db.equipment_nodes.count_documents = AsyncMock(side_effect=equipment_count_documents)
+
+    with patch("services.onboarding_validation.db", mock_db):
+        from services.onboarding_validation import _validate_spare_parts
+
+        result = await _validate_spare_parts("Tyromer")
+
+    linked_check = next(c for c in result["checks"] if c["code"] == "spare_parts_linked")
+    assert linked_check["detail"]["linked_count"] == 3
+    assert linked_check["detail"]["linked_equipment_count"] == 4
+    assert linked_check["detail"]["equipment_in_scope"] == 10
+    assert linked_check["detail"]["equipment_with_spares"] == 4
+    assert linked_check["detail"]["equipment_coverage_percent"] == 40
+    assert "3 spare part(s) linked to equipment (40% equipment coverage)" == linked_check["message"]
+    assert result["equipment_coverage_percent"] == 40
+    assert result["score"] == 76
+
+    spare_count_calls = [
+        call.args[0]
+        for call in mock_db.spare_parts.count_documents.await_args_list
+    ]
+    assert not any("equipment_id" in query and "equipment_links" not in query for query in spare_count_calls)
 
 
 @pytest.mark.asyncio
