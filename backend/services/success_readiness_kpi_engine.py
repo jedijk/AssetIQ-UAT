@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 from iso14224_models import ISOLevel
+from services.success_readiness_kpi_actions import improvement_actions_for_kpi
 from services.success_readiness_models import (
     KPI_CATALOG,
     KpiResult,
@@ -293,6 +294,7 @@ async def build_kpi_results(user: dict, tenant_id: Optional[str]) -> List[KpiRes
                 evidence_count=evidence_count,
                 auto_detail=auto_detail,
                 todo=todo,
+                improvement_actions=improvement_actions_for_kpi(kpi_id),
             )
         )
     return results

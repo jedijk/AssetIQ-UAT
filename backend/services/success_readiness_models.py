@@ -172,6 +172,7 @@ class KpiResult(TypedDict, total=False):
     evidence_count: int
     auto_detail: Optional[Dict[str, Any]]
     todo: Optional[str]
+    improvement_actions: Optional[List[Dict[str, Any]]]
 
 
 def status_from_score(score: Optional[int], target: int) -> KpiStatus:

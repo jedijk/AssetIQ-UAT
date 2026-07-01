@@ -17,6 +17,10 @@ from services.success_readiness_kpi_engine import (
     overall_score,
     pillar_score,
 )
+from services.success_readiness_kpi_actions import (
+    owner_role_for_kpi,
+    primary_action_for_kpi,
+)
 from services.success_readiness_models import PILLAR_WEIGHTS, kpi_by_id
 from services.success_readiness_registers import (
     create_register_entry,
@@ -147,8 +151,8 @@ async def get_ai_recommendations(user: dict) -> Dict[str, Any]:
             "rationale": f"Current score {kpi.get('score')}% vs target {kpi.get('target')}%",
             "estimated_impact": min(15, max(2, gap // 2)),
             "evidence": kpi.get("auto_detail") or {},
-            "recommended_action": _recommended_action_for_kpi(kpi["id"]),
-            "responsible_role": _owner_role_for_pillar(kpi.get("pillar")),
+            "recommended_action": primary_action_for_kpi(kpi["id"]),
+            "responsible_role": owner_role_for_kpi(kpi["id"], kpi.get("pillar")),
         })
     return {
         "recommendations": recommendations,
@@ -182,30 +186,6 @@ async def update_configuration(user: dict, payload: dict) -> Dict[str, Any]:
     query = merge_tenant_filter({"type": "success_readiness_config"}, user)
     await db.success_readiness_config.update_one(query, {"$set": doc}, upsert=True)
     return await get_configuration(user)
-
-
-def _recommended_action_for_kpi(kpi_id: str) -> str:
-    actions = {
-        "training_completion": "Schedule refresher training for outstanding users.",
-        "champion_program": "Assign an AssetIQ champion for each department.",
-        "governance_maturity": "Complete the monthly governance checklist.",
-        "procedure_coverage": "Update SOPs to reference AssetIQ workflows.",
-        "infrastructure_readiness": "Complete the infrastructure readiness review.",
-        "user_adoption": "Run a short adoption campaign for inactive users.",
-        "core_data_readiness": "Complete equipment hierarchy and criticality data.",
-        "workflow_adoption": "Close the loop from observations to actions.",
-    }
-    return actions.get(kpi_id, "Review KPI evidence and assign an improvement owner.")
-
-
-def _owner_role_for_pillar(pillar: Optional[str]) -> str:
-    if pillar == "people":
-        return "admin"
-    if pillar == "process":
-        return "reliability_engineer"
-    if pillar == "technology":
-        return "admin"
-    return "admin"
 
 
 def _iso_now() -> str:

@@ -1,5 +1,9 @@
 import { Fragment } from "react";
+import { Link } from "react-router-dom";
+import { ArrowRight, Info } from "lucide-react";
 import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
 import { STATUS_LABELS, STATUS_STYLES, PULSE_STATUS_LABELS, PULSE_STATUS_STYLES } from "../config/nav";
 
 export function KpiStatusBadge({ status }) {
@@ -45,6 +49,63 @@ export function PulseStatusBadge({ status }) {
   );
 }
 
+function KpiImprovementInfo({ kpi }) {
+  const actions = kpi?.improvement_actions || [];
+  if (!actions.length) return null;
+
+  const gap =
+    kpi.score != null && kpi.target != null && kpi.score < kpi.target
+      ? kpi.target - kpi.score
+      : null;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 text-slate-400 hover:text-blue-600"
+          aria-label={`How to improve ${kpi.name}`}
+          data-testid={`kpi-improvement-info-${kpi.id}`}
+        >
+          <Info className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-0">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <p className="text-sm font-semibold text-slate-900">Improve {kpi.name}</p>
+          {gap != null && (
+            <p className="mt-1 text-xs text-amber-700">
+              {gap} points below target ({kpi.score}% vs {kpi.target}%)
+            </p>
+          )}
+          {kpi.status === "on_track" && gap == null && (
+            <p className="mt-1 text-xs text-emerald-700">On track — maintain with the actions below.</p>
+          )}
+        </div>
+        <ul className="max-h-72 overflow-y-auto py-2">
+          {actions.map((action, index) => (
+            <li key={`${kpi.id}-action-${index}`} className="px-4 py-2.5 hover:bg-slate-50">
+              <p className="text-sm font-medium text-slate-900">{action.label}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{action.description}</p>
+              {action.path && (
+                <Link
+                  to={action.path}
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
+                >
+                  Go to action
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function KpiTable({ kpis }) {
   if (!kpis?.length) {
     return <p className="text-sm text-slate-500">No KPIs available.</p>;
@@ -69,8 +130,13 @@ export function KpiTable({ kpis }) {
             <Fragment key={kpi.id}>
             <tr className="bg-white">
               <td className="px-4 py-3">
-                <div className="font-medium text-slate-900">{kpi.name}</div>
-                <div className="text-xs text-slate-500">{kpi.description}</div>
+                <div className="flex items-start gap-1">
+                  <div className="min-w-0">
+                    <div className="font-medium text-slate-900">{kpi.name}</div>
+                    <div className="text-xs text-slate-500">{kpi.description}</div>
+                  </div>
+                  <KpiImprovementInfo kpi={kpi} />
+                </div>
               </td>
               <td className="px-4 py-3 tabular-nums">{kpi.score == null ? "—" : `${kpi.score}%`}</td>
               <td className="px-4 py-3 tabular-nums">{kpi.target}%</td>
