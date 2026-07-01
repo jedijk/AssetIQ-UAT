@@ -1,26 +1,62 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
 import { Textarea } from "../../../components/ui/textarea";
 import { successReadinessAPI } from "../../../lib/apis/successReadiness";
 import { SuccessReadinessLoading } from "../components/SuccessReadinessLayout";
 import { KpiStatusBadge, ScoreDisplay } from "../components/SuccessReadinessShared";
 
+function FieldIntentInfo({ field }) {
+  if (!field?.intent) return null;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0 text-slate-400 hover:text-blue-600"
+          aria-label={`Why we ask: ${field.label}`}
+          data-testid={`assessment-field-intent-${field.id}`}
+        >
+          <Info className="h-3.5 w-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 text-sm">
+        <p className="font-medium text-slate-900">{field.label}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{field.intent}</p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function FieldLabel({ field }) {
+  return (
+    <div className="mb-1 flex items-center gap-0.5">
+      <Label className="text-xs">{field.label}</Label>
+      <FieldIntentInfo field={field} />
+    </div>
+  );
+}
+
 function AssessmentField({ field, value, onChange }) {
   if (field.type === "yes_no") {
     return (
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <input
           type="checkbox"
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
-          className="h-4 w-4"
+          className="h-4 w-4 shrink-0"
         />
         <span className="text-sm text-slate-700">{field.label}</span>
+        <FieldIntentInfo field={field} />
       </div>
     );
   }
@@ -28,22 +64,22 @@ function AssessmentField({ field, value, onChange }) {
   if (field.type === "comment") {
     return (
       <div>
-        <Label className="text-xs">{field.label}</Label>
-        <Textarea value={value || ""} onChange={(e) => onChange(e.target.value)} className="mt-1" />
+        <FieldLabel field={field} />
+        <Textarea value={value || ""} onChange={(e) => onChange(e.target.value)} />
       </div>
     );
   }
 
   return (
     <div>
-      <Label className="text-xs">{field.label}</Label>
+      <FieldLabel field={field} />
       <Input
         type={field.type === "number" || field.type === "percentage" ? "number" : "text"}
         min={field.type === "percentage" ? 0 : undefined}
         max={field.type === "percentage" ? 100 : undefined}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 h-9"
+        className="h-9"
       />
     </div>
   );

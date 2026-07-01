@@ -3,9 +3,9 @@ import { Database, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../../../components/ui/button";
 import { successReadinessAPI } from "../../../lib/apis/successReadiness";
-import { PILLAR_LABELS, PILLAR_WEIGHTS } from "../config/nav";
 import { SuccessReadinessLoading } from "../components/SuccessReadinessLayout";
-import { KpiTable, PillarCard, ScoreDisplay } from "../components/SuccessReadinessShared";
+import { KpiTable, ScoreDisplay } from "../components/SuccessReadinessShared";
+import { SuccessReadinessSnowflakeGrid } from "../components/SuccessReadinessSnowflake";
 
 export default function SuccessReadinessDashboardPage() {
   const queryClient = useQueryClient();
@@ -64,15 +64,12 @@ export default function SuccessReadinessDashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Object.entries(PILLAR_LABELS).map(([key, label]) => (
-          <PillarCard
-            key={key}
-            title={label}
-            weight={PILLAR_WEIGHTS[key]}
-            score={pillars[key]?.score}
-          />
-        ))}
+      <div>
+        <h2 className="text-base font-semibold text-slate-900 mb-1">Readiness snowflake</h2>
+        <p className="text-sm text-slate-500 mb-4">
+          KPI scores per segment — People, Process, and Technology.
+        </p>
+        <SuccessReadinessSnowflakeGrid kpis={data?.kpis} pillars={pillars} />
       </div>
 
       {data?.generated_at && (

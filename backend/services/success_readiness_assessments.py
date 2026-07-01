@@ -15,10 +15,30 @@ ASSESSMENT_TEMPLATES: List[Dict[str, Any]] = [
         "kpi_ids": ["training_completion"],
         "frequency": "quarterly",
         "fields": [
-            {"id": "required_users", "label": "Required users", "type": "number"},
-            {"id": "trained_users", "label": "Users trained", "type": "number"},
-            {"id": "refresh_overdue", "label": "Training refresh overdue", "type": "number"},
-            {"id": "notes", "label": "Notes", "type": "comment"},
+            {
+                "id": "required_users",
+                "label": "Required users",
+                "type": "number",
+                "intent": "Count users who must complete AssetIQ training for their role before go-live or ongoing operations.",
+            },
+            {
+                "id": "trained_users",
+                "label": "Users trained",
+                "type": "number",
+                "intent": "Users who have completed all required training modules and are cleared to work in AssetIQ.",
+            },
+            {
+                "id": "refresh_overdue",
+                "label": "Training refresh overdue",
+                "type": "number",
+                "intent": "Users whose training has expired or is past the refresh due date. Each overdue user reduces the score.",
+            },
+            {
+                "id": "notes",
+                "label": "Notes",
+                "type": "comment",
+                "intent": "Capture gaps, planned sessions, or roles still waiting on training assignment.",
+            },
         ],
     },
     {
@@ -28,11 +48,36 @@ ASSESSMENT_TEMPLATES: List[Dict[str, Any]] = [
         "kpi_ids": ["governance_maturity"],
         "frequency": "monthly",
         "fields": [
-            {"id": "daily_standup", "label": "Daily operational stand-up held", "type": "yes_no"},
-            {"id": "weekly_planning", "label": "Weekly planning meeting held", "type": "yes_no"},
-            {"id": "monthly_reliability", "label": "Monthly reliability review held", "type": "yes_no"},
-            {"id": "quarterly_management", "label": "Quarterly management review held", "type": "yes_no"},
-            {"id": "notes", "label": "Comments", "type": "comment"},
+            {
+                "id": "daily_standup",
+                "label": "Daily operational stand-up held",
+                "type": "yes_no",
+                "intent": "Confirms a short daily forum exists to review priorities, blockers, and AssetIQ usage.",
+            },
+            {
+                "id": "weekly_planning",
+                "label": "Weekly planning meeting held",
+                "type": "yes_no",
+                "intent": "Checks that work is planned weekly with reliability and operations aligned on AssetIQ tasks.",
+            },
+            {
+                "id": "monthly_reliability",
+                "label": "Monthly reliability review held",
+                "type": "yes_no",
+                "intent": "Validates monthly review of failures, observations, and improvement actions in AssetIQ.",
+            },
+            {
+                "id": "quarterly_management",
+                "label": "Quarterly management review held",
+                "type": "yes_no",
+                "intent": "Ensures leadership reviews readiness trends, KPIs, and major adoption risks each quarter.",
+            },
+            {
+                "id": "notes",
+                "label": "Comments",
+                "type": "comment",
+                "intent": "Record meeting gaps, attendance issues, or actions to restore governance cadence.",
+            },
         ],
     },
     {
@@ -42,9 +87,24 @@ ASSESSMENT_TEMPLATES: List[Dict[str, Any]] = [
         "kpi_ids": ["procedure_coverage"],
         "frequency": "annual",
         "fields": [
-            {"id": "procedures_reviewed", "label": "Procedures reviewed", "type": "number"},
-            {"id": "procedures_updated", "label": "Updated for AssetIQ", "type": "number"},
-            {"id": "notes", "label": "Notes", "type": "comment"},
+            {
+                "id": "procedures_reviewed",
+                "label": "Procedures reviewed",
+                "type": "number",
+                "intent": "Total critical operating procedures assessed during this review cycle.",
+            },
+            {
+                "id": "procedures_updated",
+                "label": "Updated for AssetIQ",
+                "type": "number",
+                "intent": "Procedures revised to reference AssetIQ workflows, forms, or data instead of offline steps.",
+            },
+            {
+                "id": "notes",
+                "label": "Notes",
+                "type": "comment",
+                "intent": "List procedures still pending update or needing SME review.",
+            },
         ],
     },
     {
@@ -54,12 +114,42 @@ ASSESSMENT_TEMPLATES: List[Dict[str, Any]] = [
         "kpi_ids": ["infrastructure_readiness"],
         "frequency": "quarterly",
         "fields": [
-            {"id": "connectivity", "label": "Reliable internet connectivity", "type": "yes_no"},
-            {"id": "wifi", "label": "Adequate Wi-Fi coverage", "type": "yes_no"},
-            {"id": "mobile_devices", "label": "Mobile devices available", "type": "yes_no"},
-            {"id": "authentication", "label": "Authentication configured", "type": "yes_no"},
-            {"id": "browser_compat", "label": "Browser compatibility verified", "type": "yes_no"},
-            {"id": "notes", "label": "Notes", "type": "comment"},
+            {
+                "id": "connectivity",
+                "label": "Reliable internet connectivity",
+                "type": "yes_no",
+                "intent": "Field and office locations have stable internet for AssetIQ web and mobile access.",
+            },
+            {
+                "id": "wifi",
+                "label": "Adequate Wi-Fi coverage",
+                "type": "yes_no",
+                "intent": "Wi-Fi reaches work areas where technicians and operators use mobile AssetIQ.",
+            },
+            {
+                "id": "mobile_devices",
+                "label": "Mobile devices available",
+                "type": "yes_no",
+                "intent": "Suitable phones or tablets are issued to users who need mobile workflows.",
+            },
+            {
+                "id": "authentication",
+                "label": "Authentication configured",
+                "type": "yes_no",
+                "intent": "SSO or secure login is configured so users can access AssetIQ without shared credentials.",
+            },
+            {
+                "id": "browser_compat",
+                "label": "Browser compatibility verified",
+                "type": "yes_no",
+                "intent": "Supported browsers are tested on standard client devices used in daily operations.",
+            },
+            {
+                "id": "notes",
+                "label": "Notes",
+                "type": "comment",
+                "intent": "Document infrastructure gaps, planned upgrades, or sites blocked from rollout.",
+            },
         ],
     },
     {
@@ -69,12 +159,57 @@ ASSESSMENT_TEMPLATES: List[Dict[str, Any]] = [
         "kpi_ids": ["change_readiness"],
         "frequency": "quarterly",
         "fields": [
-            {"id": "leadership_alignment", "label": "Leadership alignment", "type": "percentage"},
-            {"id": "user_confidence", "label": "User confidence", "type": "percentage"},
-            {"id": "notes", "label": "Notes", "type": "comment"},
+            {
+                "id": "leadership_alignment",
+                "label": "Leadership alignment",
+                "type": "percentage",
+                "intent": "How aligned sponsors and managers are on rollout goals, priorities, and resourcing (0–100%).",
+            },
+            {
+                "id": "user_confidence",
+                "label": "User confidence",
+                "type": "percentage",
+                "intent": "How confident frontline users feel using AssetIQ in daily work without extra support (0–100%).",
+            },
+            {
+                "id": "notes",
+                "label": "Notes",
+                "type": "comment",
+                "intent": "Capture resistance themes, communication needs, or support actions before the next milestone.",
+            },
         ],
     },
 ]
+
+
+def _template_by_id(template_id: str) -> Optional[Dict[str, Any]]:
+    for template in ASSESSMENT_TEMPLATES:
+        if template["template_id"] == template_id:
+            return template
+    return None
+
+
+def _merge_field_metadata(assessment: Dict[str, Any]) -> Dict[str, Any]:
+    """Enrich stored fields with latest template labels and intent text."""
+    template = _template_by_id(assessment.get("template_id") or "")
+    if not template:
+        return assessment
+
+    template_fields = {field["id"]: field for field in template.get("fields") or []}
+    merged_fields = []
+    for field in assessment.get("fields") or []:
+        template_field = template_fields.get(field.get("id"))
+        merged = dict(field)
+        if template_field:
+            merged["label"] = template_field.get("label", merged.get("label"))
+            merged["type"] = template_field.get("type", merged.get("type"))
+            if template_field.get("intent"):
+                merged["intent"] = template_field["intent"]
+        merged_fields.append(merged)
+
+    result = dict(assessment)
+    result["fields"] = merged_fields
+    return result
 
 
 def _now_iso() -> str:
@@ -156,7 +291,7 @@ async def list_assessments(user: dict) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     async for doc in cursor:
         doc["id"] = str(doc.pop("_id"))
-        rows.append(doc)
+        rows.append(_merge_field_metadata(doc))
     return rows
 
 
@@ -192,4 +327,4 @@ async def submit_assessment(user: dict, assessment_id: str, payload: dict) -> Op
     if not result:
         return None
     result["id"] = str(result.pop("_id"))
-    return result
+    return _merge_field_metadata(result)
