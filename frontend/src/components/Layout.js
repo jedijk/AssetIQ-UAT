@@ -10,6 +10,8 @@ import { useRolePreview } from "../contexts/RolePreviewContext";
 import RolePreviewBanner from "./layout/RolePreviewBanner";
 import RolePreviewDialog from "./layout/RolePreviewDialog";
 import TenantSwitchBanner from "./layout/TenantSwitchBanner";
+import EquipmentUnitFilterBanner from "./layout/EquipmentUnitFilterBanner";
+import DisciplineFilterBanner from "./layout/DisciplineFilterBanner";
 import TenantSwitcherDialog from "./layout/TenantSwitcherDialog";
 import { getActiveTenantId, getActiveTenantName } from "../lib/activeTenant";
 import { getBackendUrl } from "../lib/apiConfig";
@@ -590,6 +592,7 @@ const Layout = () => {
   return (
     <div className="app-container">
       {/* Header */}
+      <div className="shrink-0">
       <LayoutHeader
         isOperatorActive={isOperatorActive}
         mobileMenuOpen={mobileMenuOpen}
@@ -627,9 +630,14 @@ const Layout = () => {
         dismissedNotifications={dismissedNotifications}
         setDismissedNotifications={setDismissedNotifications}
       />
+      </div>
 
+      <div className="shrink-0">
       <RolePreviewBanner t={t} />
       <TenantSwitchBanner t={t} activeTenantLabel={activeTenantLabel} />
+      <EquipmentUnitFilterBanner />
+      <DisciplineFilterBanner />
+      </div>
       <RolePreviewDialog
         open={rolePreviewDialogOpen}
         onOpenChange={setRolePreviewDialogOpen}
@@ -643,16 +651,16 @@ const Layout = () => {
 
 
       {/* Main Layout with Sidebar */}
-      <div className={`flex h-[calc(100dvh-var(--app-header-offset))] ${isResizing ? 'select-none cursor-col-resize' : ''}`}>
+      <div className={`flex flex-1 min-h-0 ${isResizing ? 'select-none cursor-col-resize' : ''}`}>
         {/* Equipment Hierarchy Sidebar - Desktop */}
         {hierarchyOpen && (
           <>
             <div 
-              className="hidden lg:block flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+              className="hidden lg:block flex-shrink-0 h-full min-h-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
               data-testid="hierarchy-sidebar"
               style={{ width: `${hierarchyWidth}px` }}
             >
-              <div className="sticky top-12 h-[calc(100vh-48px)]">
+              <div className="h-full min-h-0">
                 <EquipmentHierarchy 
                   isOpen={true} 
                   onClose={() => setHierarchyOpen(false)}

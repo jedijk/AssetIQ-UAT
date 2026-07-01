@@ -20,9 +20,7 @@ async def _scoped_equipment_ids(user: dict) -> Set[str]:
     installation_ids = await installation_filter.get_user_installation_ids(user)
     if not installation_ids:
         return set()
-    return await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, user.get("id")
-    )
+    return await installation_filter.get_scoped_equipment_ids(user)
 
 
 async def compute_analytics_dashboard(user: dict) -> Dict[str, Any]:

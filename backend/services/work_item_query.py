@@ -92,6 +92,17 @@ async def fetch_work_items(
         discipline_match = case_insensitive_contains(discipline)
         if discipline_match:
             query["discipline"] = discipline_match
+    else:
+        from services.discipline_filter import discipline_filter_values
+
+        header_values = discipline_filter_values(user)
+        if header_values:
+            if len(header_values) == 1:
+                discipline_match = case_insensitive_contains(header_values[0])
+                if discipline_match:
+                    query["discipline"] = discipline_match
+            else:
+                query["discipline"] = {"$in": header_values}
 
     if filter_name == "open":
         query["status"] = {"$in": ["pending", "in_progress"]}

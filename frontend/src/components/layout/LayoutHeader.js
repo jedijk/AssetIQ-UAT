@@ -17,6 +17,8 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import LayoutNotificationsMenu from "./LayoutNotificationsMenu";
+import EquipmentUnitFilterSelect from "./EquipmentUnitFilterSelect";
+import DisciplineFilterSelect from "./DisciplineFilterSelect";
 
 const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.7";
 
@@ -149,6 +151,14 @@ export default function LayoutHeader({
               </span>
             </div>
 
+            {/* Equipment unit filter — global scope */}
+            {!isOperatorActive && (
+              <div className="hidden sm:flex shrink-0 items-center gap-1">
+                <EquipmentUnitFilterSelect />
+                <DisciplineFilterSelect />
+              </div>
+            )}
+
             {/* Desktop Navigation - Scrollable on smaller screens */}
             <nav className="hidden md:flex items-center gap-0.5 overflow-x-auto scrollbar-hide max-w-[calc(100vw-400px)]" data-testid="desktop-nav">
               {navItems.map((item) => (
@@ -187,6 +197,12 @@ export default function LayoutHeader({
 
           {/* Right Side - packed cluster, never grows/shrinks into logo */}
           <div className="flex items-center flex-nowrap shrink-0 ml-auto gap-0.5 sm:gap-1 md:gap-2">
+            {!isOperatorActive && (
+              <div className="sm:hidden shrink-0 flex items-center gap-0.5">
+                <EquipmentUnitFilterSelect compact />
+                <DisciplineFilterSelect compact />
+              </div>
+            )}
             <LayoutNotificationsMenu
               open={openHeaderMenu === "notifications"}
               onOpenChange={(open) => setOpenHeaderMenu(open ? "notifications" : null)}

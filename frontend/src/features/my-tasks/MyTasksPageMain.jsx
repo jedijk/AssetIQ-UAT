@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/AuthContext";
 import { useEffectiveRole } from "../../contexts/RolePreviewContext";
+import { useDisciplineFilterOptional } from "../../contexts/DisciplineFilterContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { taskPriorityRank } from "./myTasksShared";
 import { AdhocPlanCardContent, SortableAdhocPlanCard } from "./AdhocPlanCard";
@@ -139,6 +140,8 @@ export default function MyTasksPage() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { effectiveRole } = useEffectiveRole();
+  const globalDisciplineFilter = useDisciplineFilterOptional();
+  const globalDisciplineActive = Boolean(globalDisciplineFilter?.isActive);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const invalidateTaskListQueries = useCallback(() => {
@@ -355,7 +358,18 @@ export default function MyTasksPage() {
     return `${getDisciplineLabel(selectedDisciplines[0])} +${selectedDisciplines.length - 1}`;
   };
 
-  const matchesDisciplineFilter = (item) => itemMatchesDisciplines(item, selectedDisciplines);
+  const matchesDisciplineFilter = (item) =>
+    globalDisciplineActive
+      ? globalDisciplineFilter.matchesItem(item)
+      : itemMatchesDisciplines(item, selectedDisciplines);
+
+  const filterDisciplines = globalDisciplineActive
+    ? globalDisciplineFilter.selectedDisciplineIds
+    : selectedDisciplines;
+
+  const apiDisciplineParam = globalDisciplineActive
+    ? undefined
+    : getApiDisciplineParam(selectedDisciplines);
 
   // Seed discipline filter from saved preference or role-based defaults (shared with operator landing).
   useEffect(() => {
@@ -367,13 +381,13 @@ export default function MyTasksPage() {
   
   // Fetch tasks with offline caching
   const { data: tasksData, isLoading: tasksLoading, error: tasksError, refetch: refetchTasks } = useQuery({
-    queryKey: queryKeys.myTasks.list(activeFilter, selectedDate, selectedDisciplines),
+    queryKey: queryKeys.myTasks.list(activeFilter, selectedDate, filterDisciplines),
     queryFn: async () => {
       try {
         const data = await myTasksAPI.getTasks({
           filter: activeFilter,
           date: activeFilter === "open" ? format(selectedDate, "yyyy-MM-dd") : undefined,
-          discipline: getApiDisciplineParam(selectedDisciplines),
+          discipline: apiDisciplineParam,
         });
         // Cache tasks for offline access
         if (data?.tasks) {
@@ -588,14 +602,14 @@ export default function MyTasksPage() {
   // Per-tab counts (respect discipline filter selection)
   const filterCountQueries = useQueries({
     queries: ["open", "overdue", "recurring"].map((filter) => ({
-      queryKey: queryKeys.myTasks.filterCount(filter, selectedDisciplines, selectedDate, user?.id),
+      queryKey: queryKeys.myTasks.filterCount(filter, filterDisciplines, selectedDate, user?.id),
       queryFn: async () => {
         const data = await myTasksAPI.getTasks({
           filter,
           date: filter === "open" ? format(selectedDate, "yyyy-MM-dd") : undefined,
-          discipline: getApiDisciplineParam(selectedDisciplines),
+          discipline: apiDisciplineParam,
         });
-        return filterActiveWorkItems(data.tasks, selectedDisciplines).length;
+        return filterActiveWorkItems(data.tasks, filterDisciplines).length;
       },
       enabled: !!user && activeFilter !== filter && secondaryQueriesEnabled,
       staleTime: 30000,
@@ -604,8 +618,8 @@ export default function MyTasksPage() {
 
   const activeTabCount = useMemo(() => {
     if (!tasksData?.tasks || activeFilter === "adhoc") return undefined;
-    return filterActiveWorkItems(tasksData.tasks, selectedDisciplines).length;
-  }, [tasksData, selectedDisciplines, activeFilter]);
+    return filterActiveWorkItems(tasksData.tasks, filterDisciplines).length;
+  }, [tasksData, filterDisciplines, activeFilter]);
 
   const filterCounts = {
     open:
@@ -734,7 +748,7 @@ export default function MyTasksPage() {
       return false;
     }
     // Apply discipline filter (API only handles single discipline param)
-    if (selectedDisciplines.length > 0 && !matchesDisciplineFilter(task)) {
+    if (filterDisciplines.length > 0 && !matchesDisciplineFilter(task)) {
       return false;
     }
     // Apply search filter
@@ -935,6 +949,7 @@ export default function MyTasksPage() {
         clearDisciplineFilter={clearDisciplineFilter}
         disciplines={disciplines}
         toggleDiscipline={toggleDiscipline}
+        hideDisciplineFilter={globalDisciplineActive}
         selectedDate={selectedDate}
         setSelectedDate={setSelectedDate}
         isManualSort={isManualSort}

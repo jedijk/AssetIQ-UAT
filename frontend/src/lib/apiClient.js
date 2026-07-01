@@ -3,6 +3,7 @@ import { getApiUrl, getBackendUrl, AUTH_MODE, getCsrfToken, setCsrfToken } from 
 import { debugLog } from "./debug";
 import { getDatabaseEnvironment } from "./databaseEnv";
 import { getActiveTenantId } from "./activeTenant";
+import { getGlobalScopeFilterHeaders } from "./disciplineFilter";
 import { isPublicKioskPath } from "./publicRoutes";
 
 // Get API URL at initialization for static uses
@@ -19,6 +20,7 @@ function applyCookieAuthHeaders(config) {
   if (dbEnv) config.headers["X-Database-Environment"] = dbEnv;
   const activeTenant = getActiveTenantId();
   if (activeTenant) config.headers["X-Active-Tenant"] = activeTenant;
+  Object.assign(config.headers, getGlobalScopeFilterHeaders(activeTenant));
   return config;
 }
 
@@ -32,6 +34,7 @@ function buildSessionCheckHeaders() {
   if (dbEnv) headers["X-Database-Environment"] = dbEnv;
   const activeTenant = getActiveTenantId();
   if (activeTenant) headers["X-Active-Tenant"] = activeTenant;
+  Object.assign(headers, getGlobalScopeFilterHeaders(activeTenant));
   return headers;
 }
 
@@ -191,6 +194,7 @@ api.interceptors.request.use((config) => {
     if (activeTenant) {
       config.headers["X-Active-Tenant"] = activeTenant;
     }
+    Object.assign(config.headers, getGlobalScopeFilterHeaders(activeTenant));
   } else {
     applyCookieAuthHeaders(config);
   }
@@ -262,6 +266,7 @@ aiApi.interceptors.request.use((config) => {
     if (activeTenant) {
       config.headers["X-Active-Tenant"] = activeTenant;
     }
+    Object.assign(config.headers, getGlobalScopeFilterHeaders(activeTenant));
   } else {
     applyCookieAuthHeaders(config);
   }

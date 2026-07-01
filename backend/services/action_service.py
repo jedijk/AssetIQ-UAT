@@ -226,12 +226,8 @@ async def list_all_actions(
     if not installation_ids:
         return empty
 
-    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, current_user["id"]
-    )
-    equipment_names = await installation_filter.get_equipment_names_for_installations(
-        installation_ids, current_user["id"]
-    )
+    equipment_ids = await installation_filter.get_scoped_equipment_ids(current_user)
+    equipment_names = await installation_filter.get_scoped_equipment_names(current_user)
     threat_ids = await installation_filter.get_filtered_threat_ids(
         current_user["id"], equipment_ids, equipment_names
     )
@@ -244,6 +240,10 @@ async def list_all_actions(
     )
     if query.get("_impossible"):
         return empty
+
+    from services.discipline_filter import apply_discipline_filter_to_query
+
+    query = apply_discipline_filter_to_query(query, current_user)
 
     if status and status != "all":
         query["status"] = status
@@ -309,6 +309,7 @@ async def list_all_actions(
         stats = empty["stats"]
     else:
         base_stats_query = merge_tenant_filter(base_stats_query, current_user)
+        base_stats_query = apply_discipline_filter_to_query(base_stats_query, current_user)
         stats = await _action_repo.aggregate_stats(
             base_stats_query,
             user=current_user,

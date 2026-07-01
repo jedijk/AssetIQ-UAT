@@ -30,9 +30,7 @@ async def _fetch_scoped_equipment_nodes(current_user: dict) -> List[dict]:
     installation_ids = await installation_filter.get_user_installation_ids(current_user)
     if not installation_ids:
         return []
-    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, current_user["id"]
-    )
+    equipment_ids = await installation_filter.get_scoped_equipment_ids(current_user)
     if not equipment_ids:
         return []
     return await db.equipment_nodes.find(
@@ -57,18 +55,18 @@ async def _fetch_scoped_observations(current_user: dict) -> List[dict]:
         return []
 
     equipment_ids, equipment_names = await asyncio.gather(
-        installation_filter.get_all_equipment_ids_for_installations(
-            installation_ids, user_id
-        ),
-        installation_filter.get_equipment_names_for_installations(
-            installation_ids, user_id
-        ),
+        installation_filter.get_scoped_equipment_ids(current_user),
+        installation_filter.get_scoped_equipment_names(current_user),
     )
     query = installation_filter.build_threat_filter(
         user_id, equipment_ids, equipment_names
     )
     if query.get("_impossible"):
         return []
+
+    from services.discipline_filter import apply_discipline_filter_to_query
+
+    query = apply_discipline_filter_to_query(query, current_user)
 
     return await db.threats.find(
         merge_tenant_filter(query, current_user),

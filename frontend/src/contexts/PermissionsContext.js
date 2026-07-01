@@ -71,7 +71,19 @@ const FEATURE_PATHS = {
     "/settings/onboarding",
     "/settings/company",
     "/settings/maintenance-readiness",
+    "/settings/success-readiness",
     "/settings/tenant-management",
+  ],
+  success_readiness: [
+    "/settings/success-readiness",
+    "/settings/success-readiness/people",
+    "/settings/success-readiness/process",
+    "/settings/success-readiness/technology",
+    "/settings/success-readiness/assessments",
+    "/settings/success-readiness/evidence",
+    "/settings/success-readiness/history",
+    "/settings/success-readiness/ai-recommendations",
+    "/settings/success-readiness/configuration",
   ],
 };
 

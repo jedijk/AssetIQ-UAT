@@ -17,6 +17,8 @@ from repositories.threat_repository import ThreatRepository
 from services.cache_service import cache
 from services.equipment_type_registry import equipment_type_id_set
 from services.tenant_schema import merge_tenant_filter, tenant_id_from_user
+from services.equipment_unit_filter import equipment_unit_filter_cache_suffix
+from services.discipline_filter import discipline_filter_cache_suffix
 
 _threat_repo = ThreatRepository(db)
 _equipment_repo = EquipmentRepository(db)
@@ -34,7 +36,7 @@ _EMPTY = {
 async def get_threat_summary_stats(current_user: dict) -> Dict[str, Any]:
     user_id = current_user["id"]
     tenant_key = tenant_id_from_user(current_user) or "legacy"
-    cache_key = f"stats:{tenant_key}:{user_id}"
+    cache_key = f"stats:{tenant_key}:{user_id}{equipment_unit_filter_cache_suffix(current_user)}{discipline_filter_cache_suffix(current_user)}"
 
     cached = cache.get_stat_entry(cache_key)
     if cached:
@@ -45,16 +47,15 @@ async def get_threat_summary_stats(current_user: dict) -> Dict[str, Any]:
         cache.set_stats(cache_key, _EMPTY)
         return _EMPTY
 
-    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, user_id
-    )
-    equipment_names = await installation_filter.get_equipment_names_for_installations(
-        installation_ids, user_id
-    )
+    equipment_ids = await installation_filter.get_scoped_equipment_ids(current_user)
+    equipment_names = await installation_filter.get_scoped_equipment_names(current_user)
 
     base_filter = installation_filter.build_threat_filter(
         user_id, equipment_ids, equipment_names
     )
+    from services.discipline_filter import apply_discipline_filter_to_query
+
+    base_filter = apply_discipline_filter_to_query(base_filter, current_user)
     base_filter = merge_tenant_filter(base_filter, current_user)
 
     if base_filter.get("_impossible"):

@@ -26,6 +26,7 @@ DEFAULT_PERMISSIONS = {
         "feedback": {"read": True, "write": True, "delete": True},
         "users": {"read": True, "write": True, "delete": True},
         "settings": {"read": True, "write": True, "delete": True},
+        "success_readiness": {"read": True, "write": True, "delete": True},
     },
     "admin": {
         "observations": {"read": True, "write": True, "delete": True},
@@ -50,6 +51,7 @@ DEFAULT_PERMISSIONS = {
         "feedback": {"read": True, "write": True, "delete": True},
         "users": {"read": True, "write": True, "delete": False},
         "settings": {"read": True, "write": False, "delete": False},
+        "success_readiness": {"read": True, "write": True, "delete": False},
     },
     "reliability_engineer": {
         "observations": {"read": True, "write": True, "delete": True},
@@ -74,6 +76,7 @@ DEFAULT_PERMISSIONS = {
         "feedback": {"read": True, "write": True, "delete": False},
         "users": {"read": True, "write": False, "delete": False},
         "settings": {"read": True, "write": False, "delete": False},
+        "success_readiness": {"read": True, "write": True, "delete": False},
     },
     "maintenance": {
         "observations": {"read": True, "write": True, "delete": False},
@@ -98,6 +101,7 @@ DEFAULT_PERMISSIONS = {
         "feedback": {"read": True, "write": True, "delete": False},
         "users": {"read": False, "write": False, "delete": False},
         "settings": {"read": False, "write": False, "delete": False},
+        "success_readiness": {"read": True, "write": False, "delete": False},
     },
     "operations": {
         "observations": {"read": True, "write": True, "delete": False},
@@ -122,6 +126,7 @@ DEFAULT_PERMISSIONS = {
         "feedback": {"read": True, "write": True, "delete": False},
         "users": {"read": False, "write": False, "delete": False},
         "settings": {"read": False, "write": False, "delete": False},
+        "success_readiness": {"read": True, "write": False, "delete": False},
     },
     "viewer": {
         "observations": {"read": True, "write": False, "delete": False},
@@ -146,6 +151,7 @@ DEFAULT_PERMISSIONS = {
         "feedback": {"read": True, "write": True, "delete": False},
         "users": {"read": False, "write": False, "delete": False},
         "settings": {"read": False, "write": False, "delete": False},
+        "success_readiness": {"read": True, "write": False, "delete": False},
     },
 }
 
@@ -242,6 +248,10 @@ FEATURES = {
     "settings": {
         "name": "Settings",
         "description": "Settings pages and system configuration"
+    },
+    "success_readiness": {
+        "name": "Success Readiness",
+        "description": "Customer success readiness dashboard, KPIs, and registers"
     },
 }
 

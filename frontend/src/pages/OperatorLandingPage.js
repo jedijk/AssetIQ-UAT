@@ -5,6 +5,7 @@ import { Building2, ClipboardCheck, Activity, AlertTriangle } from "lucide-react
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useEffectiveRole } from "../contexts/RolePreviewContext";
+import { useDisciplineFilterOptional } from "../contexts/DisciplineFilterContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { isMaintenanceSimpleMode } from "../lib/simpleModeProfile";
 import { myTasksAPI, preferencesAPI } from "../lib/api";
@@ -26,11 +27,11 @@ const haptic = () => {
   } catch {}
 };
 
-const fetchOpenTaskCount = async (selectedDisciplines) => {
+const fetchOpenTaskCount = async (selectedDisciplines, useHeaderDiscipline = false) => {
   const data = await myTasksAPI.getTasks({
     filter: "open",
     date: format(new Date(), "yyyy-MM-dd"),
-    discipline: getApiDisciplineParam(selectedDisciplines),
+    discipline: useHeaderDiscipline ? undefined : getApiDisciplineParam(selectedDisciplines),
   });
   return filterActiveWorkItems(data.tasks, selectedDisciplines).length;
 };
@@ -42,6 +43,9 @@ export default function OperatorLandingPage() {
   const { t } = useLanguage();
   const maintenanceProfile = isMaintenanceSimpleMode(effectiveRole || user?.role);
   
+  const globalDisciplineFilter = useDisciplineFilterOptional();
+  const globalDisciplineActive = Boolean(globalDisciplineFilter?.isActive);
+  
   // Fetch user preferences to get discipline filter
   const { data: preferences } = useQuery({
     queryKey: queryKeys.users.preferences(),
@@ -49,14 +53,22 @@ export default function OperatorLandingPage() {
     staleTime: 60000,
   });
   
-  const selectedDisciplines = useMemo(
-    () => resolveMyTasksDisciplines(effectiveRole || user?.role, preferences?.discipline),
-    [effectiveRole, user?.role, preferences?.discipline],
-  );
+  const selectedDisciplines = useMemo(() => {
+    if (globalDisciplineActive) {
+      return globalDisciplineFilter.selectedDisciplineIds;
+    }
+    return resolveMyTasksDisciplines(effectiveRole || user?.role, preferences?.discipline);
+  }, [
+    globalDisciplineActive,
+    globalDisciplineFilter?.selectedDisciplineIds,
+    effectiveRole,
+    user?.role,
+    preferences?.discipline,
+  ]);
 
   const { data: openCount } = useQuery({
     queryKey: queryKeys.myTasks.operatorCounts(selectedDisciplines, user?.id),
-    queryFn: () => fetchOpenTaskCount(selectedDisciplines),
+    queryFn: () => fetchOpenTaskCount(selectedDisciplines, globalDisciplineActive),
     enabled: !!user,
     refetchInterval: 30000,
     staleTime: 10000,

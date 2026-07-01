@@ -204,8 +204,13 @@ async def _validate_token(token: str, request: Optional[Request] = None) -> dict
                 detail="This organization is suspended or archived. Contact your platform administrator.",
             )
         from services.active_tenant import apply_active_tenant_override
+        from services.equipment_unit_filter import apply_equipment_unit_filter_to_user
 
-        return await apply_active_tenant_override(user, request)
+        user = await apply_active_tenant_override(user, request)
+        from services.discipline_filter import apply_discipline_filter_to_user
+
+        user = apply_equipment_unit_filter_to_user(user, request)
+        return apply_discipline_filter_to_user(user, request)
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:

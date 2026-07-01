@@ -71,6 +71,8 @@ import {
 import { queryKeys } from "../../../lib/queryKeys";
 import { resolveScheduledTaskRequiresDowntime } from "../../failure-modes/ActionDowntimeBadge";
 import { useLanguage } from "../../../contexts/LanguageContext";
+import { useEquipmentUnitFilterOptional } from "../../../contexts/EquipmentUnitFilterContext";
+import { useDisciplineFilterOptional } from "../../../contexts/DisciplineFilterContext";
 import { useBreadcrumbTab } from "../../../contexts/BreadcrumbContext";
 import { DashboardCards } from "./DashboardCards";
 import { TimelineView } from "./TimelineView";
@@ -124,6 +126,8 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
   const [selectedDisciplines, setSelectedDisciplines] = useState([]);
   const [disciplineFilterOpen, setDisciplineFilterOpen] = useState(false);
   const [sourceFilter, setSourceFilter] = useState("all");
+  const globalUnitFilter = useEquipmentUnitFilterOptional();
+  const globalDisciplineFilter = useDisciplineFilterOptional();
 
   const scheduleTabBreadcrumbLabel = useMemo(() => {
     const viewLabels = {
@@ -254,6 +258,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
   // Compute the set of equipment_ids included by the current Equipment Unit filter.
   // "" → return null (no filter); otherwise include the selected unit's id + all descendants.
   const filteredEquipmentIds = useMemo(() => {
+    if (globalUnitFilter?.isActive) return globalUnitFilter.filteredEquipmentIds;
     if (!selectedUnitId) return null;
     const childrenByParent = {};
     for (const n of allNodes) {
@@ -272,9 +277,12 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
       }
     }
     return included;
-  }, [selectedUnitId, allNodes]);
+  }, [globalUnitFilter, selectedUnitId, allNodes]);
 
   const matchesDisciplineFilter = useCallback((item) => {
+    if (globalDisciplineFilter?.isActive) {
+      return globalDisciplineFilter.matchesItem(item);
+    }
     if (selectedDisciplines.length === 0) return true;
     const disc = normalizeDiscipline(item?.discipline) || (item?.discipline || "").toLowerCase();
     if (!disc) return false;
@@ -282,7 +290,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
       const dl = d.toLowerCase();
       return disc === dl || disc.includes(dl) || dl.includes(disc);
     });
-  }, [selectedDisciplines]);
+  }, [globalDisciplineFilter, selectedDisciplines]);
 
   const filterTask = useCallback((task) => {
     if (!task) return false;
@@ -329,7 +337,8 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
   const filteredTimeline = useMemo(() => {
     if (!timeline) return timeline;
     const hasUnitFilter = !!filteredEquipmentIds;
-    const hasDisciplineFilter = selectedDisciplines.length > 0;
+    const hasDisciplineFilter =
+      Boolean(globalDisciplineFilter?.isActive) || selectedDisciplines.length > 0;
     const hasSourceFilter = sourceFilter !== "all";
     const hasThreadFilter = !!threadSelection;
     if (!hasUnitFilter && !hasDisciplineFilter && !hasSourceFilter && !hasThreadFilter) {
@@ -352,7 +361,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
       timeline: filterEquipmentList(timeline.timeline),
       equipment: filterEquipmentList(timeline.equipment),
     };
-  }, [timeline, filteredEquipmentIds, selectedDisciplines, sourceFilter, threadSelection, applyTaskListFilter]);
+  }, [timeline, filteredEquipmentIds, globalDisciplineFilter, selectedDisciplines, sourceFilter, threadSelection, applyTaskListFilter]);
 
   const filteredTasksList = useMemo(
     () => applyTaskListFilter(tasksData?.tasks),
@@ -721,6 +730,11 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
           <span className={SCHEDULE_FILTER_LABEL_CLASS}>
             {t("maintenance.equipmentUnit")}:
           </span>
+          {globalUnitFilter?.isActive ? (
+            <span className="text-xs text-blue-700 px-2">
+              {globalUnitFilter.selectedUnitIds.length} selected (header)
+            </span>
+          ) : (
           <div className={cn(SCHEDULE_FILTER_SHELL_CLASS, "w-72")}>
           <Popover open={unitFilterOpen} onOpenChange={setUnitFilterOpen} modal={false}>
             <PopoverTrigger asChild>
@@ -813,12 +827,18 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
             </PopoverContent>
           </Popover>
           </div>
+          )}
         </div>
 
         <div className={SCHEDULE_FILTER_GROUP_CLASS}>
           <span className={SCHEDULE_FILTER_LABEL_CLASS}>
             {t("maintenance.discipline")}:
           </span>
+          {globalDisciplineFilter?.isActive ? (
+            <span className="text-xs text-violet-700 px-2">
+              {globalDisciplineFilter.selectedDisciplineIds.length} selected (header)
+            </span>
+          ) : (
           <div className={cn(SCHEDULE_FILTER_SHELL_CLASS, "w-56")}>
           <Popover open={disciplineFilterOpen} onOpenChange={setDisciplineFilterOpen} modal={false}>
             <PopoverTrigger asChild>
@@ -894,6 +914,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
             </PopoverContent>
           </Popover>
           </div>
+          )}
         </div>
 
         <div className={SCHEDULE_FILTER_GROUP_CLASS}>

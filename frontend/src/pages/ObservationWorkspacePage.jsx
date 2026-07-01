@@ -420,11 +420,11 @@ const ObservationWorkspacePage = () => {
                           })
                         )
                       }
-                      className="lg:hidden text-[10px] text-slate-600 font-mono bg-slate-100 px-1.5 py-0.5 rounded hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer flex items-center gap-1"
+                      className="lg:hidden text-[10px] leading-none text-slate-600 font-mono bg-slate-100 px-1.5 py-px rounded hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer flex items-center gap-0.5"
                       title={t("observationWorkspace.clickToFindInHierarchy")}
                       data-testid="hero-equipment-tag"
                     >
-                      <Search className="w-2.5 h-2.5" />
+                      <Search className="w-2 h-2" />
                       {observation.equipment_tag}
                     </button>
                   )}

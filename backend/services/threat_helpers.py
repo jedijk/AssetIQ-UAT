@@ -163,14 +163,17 @@ async def _installation_scoped_threat_query(
     if not installation_ids:
         return None
     equipment_ids, equipment_names = await asyncio.gather(
-        installation_filter.get_all_equipment_ids_for_installations(installation_ids, user["id"]),
-        installation_filter.get_equipment_names_for_installations(installation_ids, user["id"]),
+        installation_filter.get_scoped_equipment_ids(user),
+        installation_filter.get_scoped_equipment_names(user),
     )
     query = installation_filter.build_threat_filter(
         user["id"], equipment_ids, equipment_names, additional_filters or {}
     )
     if query.get("_impossible"):
         return None
+    from services.discipline_filter import apply_discipline_filter_to_query
+
+    query = apply_discipline_filter_to_query(query, user)
     return merge_tenant_filter(query, user)
 
 

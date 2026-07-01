@@ -34,6 +34,7 @@ export function MyTasksPageHeader({
   clearDisciplineFilter,
   disciplines,
   toggleDiscipline,
+  hideDisciplineFilter = false,
   selectedDate,
   setSelectedDate,
   isManualSort,
@@ -73,7 +74,8 @@ export function MyTasksPageHeader({
               />
             </div>
             
-            {/* Discipline Filter — multi-select */}
+            {/* Discipline Filter — multi-select (hidden when global header filter is active) */}
+            {!hideDisciplineFilter && (
             <div className="relative">
               {disciplineDropdownOpen && (
                 <div
@@ -150,6 +152,7 @@ export function MyTasksPageHeader({
                 </div>
               )}
             </div>
+            )}
             
             {/* Date Picker - Desktop only */}
             <Popover>

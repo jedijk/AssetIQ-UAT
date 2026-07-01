@@ -578,10 +578,10 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
         {threat.equipment_tag && (
           <button
             onClick={() => handleTagClick(threat.equipment_tag)}
-            className="text-[10px] sm:text-xs text-slate-600 font-mono bg-slate-100 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer flex items-center gap-1"
+            className="text-[10px] sm:text-[11px] leading-none text-slate-600 font-mono bg-slate-100 px-1.5 sm:px-2 py-px sm:py-0.5 rounded hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer flex items-center gap-0.5"
             title={t("observationWorkspace.clickToFindInHierarchy")}
           >
-            <Search className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+            <Search className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
             {threat.equipment_tag}
           </button>
         )}

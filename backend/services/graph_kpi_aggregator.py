@@ -18,9 +18,7 @@ async def _equipment_scope_filter(user: Optional[dict]) -> Dict[str, Any]:
     installation_ids = await installation_filter.get_user_installation_ids(user)
     if not installation_ids:
         return {"_impossible": True}
-    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, user.get("id")
-    )
+    equipment_ids = await installation_filter.get_scoped_equipment_ids(user)
     if not equipment_ids:
         return {"_impossible": True}
     return {"linked_equipment_id": {"$in": list(equipment_ids)}}

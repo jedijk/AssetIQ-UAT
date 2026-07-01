@@ -323,10 +323,14 @@ class InstallationFilterService:
         query_filter = self.build_threat_filter(
             user_id, equipment_ids, equipment_names
         )
-        
+
         if query_filter.get("_impossible"):
             return []
-        
+
+        from services.discipline_filter import apply_discipline_filter_to_query
+
+        query_filter = apply_discipline_filter_to_query(query_filter, user)
+
         q = scoped(user, query_filter) if user else scoped_job(query_filter)
         threats = await self.db.threats.find(
             q,
@@ -415,3 +419,37 @@ class InstallationFilterService:
                 return parent.get("id")
             current = parent
         return None
+
+    def _equipment_unit_filter_ids(self, user: dict) -> List[str]:
+        raw = user.get("_equipment_unit_filter_ids") or []
+        return [str(x).strip() for x in raw if str(x).strip()]
+
+    async def get_scoped_equipment_ids(self, user: dict) -> Set[str]:
+        """Installation-scoped equipment IDs, optionally narrowed by equipment-unit header filter."""
+        installation_ids = await self.get_user_installation_ids(user)
+        if not installation_ids:
+            return set()
+
+        base_ids = await self.get_all_equipment_ids_for_installations(
+            installation_ids, user.get("id"), user=user
+        )
+        unit_filter_ids = self._equipment_unit_filter_ids(user)
+        if not unit_filter_ids:
+            return base_ids
+
+        unit_scope = await self.get_all_equipment_ids_for_installations(
+            unit_filter_ids, user.get("id"), user=user
+        )
+        return base_ids.intersection(unit_scope)
+
+    async def get_scoped_equipment_names(self, user: dict) -> Set[str]:
+        equipment_ids = await self.get_scoped_equipment_ids(user)
+        if not equipment_ids:
+            return set()
+
+        q = scoped(user, {"id": {"$in": list(equipment_ids)}})
+        equipment_nodes = await self.db.equipment_nodes.find(
+            q,
+            {"_id": 0, "name": 1},
+        ).to_list(5000)
+        return {node["name"] for node in equipment_nodes if node.get("name")}

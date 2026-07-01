@@ -30,6 +30,7 @@ import {
   Building2,
   Plug,
   Rocket,
+  Target,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -105,6 +106,14 @@ const SETTINGS_SECTIONS = [
     path: "/settings/onboarding",
     roles: ["owner", "admin"],
     requiresSettings: true,
+  },
+  {
+    id: "success-readiness",
+    sectionKey: "successReadiness",
+    icon: Target,
+    path: "/settings/success-readiness",
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"],
+    feature: "success_readiness",
   },
   {
     id: "company",
@@ -367,10 +376,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-48px)] flex bg-slate-50">
+    <div className="h-full min-h-0 flex bg-slate-50">
       {/* Left Sidebar - Hidden on mobile when content is shown */}
       <aside className={cn(
-        "bg-white border-r border-slate-200 flex flex-col flex-shrink-0 min-h-0 overflow-hidden",
+        "bg-white border-r border-slate-200 flex flex-col flex-shrink-0 min-h-0 h-full overflow-hidden",
         "w-full md:w-72 xl:w-80",
         "md:flex",
         showMobileNav ? "flex" : "hidden md:flex"
@@ -456,8 +465,8 @@ export default function SettingsPage() {
         </ScrollArea>
 
         {/* Sidebar Footer — pinned below scrollable nav */}
-        <div className="flex-shrink-0 p-3 border-t border-slate-200 bg-slate-50">
-          <div className="text-xs text-slate-500 text-center space-y-1">
+        <div className="flex-shrink-0 p-3 pt-2 border-t border-slate-200 bg-slate-50 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+          <div className="text-xs text-slate-500 text-center space-y-1 leading-snug">
             <div className="truncate">
               {t("settings.accessLevel").replace("{role}", formatRoleLabel(effectiveRole || user?.role || ""))}
             </div>

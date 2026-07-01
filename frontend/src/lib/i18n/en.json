@@ -12,6 +12,7 @@
     "logout": "Logout",
     "userManagement": "User Management",
     "onboardingWorkspace": "Onboarding Workspace",
+    "successReadiness": "Success Readiness",
     "statistics": "User Statistics",
     "criticalityDefinitions": "Definitions",
     "feedback": "Feedback",
@@ -209,6 +210,10 @@
       "onboardingWorkspace": {
         "label": "Onboarding Workspace",
         "description": "Guided self-service implementation journey"
+      },
+      "successReadiness": {
+        "label": "Success Readiness",
+        "description": "Customer success KPIs across People, Process, and Technology"
       },
       "companyProfile": {
         "label": "Company Profile",

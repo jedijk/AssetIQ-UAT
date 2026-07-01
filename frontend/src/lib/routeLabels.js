@@ -20,6 +20,7 @@ import {
   Sparkles,
   Plug,
   Rocket,
+  Target,
 } from 'lucide-react';
 
 /**
@@ -69,6 +70,7 @@ const staticRouteLabels = {
   '/settings/external-api': 'External API Access',
   '/settings/server-performance': 'Server Performance',
   '/settings/maintenance-readiness': 'Maintenance Readiness',
+  '/settings/success-readiness': 'Success Readiness',
   '/settings/database': 'Database',
   '/settings/audit-log': 'Audit Log',
   '/settings/statistics': 'Statistics',
@@ -83,6 +85,15 @@ const staticRouteLabels = {
   '/settings/disciplines': 'Disciplines',
   '/settings/task-generation': 'Task Generation',
   '/settings/onboarding': 'Onboarding Workspace',
+  '/settings/success-readiness': 'Success Readiness',
+  '/settings/success-readiness/people': 'People',
+  '/settings/success-readiness/process': 'Process',
+  '/settings/success-readiness/technology': 'Technology',
+  '/settings/success-readiness/assessments': 'Assessments',
+  '/settings/success-readiness/evidence': 'Evidence',
+  '/settings/success-readiness/history': 'History',
+  '/settings/success-readiness/ai-recommendations': 'AI Recommendations',
+  '/settings/success-readiness/configuration': 'Configuration',
   '/settings/company': 'Company Profile',
   '/user-statistics': 'User Statistics',
 };
@@ -148,6 +159,7 @@ const staticRouteIcons = {
   '/settings/translations': Settings,
   '/settings/disciplines': Settings,
   '/settings/onboarding': Rocket,
+  '/settings/success-readiness': Target,
   '/settings/company': Building2,
   '/settings/task-generation': Settings,
   '/user-statistics': BarChart3,

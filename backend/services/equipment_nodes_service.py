@@ -45,8 +45,10 @@ async def get_equipment_nodes(user: dict,
     from services.query_cache import query_cache
     import time
     
+    from services.equipment_unit_filter import equipment_unit_filter_cache_suffix
+
     # Check cache first (keyed by user ID since results are user-specific)
-    cache_key = f"equipment_nodes:{user['id']}"
+    cache_key = f"equipment_nodes:{user['id']}{equipment_unit_filter_cache_suffix(user)}"
     cached = query_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -61,9 +63,7 @@ async def get_equipment_nodes(user: dict,
         return result
     
     # Get all equipment IDs under assigned installations (shared equipment - no created_by filter)
-    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, user["id"], user=user
-    )
+    equipment_ids = await installation_filter.get_scoped_equipment_ids(user)
     
     if not equipment_ids:
         result = {"nodes": []}
@@ -140,9 +140,7 @@ async def export_equipment_hierarchy_excel(user: dict,
         )
     
     # Get all equipment IDs under assigned installations
-    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, user["id"], user=user
-    )
+    equipment_ids = await installation_filter.get_scoped_equipment_ids(user)
     
     # Fetch nodes using installation filter (same as hierarchy view)
     nodes = await db.equipment_nodes.find(

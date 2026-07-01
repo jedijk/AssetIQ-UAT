@@ -168,7 +168,12 @@ html, body {
 
 /* Layout */
 .app-container {
-    @apply min-h-screen;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
     background-color: var(--bg-primary);
 }
 
@@ -1121,7 +1126,8 @@ a, button, input, select, textarea {
 
 /* Mobile simple mode: vertically center logo, greeting, and action buttons */
 .operator-landing-layout {
-  min-height: calc(100dvh - var(--app-header-offset));
+  flex: 1 1 0%;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;

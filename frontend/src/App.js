@@ -27,6 +27,8 @@ import { VisualManagementLegacyRedirect } from "./lib/visualManagementPaths";
 import KioskErrorBoundary from "./components/KioskErrorBoundary";
 import DisplayPairingPage from "./pages/display/DisplayPairingPage";
 import DisplayBoardKioskPage from "./pages/display/DisplayBoardKioskPage";
+import { EquipmentUnitFilterProvider } from "./contexts/EquipmentUnitFilterContext";
+import { DisciplineFilterProvider } from "./contexts/DisciplineFilterContext";
 import { CapabilitiesProvider, useCapabilities } from "./core/performance";
 import { ProductionReleaseToast } from "./components/ProductionReleaseToast";
 
@@ -90,6 +92,10 @@ const SettingsTaskGenerationPage = lazy(() => import("./pages/SettingsTaskGenera
 const SettingsAuditLogPage = lazy(() => import("./pages/SettingsAuditLogPage"));
 const OnboardingWorkspacePage = lazy(() => import("./features/onboarding/pages/OnboardingWorkspacePage"));
 const OnboardingPhasePage = lazy(() => import("./features/onboarding/pages/OnboardingPhasePage"));
+const SuccessReadinessLayout = lazy(() => import("./features/success-readiness/components/SuccessReadinessLayout"));
+const SuccessReadinessDashboardPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessDashboardPage"));
+const SuccessReadinessPillarPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessPillarPage"));
+const SuccessReadinessShellPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessShellPage"));
 const SettingsCompanyProfilePage = lazy(() => import("./pages/SettingsCompanyProfilePage"));
 const GranulometryPage = lazy(() => import("./pages/GranulometryPage"));
 
@@ -451,6 +457,8 @@ function App() {
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>
+              <EquipmentUnitFilterProvider>
+              <DisciplineFilterProvider>
               <RolePreviewProvider>
               <PermissionsProvider>
                 <UndoProvider>
@@ -619,6 +627,17 @@ function App() {
                   <Route path="task-generation" element={<Suspense fallback={<RouteFallback />}><SettingsTaskGenerationPage /></Suspense>} />
                   <Route path="onboarding" element={<Suspense fallback={<RouteFallback />}><OnboardingWorkspacePage /></Suspense>} />
                   <Route path="onboarding/phases/:phaseId" element={<Suspense fallback={<RouteFallback />}><OnboardingPhasePage /></Suspense>} />
+                  <Route path="success-readiness" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessLayout /></Suspense>}>
+                    <Route index element={<Suspense fallback={<RouteFallback />}><SuccessReadinessDashboardPage /></Suspense>} />
+                    <Route path="people" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessPillarPage pillar="people" /></Suspense>} />
+                    <Route path="process" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessPillarPage pillar="process" /></Suspense>} />
+                    <Route path="technology" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessPillarPage pillar="technology" /></Suspense>} />
+                    <Route path="assessments" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="assessments" /></Suspense>} />
+                    <Route path="evidence" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="evidence" /></Suspense>} />
+                    <Route path="history" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="history" /></Suspense>} />
+                    <Route path="ai-recommendations" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="ai-recommendations" /></Suspense>} />
+                    <Route path="configuration" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="configuration" /></Suspense>} />
+                  </Route>
                   <Route path="company" element={<Suspense fallback={<RouteFallback />}><SettingsCompanyProfilePage /></Suspense>} />
                 </Route>
                 
@@ -632,6 +651,8 @@ function App() {
           </UndoProvider>
         </PermissionsProvider>
               </RolePreviewProvider>
+              </DisciplineFilterProvider>
+              </EquipmentUnitFilterProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

@@ -1,0 +1,80 @@
+"""Register CRUD skeleton for Success Readiness."""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from database import db
+from services.success_readiness_models import REGISTER_TYPES, RegisterType
+from services.tenant_schema import with_tenant_id
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+async def list_register_entries(
+    register_type: RegisterType,
+    tenant_id: Optional[str],
+    limit: int = 100,
+) -> List[Dict[str, Any]]:
+    query: Dict[str, Any] = {"register_type": register_type}
+    if tenant_id:
+        query["tenant_id"] = tenant_id
+    cursor = db.success_readiness_registers.find(query).sort("updated_at", -1).limit(limit)
+    rows: List[Dict[str, Any]] = []
+    async for doc in cursor:
+        doc["id"] = str(doc.pop("_id"))
+        rows.append(doc)
+    return rows
+
+
+async def create_register_entry(
+    register_type: RegisterType,
+    payload: Dict[str, Any],
+    user: dict,
+) -> Dict[str, Any]:
+    if register_type not in REGISTER_TYPES:
+        raise ValueError(f"Unknown register type: {register_type}")
+
+    doc: Dict[str, Any] = {
+        "register_type": register_type,
+        "title": payload.get("title", "").strip() or "Untitled",
+        "description": payload.get("description", ""),
+        "status": payload.get("status", "draft"),
+        "completion_pct": min(100, max(0, int(payload.get("completion_pct", 0)))),
+        "owner": payload.get("owner") or user.get("name"),
+        "metadata": payload.get("metadata") or {},
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
+        "created_by": user.get("id") or user.get("user_id"),
+    }
+    with_tenant_id(doc, user)
+    result = await db.success_readiness_registers.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    return doc
+
+
+async def update_register_entry(
+    entry_id: str,
+    payload: Dict[str, Any],
+    user: dict,
+) -> Optional[Dict[str, Any]]:
+    from bson import ObjectId
+
+    updates: Dict[str, Any] = {"updated_at": _now_iso()}
+    for field in ("title", "description", "status", "owner", "metadata"):
+        if field in payload:
+            updates[field] = payload[field]
+    if "completion_pct" in payload:
+        updates["completion_pct"] = min(100, max(0, int(payload["completion_pct"])))
+
+    result = await db.success_readiness_registers.find_one_and_update(
+        {"_id": ObjectId(entry_id)},
+        {"$set": updates},
+        return_document=True,
+    )
+    if not result:
+        return None
+    result["id"] = str(result.pop("_id"))
+    return result
