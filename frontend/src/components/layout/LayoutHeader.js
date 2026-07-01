@@ -151,14 +151,6 @@ export default function LayoutHeader({
               </span>
             </div>
 
-            {/* Equipment unit filter — global scope */}
-            {!isOperatorActive && (
-              <div className="hidden sm:flex shrink-0 items-center gap-1">
-                <EquipmentUnitFilterSelect />
-                <DisciplineFilterSelect />
-              </div>
-            )}
-
             {/* Desktop Navigation - Scrollable on smaller screens */}
             <nav className="hidden md:flex items-center gap-0.5 overflow-x-auto scrollbar-hide max-w-[calc(100vw-400px)]" data-testid="desktop-nav">
               {navItems.map((item) => (
@@ -197,12 +189,6 @@ export default function LayoutHeader({
 
           {/* Right Side - packed cluster, never grows/shrinks into logo */}
           <div className="flex items-center flex-nowrap shrink-0 ml-auto gap-0.5 sm:gap-1 md:gap-2">
-            {!isOperatorActive && (
-              <div className="sm:hidden shrink-0 flex items-center gap-0.5">
-                <EquipmentUnitFilterSelect compact />
-                <DisciplineFilterSelect compact />
-              </div>
-            )}
             <LayoutNotificationsMenu
               open={openHeaderMenu === "notifications"}
               onOpenChange={(open) => setOpenHeaderMenu(open ? "notifications" : null)}
@@ -391,7 +377,7 @@ export default function LayoutHeader({
                   </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuContent align="end" className="w-72">
                 <div className="px-3 py-3 border-b border-slate-100">
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 rounded-full overflow-hidden border-2 border-white shadow-md flex-shrink-0">
@@ -420,6 +406,21 @@ export default function LayoutHeader({
                     </div>
                   </div>
                 </div>
+                {!isOperatorActive && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <div
+                      className="px-3 py-2 space-y-2"
+                      onPointerDown={(e) => e.preventDefault()}
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        {t("filters.scope") || "Scope filters"}
+                      </p>
+                      <EquipmentUnitFilterSelect inProfileMenu />
+                      <DisciplineFilterSelect inProfileMenu />
+                    </div>
+                  </>
+                )}
                 <div className="py-1">
                   <DropdownMenuItem 
                     onClick={openProfileDialog}

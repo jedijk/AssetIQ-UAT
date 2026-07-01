@@ -15,7 +15,7 @@ import {
 } from "../ui/command";
 import { cn } from "../../lib/utils";
 
-export default function DisciplineFilterSelect({ className = "", compact = false }) {
+export default function DisciplineFilterSelect({ className = "", compact = false, inProfileMenu = false }) {
   const { t } = useLanguage();
   const filter = useDisciplineFilterOptional();
   const [open, setOpen] = useState(false);
@@ -33,8 +33,15 @@ export default function DisciplineFilterSelect({ className = "", compact = false
   })();
 
   return (
-    <div className={cn("flex items-center gap-1", className)} data-testid="global-discipline-filter">
-      <Popover open={open} onOpenChange={setOpen} modal={false}>
+    <div
+      className={cn(
+        "flex items-center gap-1",
+        inProfileMenu && "w-full",
+        className
+      )}
+      data-testid="global-discipline-filter"
+    >
+      <Popover open={open} onOpenChange={setOpen} modal={inProfileMenu}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
@@ -44,7 +51,8 @@ export default function DisciplineFilterSelect({ className = "", compact = false
             className={cn(
               "h-7 max-w-[10rem] justify-between gap-1 px-2 text-xs font-normal",
               isActive && "border-violet-300 bg-violet-50 text-violet-900",
-              compact && "h-7 max-w-[8rem]"
+              compact && "h-7 max-w-[8rem]",
+              inProfileMenu && "h-8 min-w-0 flex-1 max-w-none"
             )}
             data-testid="global-discipline-filter-trigger"
           >
@@ -56,9 +64,9 @@ export default function DisciplineFilterSelect({ className = "", compact = false
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-56 p-0"
-          align="start"
-          side="bottom"
+          className={cn("w-56 p-0", inProfileMenu && "z-[300]")}
+          align={inProfileMenu ? "end" : "start"}
+          side={inProfileMenu ? "left" : "bottom"}
           sideOffset={4}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >

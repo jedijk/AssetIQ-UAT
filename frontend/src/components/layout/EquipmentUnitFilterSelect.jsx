@@ -15,7 +15,7 @@ import {
 } from "../ui/command";
 import { cn } from "../../lib/utils";
 
-export default function EquipmentUnitFilterSelect({ className = "", compact = false }) {
+export default function EquipmentUnitFilterSelect({ className = "", compact = false, inProfileMenu = false }) {
   const { t } = useLanguage();
   const filter = useEquipmentUnitFilterOptional();
   const [open, setOpen] = useState(false);
@@ -40,8 +40,15 @@ export default function EquipmentUnitFilterSelect({ className = "", compact = fa
   })();
 
   return (
-    <div className={cn("flex items-center gap-1", className)} data-testid="global-equipment-unit-filter">
-      <Popover open={open} onOpenChange={setOpen} modal={false}>
+    <div
+      className={cn(
+        "flex items-center gap-1",
+        inProfileMenu && "w-full",
+        className
+      )}
+      data-testid="global-equipment-unit-filter"
+    >
+      <Popover open={open} onOpenChange={setOpen} modal={inProfileMenu}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
@@ -51,7 +58,8 @@ export default function EquipmentUnitFilterSelect({ className = "", compact = fa
             className={cn(
               "h-7 max-w-[11rem] justify-between gap-1 px-2 text-xs font-normal",
               isActive && "border-blue-300 bg-blue-50 text-blue-800",
-              compact && "h-7 max-w-[9rem]"
+              compact && "h-7 max-w-[9rem]",
+              inProfileMenu && "h-8 min-w-0 flex-1 max-w-none"
             )}
             data-testid="global-equipment-unit-filter-trigger"
           >
@@ -63,9 +71,9 @@ export default function EquipmentUnitFilterSelect({ className = "", compact = fa
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-72 p-0"
-          align="start"
-          side="bottom"
+          className={cn("w-72 p-0", inProfileMenu && "z-[300]")}
+          align={inProfileMenu ? "end" : "start"}
+          side={inProfileMenu ? "left" : "bottom"}
           sideOffset={4}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
