@@ -5,6 +5,7 @@ import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
 import { STATUS_LABELS, STATUS_STYLES, PULSE_STATUS_LABELS, PULSE_STATUS_STYLES } from "../config/nav";
+import { getMaturityLevel } from "../config/maturityLevels";
 
 export function KpiStatusBadge({ status }) {
   const key = status || "not_started";
@@ -15,12 +16,25 @@ export function KpiStatusBadge({ status }) {
   );
 }
 
-export function ScoreDisplay({ score, label, className = "" }) {
+export function MaturityBadge({ score, className = "" }) {
+  const maturity = getMaturityLevel(score);
+  return (
+    <Badge variant="outline" className={`${maturity.badgeClass} ${className}`}>
+      {maturity.label}
+    </Badge>
+  );
+}
+
+export function ScoreDisplay({ score, label, className = "", showMaturity = false }) {
   const display = score == null ? "—" : `${score}%`;
+  const maturity = getMaturityLevel(score);
   return (
     <div className={className}>
       {label && <p className="text-sm text-slate-500 mb-1">{label}</p>}
       <p className="text-3xl font-bold text-slate-900 tabular-nums">{display}</p>
+      {showMaturity && (
+        <p className={`mt-1 text-sm font-medium ${maturity.textClass}`}>{maturity.label}</p>
+      )}
     </div>
   );
 }
@@ -118,6 +132,7 @@ export function KpiTable({ kpis }) {
           <tr>
             <th className="px-4 py-2 font-medium">KPI</th>
             <th className="px-4 py-2 font-medium">Score</th>
+            <th className="px-4 py-2 font-medium">Maturity</th>
             <th className="px-4 py-2 font-medium">Target</th>
             <th className="px-4 py-2 font-medium">Status</th>
             <th className="px-4 py-2 font-medium">Trend</th>
@@ -139,6 +154,9 @@ export function KpiTable({ kpis }) {
                 </div>
               </td>
               <td className="px-4 py-3 tabular-nums">{kpi.score == null ? "—" : `${kpi.score}%`}</td>
+              <td className="px-4 py-3">
+                <MaturityBadge score={kpi.score} />
+              </td>
               <td className="px-4 py-3 tabular-nums">{kpi.target}%</td>
               <td className="px-4 py-3">
                 <KpiStatusBadge status={kpi.status} />
@@ -151,7 +169,7 @@ export function KpiTable({ kpis }) {
             </tr>
             {kpi.auto_detail && Object.keys(kpi.auto_detail).length > 0 && (
               <tr key={`${kpi.id}-detail`} className="bg-slate-50">
-                <td colSpan={7} className="px-4 py-2 text-xs text-slate-600">
+                <td colSpan={8} className="px-4 py-2 text-xs text-slate-600">
                   {Object.entries(kpi.auto_detail).map(([key, value]) => (
                     <span key={key} className="mr-4">
                       <span className="font-medium">{key}:</span> {String(value)}

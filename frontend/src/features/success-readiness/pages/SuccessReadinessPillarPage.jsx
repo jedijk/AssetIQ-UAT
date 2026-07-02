@@ -25,7 +25,7 @@ export default function SuccessReadinessPillarPage({ pillar }) {
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div>
         <p className="text-sm text-slate-500">{label} pillar · {PILLAR_WEIGHTS[pillar]}% of overall</p>
-        <ScoreDisplay score={pillarScore} label={label} />
+        <ScoreDisplay score={pillarScore} label={label} showMaturity />
       </div>
       <KpiTable kpis={kpis} />
     </div>

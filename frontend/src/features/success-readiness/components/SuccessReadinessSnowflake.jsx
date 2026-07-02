@@ -9,6 +9,18 @@ export const PILLAR_SNOWFLAKE_COLORS = {
   technology: "#84cc16",
 };
 
+export const PILLAR_BG_COLORS = {
+  people: "bg-indigo-50",
+  process: "bg-sky-50",
+  technology: "bg-lime-50",
+};
+
+export const PILLAR_DESCRIPTIONS = {
+  people: "5 KPIs. Focus on people, adoption and organizational change.",
+  process: "5 KPIs. Focus on processes, workflows and governance.",
+  technology: "5 KPIs. Focus on platform, data and technical readiness.",
+};
+
 function getRadarPoints(scores, centerX, centerY, radius, count, labelDistance) {
   const angleStep = (2 * Math.PI) / count;
   const startAngle = -Math.PI / 2;
@@ -84,9 +96,11 @@ export function buildAllKpiDimensions(kpis) {
   return PILLAR_ORDER.flatMap((pillar) => buildPillarDimensions(kpis, pillar));
 }
 
-function KpiAxisLabel({ x, y, label, pillarColor }) {
-  const width = 108;
-  const height = 40;
+function KpiAxisLabel({ x, y, label, score, pillarColor }) {
+  const width = 118;
+  const height = 52;
+  const displayScore = score == null ? "—" : `${score}%`;
+
   return (
     <foreignObject
       x={x - width / 2}
@@ -97,10 +111,18 @@ function KpiAxisLabel({ x, y, label, pillarColor }) {
     >
       <div
         xmlns="http://www.w3.org/1999/xhtml"
-        className="flex h-full items-center justify-center px-1 text-center text-[10px] font-medium leading-snug text-slate-700"
-        style={{ color: pillarColor }}
+        className="flex h-full flex-col items-center justify-center rounded-lg border border-slate-100 bg-white/95 px-1.5 py-1 text-center shadow-sm"
       >
-        {label}
+        <div className="flex items-center gap-1">
+          <span
+            className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ backgroundColor: pillarColor }}
+          />
+          <span className="text-[9px] font-semibold leading-tight text-slate-800">{label}</span>
+        </div>
+        <span className="mt-0.5 text-[10px] font-bold tabular-nums" style={{ color: pillarColor }}>
+          {displayScore}
+        </span>
       </div>
     </foreignObject>
   );
@@ -109,13 +131,12 @@ function KpiAxisLabel({ x, y, label, pillarColor }) {
 export default function SuccessReadinessSnowflake({
   dimensions = [],
   centerScore,
-  size = 560,
-  fillColor = "#84cc16",
+  size = 620,
 }) {
   const centerX = size / 2;
   const centerY = size / 2;
-  const radius = size / 2 - 130;
-  const labelDistance = radius + 72;
+  const radius = size / 2 - 145;
+  const labelDistance = radius + 88;
   const count = dimensions.length || 1;
 
   const normalizedScores = useMemo(
@@ -139,151 +160,120 @@ export default function SuccessReadinessSnowflake({
       ? centerScore
       : normalizedScores.length
         ? Math.round(normalizedScores.reduce((a, b) => a + b, 0) / normalizedScores.length)
-        : "—";
+        : null;
 
   const gridLevels = [0.25, 0.5, 0.75, 1];
 
   if (!dimensions.length) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+      <div className="flex min-h-[320px] items-center justify-center text-sm text-slate-500">
         No KPI data available for the readiness snowflake.
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 md:p-6">
-      <svg
-        viewBox={`0 0 ${size} ${size}`}
-        className="mx-auto block w-full max-w-[560px]"
-        role="img"
-        aria-label="Success Readiness snowflake with fifteen KPIs"
-      >
-        <circle cx={centerX} cy={centerY} r={radius + 12} fill="#f8fafc" />
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      className="mx-auto block w-full max-w-[620px]"
+      role="img"
+      aria-label="Success Readiness snowflake with fifteen KPIs"
+    >
+      <defs>
+        <radialGradient id="snowflake-bg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#f8fafc" />
+          <stop offset="100%" stopColor="#f1f5f9" />
+        </radialGradient>
+      </defs>
 
-        {gridLevels.map((factor, i) => (
-          <circle
-            key={factor}
-            cx={centerX}
-            cy={centerY}
-            r={radius * factor}
-            fill="none"
-            stroke="#e2e8f0"
-            strokeWidth={1}
-            strokeDasharray={i < gridLevels.length - 1 ? "4,4" : "0"}
-          />
-        ))}
+      <circle cx={centerX} cy={centerY} r={radius + 16} fill="url(#snowflake-bg)" />
 
-        {dimensions.map((_, i) => {
-          const angle = -Math.PI / 2 + i * ((2 * Math.PI) / count);
-          const isPillarBoundary = i > 0 && i % 5 === 0;
-          return (
-            <line
-              key={`spoke-${i}`}
-              x1={centerX}
-              y1={centerY}
-              x2={centerX + radius * Math.cos(angle)}
-              y2={centerY + radius * Math.sin(angle)}
-              stroke={isPillarBoundary ? "#cbd5e1" : "#e2e8f0"}
-              strokeWidth={isPillarBoundary ? 1.5 : 1}
-            />
-          );
-        })}
-
-        <path
-          d={blobPath}
-          fill={fillColor}
-          fillOpacity={0.32}
-          stroke={fillColor}
-          strokeWidth={2.5}
-          strokeLinejoin="round"
+      {gridLevels.map((factor, i) => (
+        <circle
+          key={factor}
+          cx={centerX}
+          cy={centerY}
+          r={radius * factor}
+          fill="none"
+          stroke="#e2e8f0"
+          strokeWidth={1}
+          strokeDasharray={i < gridLevels.length - 1 ? "4,4" : "0"}
         />
+      ))}
 
-        {points.map((point, i) => {
-          const pillarColor = PILLAR_SNOWFLAKE_COLORS[dimensions[i].pillar] || fillColor;
-          return (
-            <circle
-              key={`point-${dimensions[i].id}`}
-              cx={point.x}
-              cy={point.y}
-              r={4.5}
-              fill={pillarColor}
-              stroke="#ffffff"
-              strokeWidth={2}
-            />
-          );
-        })}
-
-        {points.map((point, i) => (
-          <KpiAxisLabel
-            key={`label-${dimensions[i].id}`}
-            x={point.labelX}
-            y={point.labelY}
-            label={dimensions[i].label}
-            pillarColor={PILLAR_SNOWFLAKE_COLORS[dimensions[i].pillar] || "#334155"}
+      {dimensions.map((_, i) => {
+        const angle = -Math.PI / 2 + i * ((2 * Math.PI) / count);
+        const isPillarBoundary = i > 0 && i % 5 === 0;
+        return (
+          <line
+            key={`spoke-${i}`}
+            x1={centerX}
+            y1={centerY}
+            x2={centerX + radius * Math.cos(angle)}
+            y2={centerY + radius * Math.sin(angle)}
+            stroke={isPillarBoundary ? "#cbd5e1" : "#e8edf2"}
+            strokeWidth={isPillarBoundary ? 1.5 : 1}
           />
-        ))}
+        );
+      })}
 
-        <text
-          x={centerX}
-          y={centerY - 8}
-          textAnchor="middle"
-          className="fill-slate-900 text-[28px] font-bold"
-        >
-          {displayCenterScore}
-          {displayCenterScore !== "—" ? "%" : ""}
-        </text>
-        <text
-          x={centerX}
-          y={centerY + 16}
-          textAnchor="middle"
-          className="fill-slate-500 text-[11px] uppercase tracking-wide"
-        >
-          Overall
-        </text>
-      </svg>
+      <path
+        d={blobPath}
+        fill="#84cc16"
+        fillOpacity={0.28}
+        stroke="#65a30d"
+        strokeWidth={2.5}
+        strokeLinejoin="round"
+      />
 
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
-        {PILLAR_ORDER.map((pillar) => {
-          const pillarDims = dimensions.filter((d) => d.pillar === pillar);
-          if (!pillarDims.length) return null;
-          return (
-            <div key={pillar}>
-              <h4
-                className="text-xs font-semibold uppercase tracking-wide mb-2"
-                style={{ color: PILLAR_SNOWFLAKE_COLORS[pillar] }}
-              >
-                {PILLAR_LABELS[pillar]}
-              </h4>
-              <div className="space-y-1.5">
-                {pillarDims.map((dim, i) => {
-                  const idx = dimensions.findIndex((d) => d.id === dim.id);
-                  const score = idx >= 0 ? normalizedScores[idx] : null;
-                  return (
-                    <div key={dim.id} className="flex items-start justify-between gap-2 text-xs">
-                      <span className="text-slate-600 leading-snug">{dim.label}</span>
-                      <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-                        {dim.score == null ? "—" : `${score}%`}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+      {points.map((point, i) => {
+        const pillarColor = PILLAR_SNOWFLAKE_COLORS[dimensions[i].pillar] || "#84cc16";
+        return (
+          <circle
+            key={`point-${dimensions[i].id}`}
+            cx={point.x}
+            cy={point.y}
+            r={5}
+            fill={pillarColor}
+            stroke="#ffffff"
+            strokeWidth={2.5}
+          />
+        );
+      })}
+
+      {points.map((point, i) => (
+        <KpiAxisLabel
+          key={`label-${dimensions[i].id}`}
+          x={point.labelX}
+          y={point.labelY}
+          label={dimensions[i].label}
+          score={dimensions[i].score}
+          pillarColor={PILLAR_SNOWFLAKE_COLORS[dimensions[i].pillar] || "#334155"}
+        />
+      ))}
+
+      <circle cx={centerX} cy={centerY} r={46} fill="#ffffff" stroke="#e2e8f0" strokeWidth={1.5} />
+      <text
+        x={centerX}
+        y={centerY - 4}
+        textAnchor="middle"
+        className="fill-slate-900 text-[26px] font-bold"
+      >
+        {displayCenterScore == null ? "—" : `${displayCenterScore}%`}
+      </text>
+      <text
+        x={centerX}
+        y={centerY + 18}
+        textAnchor="middle"
+        className="fill-slate-500 text-[10px] font-semibold uppercase tracking-wider"
+      >
+        Overall
+      </text>
+    </svg>
   );
 }
 
 export function SuccessReadinessSnowflakeChart({ kpis, overallScore }) {
   const dimensions = buildAllKpiDimensions(kpis);
-  return (
-    <SuccessReadinessSnowflake
-      dimensions={dimensions}
-      centerScore={overallScore}
-      fillColor="#84cc16"
-    />
-  );
+  return <SuccessReadinessSnowflake dimensions={dimensions} centerScore={overallScore} />;
 }
