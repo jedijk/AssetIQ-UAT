@@ -144,7 +144,12 @@ BACKFILL_TENANT_ID = os.environ.get("BACKFILL_TENANT_ID") or None
 def tenant_id_from_user(user: Optional[dict]) -> Optional[str]:
     if not user:
         return None
-    return user.get("company_id") or user.get("organization_id") or None
+    return (
+        user.get("company_id")
+        or user.get("organization_id")
+        or user.get("tenant_id")
+        or None
+    )
 
 
 def with_tenant_id(doc: Dict[str, Any], user: Optional[dict]) -> Dict[str, Any]:

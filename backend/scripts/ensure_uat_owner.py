@@ -49,6 +49,11 @@ async def ensure_uat_primary_owner(client, available_databases: dict) -> None:
 
     uat_db = client[uat_name]
     esc = re.escape(email)
+    bootstrap_tenant = (
+        os.environ.get("BACKFILL_TENANT_ID")
+        or os.environ.get("PRIMARY_TENANT_ID")
+        or "Tyromer"
+    ).strip()
     result = await uat_db.users.update_one(
         {"email": {"$regex": f"^{esc}$", "$options": "i"}},
         {
@@ -56,6 +61,8 @@ async def ensure_uat_primary_owner(client, available_databases: dict) -> None:
                 "role": "owner",
                 "approval_status": "approved",
                 "is_active": True,
+                "company_id": bootstrap_tenant,
+                "tenant_id": bootstrap_tenant,
             }
         },
     )

@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from bson import ObjectId
 from database import db
 from services.success_readiness_models import REGISTER_TYPES, RegisterType
 from services.success_readiness_register_scoring import derive_register_completion_pct
@@ -14,17 +15,37 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+def _serialize_register_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
+    row = _json_safe(dict(doc))
+    oid = row.pop("_id", None)
+    row["id"] = str(oid) if oid is not None else row.get("id")
+    return row
+
+
 async def list_register_entries(
     register_type: RegisterType,
     user: dict,
     limit: int = 100,
 ) -> List[Dict[str, Any]]:
+    if register_type not in REGISTER_TYPES:
+        raise ValueError(f"Unknown register type: {register_type}")
     query = merge_tenant_filter({"register_type": register_type}, user)
     cursor = db.success_readiness_registers.find(query).sort("updated_at", -1).limit(limit)
     rows: List[Dict[str, Any]] = []
     async for doc in cursor:
-        doc["id"] = str(doc.pop("_id"))
-        rows.append(doc)
+        rows.append(_serialize_register_doc(doc))
     return rows
 
 

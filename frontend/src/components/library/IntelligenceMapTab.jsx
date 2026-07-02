@@ -421,18 +421,22 @@ const SankeyDiagram = ({ data, isLoading }) => {
 
         {/* Nodes */}
         <g className="nodes">
-          {sankeyLayout.nodes.map((node, i) => (
-            <g key={i} transform={`translate(${node.x0},${node.y0})`}>
+          {sankeyLayout.nodes.map((node, i) => {
+            const width = Math.max(0, (node.x1 ?? 0) - (node.x0 ?? 0));
+            const height = Math.max(0, (node.y1 ?? 0) - (node.y0 ?? 0));
+            if (!width || !height) return null;
+            return (
+            <g key={i} transform={`translate(${node.x0 ?? 0},${node.y0 ?? 0})`}>
               <rect
-                width={node.x1 - node.x0}
-                height={node.y1 - node.y0}
+                width={width}
+                height={height}
                 fill={node.color}
                 rx={4}
                 className="transition-all duration-200 hover:opacity-80"
               />
               <text
-                x={(node.x1 - node.x0) / 2}
-                y={(node.y1 - node.y0) / 2}
+                x={width / 2}
+                y={height / 2}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill="white"
@@ -446,7 +450,7 @@ const SankeyDiagram = ({ data, isLoading }) => {
                 )?.toLocaleString() || 0}
               </text>
               <text
-                x={(node.x1 - node.x0) / 2}
+                x={width / 2}
                 y={-8}
                 textAnchor="middle"
                 fill="#475569"
@@ -457,7 +461,8 @@ const SankeyDiagram = ({ data, isLoading }) => {
                 {node.name}
               </text>
             </g>
-          ))}
+            );
+          })}
         </g>
       </svg>
     </div>

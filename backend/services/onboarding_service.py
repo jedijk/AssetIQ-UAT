@@ -113,6 +113,10 @@ _estimate_time_remaining = estimate_time_remaining
 async def get_onboarding_summary(user: dict) -> dict:
     tenant_id = tenant_id_from_user(user)
     if not tenant_id:
+        from services.tenant_schema import BACKFILL_TENANT_ID
+
+        tenant_id = BACKFILL_TENANT_ID
+    if not tenant_id:
         raise HTTPException(status_code=400, detail="No tenant context for user")
 
     state = await _get_state_doc(tenant_id)
@@ -230,6 +234,10 @@ async def _ensure_tenant_doc(tenant_id: str, actor: dict) -> dict:
 
 async def get_company_profile(user: dict) -> dict:
     tenant_id = tenant_id_from_user(user)
+    if not tenant_id:
+        from services.tenant_schema import BACKFILL_TENANT_ID
+
+        tenant_id = BACKFILL_TENANT_ID
     if not tenant_id:
         raise HTTPException(status_code=400, detail="No tenant context for user")
     tenant = await _ensure_tenant_doc(tenant_id, user)

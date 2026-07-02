@@ -85,7 +85,14 @@ async def get_kpi(kpi_id: str, current_user: dict = Depends(_view_roles)):
 
 @router.get("/registers/{register_type}")
 async def list_registers(register_type: str, current_user: dict = Depends(_view_roles)):
-    return await svc.get_registers(current_user, register_type)
+    from services.success_readiness_models import REGISTER_TYPES
+
+    if register_type not in REGISTER_TYPES:
+        raise HTTPException(status_code=404, detail="Unknown register type")
+    try:
+        return await svc.get_registers(current_user, register_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/registers/{register_type}")

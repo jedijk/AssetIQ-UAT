@@ -81,7 +81,7 @@ function createBlobPath(points, smoothing = 0.22) {
 
 export function buildPillarDimensions(kpis, pillar) {
   return (kpis || [])
-    .filter((kpi) => kpi.pillar === pillar)
+    .filter((kpi) => kpi.pillar === pillar && !kpi.excluded && kpi.status !== "excluded")
     .map((kpi) => ({
       id: kpi.id,
       pillar: kpi.pillar,
