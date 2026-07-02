@@ -150,12 +150,18 @@ export function KpiTable({ kpis }) {
                     <div className="font-medium text-slate-900">{kpi.name}</div>
                     <div className="text-xs text-slate-500">{kpi.description}</div>
                   </div>
-                  <KpiImprovementInfo kpi={kpi} />
+                  {!kpi.excluded && kpi.status !== "excluded" && <KpiImprovementInfo kpi={kpi} />}
                 </div>
               </td>
-              <td className="px-4 py-3 tabular-nums">{kpi.score == null ? "—" : `${kpi.score}%`}</td>
+              <td className="px-4 py-3 tabular-nums">
+                {kpi.excluded || kpi.status === "excluded" ? "—" : kpi.score == null ? "—" : `${kpi.score}%`}
+              </td>
               <td className="px-4 py-3">
-                <MaturityBadge score={kpi.score} />
+                {kpi.excluded || kpi.status === "excluded" ? (
+                  <span className="text-xs text-slate-500">—</span>
+                ) : (
+                  <MaturityBadge score={kpi.score} />
+                )}
               </td>
               <td className="px-4 py-3 tabular-nums">{kpi.target}%</td>
               <td className="px-4 py-3">

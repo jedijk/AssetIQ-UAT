@@ -1173,7 +1173,7 @@ const FailureModesPage = () => {
         />
         
         {/* Maintenance Strategies Tab */}
-        <TabsContent value="maintenance" className="flex-1 min-h-0 mt-0 flex flex-col">
+        <TabsContent value="maintenance" className="flex-1 min-h-0 mt-0 flex flex-col overflow-hidden">
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white rounded-xl border border-slate-200">
             <MaintenanceStrategyTab
               filterLinkedToEquipment={filterLinkedToEquipment}

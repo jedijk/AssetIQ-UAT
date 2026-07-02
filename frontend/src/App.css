@@ -253,16 +253,22 @@ html, body {
     flex-direction: column;
 }
 
-/* Target TabsContent when active to fill remaining space */
-.app-page-shell [data-state="active"]:not(button):not([role="tablist"] *) {
+/* Page-level tab list must stay above tab panels for hit-testing */
+.app-page-shell > [data-orientation="horizontal"] > [role="tablist"] {
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+}
+
+/* Only direct tab panels on page-level tabs — not nested library tabs */
+.app-page-shell > [data-orientation="horizontal"] > [role="tabpanel"][data-state="active"] {
     flex: 1 1 0%;
     min-height: 0;
     display: flex;
     flex-direction: column;
 }
 
-/* Hide inactive TabsContent */
-.app-page-shell [data-state="inactive"]:not(button):not([role="tablist"] *) {
+.app-page-shell > [data-orientation="horizontal"] > [role="tabpanel"][data-state="inactive"] {
     display: none;
 }
 

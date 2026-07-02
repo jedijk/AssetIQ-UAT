@@ -40,6 +40,7 @@ class RegisterUpdateRequest(BaseModel):
 class ConfigurationUpdateRequest(BaseModel):
     targets_locked: Optional[bool] = None
     notification_enabled: Optional[bool] = None
+    integrations_enabled: Optional[bool] = None
     pillar_weights: Optional[Dict[str, float]] = None
 
 

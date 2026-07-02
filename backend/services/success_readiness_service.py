@@ -165,23 +165,33 @@ async def get_configuration(user: dict) -> Dict[str, Any]:
     doc = await db.success_readiness_config.find_one(query)
     if doc:
         doc["id"] = str(doc.pop("_id"))
+        doc.setdefault("integrations_enabled", True)
         return doc
     return {
         "targets_locked": False,
         "pillar_weights": PILLAR_WEIGHTS,
         "notification_enabled": True,
+        "integrations_enabled": True,
     }
 
 
 async def update_configuration(user: dict, payload: dict) -> Dict[str, Any]:
+    current = await get_configuration(user)
     doc = {
         "type": "success_readiness_config",
-        "targets_locked": payload.get("targets_locked", False),
-        "notification_enabled": payload.get("notification_enabled", True),
+        "targets_locked": payload.get("targets_locked", current.get("targets_locked", False)),
+        "notification_enabled": payload.get(
+            "notification_enabled", current.get("notification_enabled", True)
+        ),
+        "integrations_enabled": payload.get(
+            "integrations_enabled", current.get("integrations_enabled", True)
+        ),
         "updated_at": _iso_now(),
     }
     if "pillar_weights" in payload:
         doc["pillar_weights"] = payload["pillar_weights"]
+    elif current.get("pillar_weights"):
+        doc["pillar_weights"] = current["pillar_weights"]
     with_tenant_id(doc, user)
     query = merge_tenant_filter({"type": "success_readiness_config"}, user)
     await db.success_readiness_config.update_one(query, {"$set": doc}, upsert=True)

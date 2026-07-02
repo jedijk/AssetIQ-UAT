@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Literal, Optional, TypedDict
 
 PillarId = Literal["people", "process", "technology"]
 RegisterType = Literal["training", "champion", "procedure", "governance"]
-KpiStatus = Literal["on_track", "at_risk", "off_track", "not_started"]
+KpiStatus = Literal["on_track", "at_risk", "off_track", "not_started", "excluded"]
 KpiSource = Literal["automatic", "manual", "stub"]
 
 PILLAR_WEIGHTS: Dict[PillarId, float] = {
@@ -23,7 +23,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "weight": 0.20,
         "target": 80,
         "source": "automatic",
-        "description": "Share of licensed users active in the last 30 days",
+        "description": "Active users in the last 30 days vs the prior 30 days (growth 100%, same 90%, decline 50%, no use 0%)",
     },
     {
         "id": "training_completion",
@@ -69,7 +69,7 @@ KPI_CATALOG: List[Dict[str, Any]] = [
         "weight": 0.20,
         "target": 85,
         "source": "automatic",
-        "description": "Hierarchy, equipment typing, and criticality coverage",
+        "description": "Hierarchy, equipment typing, and criticality coverage on sub-units and maintainable items",
     },
     {
         "id": "procedure_coverage",
@@ -173,6 +173,7 @@ class KpiResult(TypedDict, total=False):
     auto_detail: Optional[Dict[str, Any]]
     todo: Optional[str]
     improvement_actions: Optional[List[Dict[str, Any]]]
+    excluded: bool
 
 
 def status_from_score(score: Optional[int], target: int) -> KpiStatus:

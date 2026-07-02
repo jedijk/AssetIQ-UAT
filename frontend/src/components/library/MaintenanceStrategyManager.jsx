@@ -1285,6 +1285,44 @@ const isEnableOnlyFmUpdate = (data) =>
 const isMandatoryOnlyTaskUpdate = (data) =>
   data && Object.keys(data).length === 1 && data.is_mandatory !== undefined;
 
+const strategyViewToggleClass = (isActive) =>
+  `inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+    isActive
+      ? "bg-background text-foreground shadow"
+      : "text-muted-foreground hover:text-foreground"
+  }`;
+
+const StrategyViewToggle = ({ mainView, onMainViewChange, t }) => (
+  <div
+    className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground w-auto"
+    role="tablist"
+    aria-label={t("maintenance.maintenanceStrategy")}
+  >
+    <button
+      type="button"
+      role="tab"
+      aria-selected={mainView === "strategy"}
+      className={strategyViewToggleClass(mainView === "strategy")}
+      onClick={() => onMainViewChange("strategy")}
+      data-testid="strategy-view-toggle-strategy"
+    >
+      <Wrench className="w-3.5 h-3.5 mr-1.5" />
+      {t("maintenance.maintenanceStrategy")}
+    </button>
+    <button
+      type="button"
+      role="tab"
+      aria-selected={mainView === "schedule"}
+      className={strategyViewToggleClass(mainView === "schedule")}
+      onClick={() => onMainViewChange("schedule")}
+      data-testid="strategy-view-toggle-schedule"
+    >
+      <Calendar className="w-3.5 h-3.5 mr-1.5" />
+      {t("maintenance.maintenanceSchedule")}
+    </button>
+  </div>
+);
+
 const invalidateStrategyQueries = async (queryClient, equipmentTypeId) => {
   await queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2", equipmentTypeId] });
   await queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2-history", equipmentTypeId] });
@@ -1829,18 +1867,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
       <div className="space-y-4">
         {/* View Toggle */}
         <div className="flex items-center gap-2">
-          <Tabs value={mainView} onValueChange={setMainView} className="w-auto">
-            <TabsList className="h-9">
-              <TabsTrigger value="strategy" className="text-xs px-4">
-                <Wrench className="w-3.5 h-3.5 mr-1.5" />
-                {t("maintenance.maintenanceStrategy")}
-              </TabsTrigger>
-              <TabsTrigger value="schedule" className="text-xs px-4">
-                <Calendar className="w-3.5 h-3.5 mr-1.5" />
-                {t("maintenance.maintenanceSchedule")}
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <StrategyViewToggle mainView={mainView} onMainViewChange={setMainView} t={t} />
         </div>
         
         {hasStrategy && strategy?.strategy_needs_apply && (
@@ -1864,18 +1891,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
     <div className="space-y-4">
       {/* View Toggle */}
       <div className="flex flex-wrap items-center gap-2 mb-2">
-        <Tabs value={mainView} onValueChange={setMainView} className="w-auto">
-          <TabsList className="h-9">
-            <TabsTrigger value="strategy" className="text-xs px-4">
-              <Wrench className="w-3.5 h-3.5 mr-1.5" />
-              {t("maintenance.maintenanceStrategy")}
-            </TabsTrigger>
-            <TabsTrigger value="schedule" className="text-xs px-4">
-              <Calendar className="w-3.5 h-3.5 mr-1.5" />
-              {t("maintenance.maintenanceSchedule")}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <StrategyViewToggle mainView={mainView} onMainViewChange={setMainView} t={t} />
       </div>
 
       {hasStrategy && strategy?.strategy_needs_apply && (

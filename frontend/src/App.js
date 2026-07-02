@@ -102,6 +102,7 @@ const PulseSurveyCreatePage = lazy(() => import("./features/success-readiness/pa
 const PulseSurveyDetailPage = lazy(() => import("./features/success-readiness/pages/PulseSurveyDetailPage"));
 const PulseSurveyRespondPage = lazy(() => import("./features/success-readiness/pages/PulseSurveyRespondPage"));
 const SuccessReadinessShellPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessShellPage"));
+const SuccessReadinessConfigurationPage = lazy(() => import("./features/success-readiness/pages/SuccessReadinessConfigurationPage"));
 const SettingsCompanyProfilePage = lazy(() => import("./pages/SettingsCompanyProfilePage"));
 const GranulometryPage = lazy(() => import("./pages/GranulometryPage"));
 
@@ -647,7 +648,7 @@ function App() {
                     <Route path="evidence" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="evidence" /></Suspense>} />
                     <Route path="history" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="history" /></Suspense>} />
                     <Route path="ai-recommendations" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="ai-recommendations" /></Suspense>} />
-                    <Route path="configuration" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessShellPage pageKey="configuration" /></Suspense>} />
+                    <Route path="configuration" element={<Suspense fallback={<RouteFallback />}><SuccessReadinessConfigurationPage /></Suspense>} />
                   </Route>
                   <Route path="company" element={<Suspense fallback={<RouteFallback />}><SettingsCompanyProfilePage /></Suspense>} />
                 </Route>

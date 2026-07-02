@@ -14,6 +14,7 @@ from services.success_readiness_models import (
     PILLAR_WEIGHTS,
     status_from_score,
 )
+from services.onboarding_criticality_scope import _has_criticality_assessment
 from services.success_readiness_register_scoring import score_register_kpi
 from services.tenant_schema import merge_tenant_filter
 from services.tenant_scope import scoped
@@ -25,6 +26,11 @@ OPERATIONAL_LEVELS = (
     ISOLevel.PLANT_UNIT.value,
     ISOLevel.SECTION_SYSTEM.value,
     ISOLevel.EQUIPMENT_UNIT.value,
+    ISOLevel.SUBUNIT.value,
+    ISOLevel.MAINTAINABLE_ITEM.value,
+)
+
+CRITICALITY_SCOPE_LEVELS = (
     ISOLevel.SUBUNIT.value,
     ISOLevel.MAINTAINABLE_ITEM.value,
 )
@@ -42,44 +48,77 @@ _ASSESSMENT_BY_KPI = {
 }
 
 
+def _user_adoption_score(current_active: int, previous_active: int) -> int:
+    """Score adoption by period-over-period active-user trend."""
+    if current_active <= 0:
+        return 0
+    if current_active > previous_active:
+        return 100
+    if current_active == previous_active:
+        return 90
+    return 50
+
+
 async def _calc_user_adoption(user: dict) -> tuple[Optional[int], Dict[str, Any]]:
-    """Active users / total users in the last 30 days."""
+    """Active users in the last 30 days vs the prior 30-day window."""
     end = datetime.now(timezone.utc)
-    start = end - timedelta(days=30)
-    match_stage = _user_stats.build_event_match_stage(start, end)
-    kpis = await _user_stats._get_kpi_metrics(match_stage)
-    user_query = merge_tenant_filter(_user_stats.stats_users_query(), user)
-    total_users = await _user_stats.users.count_documents(user_query)
-    active_users = kpis.get("active_users", 0)
-    if total_users <= 0:
-        return 0, {"active_users": active_users, "total_users": 0, "period_days": 30}
-    score = min(100, round((active_users / total_users) * 100))
+    current_start = end - timedelta(days=30)
+    previous_end = current_start
+    previous_start = end - timedelta(days=60)
+
+    current_match = _user_stats.build_event_match_stage(current_start, end)
+    previous_match = _user_stats.build_event_match_stage(previous_start, previous_end)
+    current_kpis, previous_kpis = await asyncio.gather(
+        _user_stats._get_kpi_metrics(current_match),
+        _user_stats._get_kpi_metrics(previous_match),
+    )
+
+    active_users = current_kpis.get("active_users", 0)
+    previous_active_users = previous_kpis.get("active_users", 0)
+    score = _user_adoption_score(active_users, previous_active_users)
     return score, {
         "active_users": active_users,
-        "total_users": total_users,
+        "previous_active_users": previous_active_users,
         "period_days": 30,
-        "total_sessions": kpis.get("total_sessions", 0),
+        "comparison": (
+            "growth" if active_users > previous_active_users
+            else "same" if active_users == previous_active_users
+            else "decline" if active_users > 0
+            else "no_use"
+        ),
+        "total_sessions": current_kpis.get("total_sessions", 0),
     }
 
 
 async def _calc_core_data_readiness(user: dict) -> tuple[Optional[int], Dict[str, Any]]:
-    """Hierarchy depth, equipment typing, and criticality assignment."""
+    """Hierarchy depth, equipment typing, and criticality on sub-units / maintainable items."""
     site_query = scoped(user, {"level": ISOLevel.INSTALLATION.value})
     equipment_query = scoped(user, {"level": {"$in": list(OPERATIONAL_LEVELS)}})
     typed_query = scoped(user, {
         "level": {"$in": list(OPERATIONAL_LEVELS)},
         "equipment_type_id": {"$exists": True, "$nin": [None, ""]},
     })
-    criticality_query = scoped(user, {
-        "level": {"$in": list(OPERATIONAL_LEVELS)},
-        "criticality_level": {"$exists": True, "$nin": [None, ""]},
-    })
+    criticality_scope_query = scoped(user, {"level": {"$in": list(CRITICALITY_SCOPE_LEVELS)}})
 
-    sites, equipment, typed, with_criticality = await asyncio.gather(
+    sites, equipment, typed, scope_nodes = await asyncio.gather(
         db.equipment_nodes.count_documents(site_query),
         db.equipment_nodes.count_documents(equipment_query),
         db.equipment_nodes.count_documents(typed_query),
-        db.equipment_nodes.count_documents(criticality_query),
+        db.equipment_nodes.find(
+            criticality_scope_query,
+            {"_id": 0, "level": 1, "criticality": 1},
+        ).to_list(length=10000),
+    )
+
+    criticality_total = len(scope_nodes)
+    criticality_assessed = sum(
+        1 for node in scope_nodes if _has_criticality_assessment(node.get("criticality"))
+    )
+    subunit_nodes = [n for n in scope_nodes if n.get("level") == ISOLevel.SUBUNIT.value]
+    maintainable_nodes = [n for n in scope_nodes if n.get("level") == ISOLevel.MAINTAINABLE_ITEM.value]
+    subunit_assessed = sum(1 for n in subunit_nodes if _has_criticality_assessment(n.get("criticality")))
+    maintainable_assessed = sum(
+        1 for n in maintainable_nodes if _has_criticality_assessment(n.get("criticality"))
     )
 
     components: List[int] = []
@@ -87,16 +126,25 @@ async def _calc_core_data_readiness(user: dict) -> tuple[Optional[int], Dict[str
         components.append(100)
     if equipment > 0:
         components.append(min(100, round((typed / equipment) * 100)))
-        components.append(min(100, round((with_criticality / equipment) * 100)))
+    if criticality_total > 0:
+        components.append(min(100, round((criticality_assessed / criticality_total) * 100)))
     else:
-        components.extend([0, 0])
+        components.append(0)
 
     score = round(sum(components) / len(components)) if components else 0
     return score, {
         "sites": sites,
         "equipment_count": equipment,
         "typed_equipment": typed,
-        "criticality_assigned": with_criticality,
+        "criticality_scope_total": criticality_total,
+        "criticality_assessed": criticality_assessed,
+        "criticality_coverage_percent": round((criticality_assessed / criticality_total) * 100)
+        if criticality_total
+        else 0,
+        "subunit_total": len(subunit_nodes),
+        "subunit_assessed": subunit_assessed,
+        "maintainable_total": len(maintainable_nodes),
+        "maintainable_assessed": maintainable_assessed,
     }
 
 
@@ -255,7 +303,16 @@ async def _manual_score_from_assessment(kpi_id: str, user: dict) -> tuple[Option
     }
 
 
+async def _integrations_enabled(user: dict) -> bool:
+    query = merge_tenant_filter({"type": "success_readiness_config"}, user)
+    doc = await db.success_readiness_config.find_one(query)
+    if not doc:
+        return True
+    return bool(doc.get("integrations_enabled", True))
+
+
 async def build_kpi_results(user: dict, tenant_id: Optional[str]) -> List[KpiResult]:
+    integrations_in_scope = await _integrations_enabled(user)
     results: List[KpiResult] = []
     for spec in KPI_CATALOG:
         kpi_id = spec["id"]
@@ -263,8 +320,12 @@ async def build_kpi_results(user: dict, tenant_id: Optional[str]) -> List[KpiRes
         score: Optional[int] = None
         auto_detail: Optional[Dict[str, Any]] = None
         todo: Optional[str] = None
+        excluded = False
 
-        if source == "automatic":
+        if kpi_id == "integration_health" and not integrations_in_scope:
+            excluded = True
+            auto_detail = {"reason": "Integrations turned off in configuration"}
+        elif source == "automatic":
             score, auto_detail = await _resolve_auto_score(kpi_id, user)
         elif source == "manual":
             reg = _REGISTER_BY_KPI.get(kpi_id)
@@ -279,6 +340,7 @@ async def build_kpi_results(user: dict, tenant_id: Optional[str]) -> List[KpiRes
         evidence_count = await db.success_readiness_evidence.count_documents(evidence_query)
 
         target = spec["target"]
+        status = "excluded" if excluded else status_from_score(score, target)
         results.append(
             KpiResult(
                 id=kpi_id,
@@ -288,13 +350,14 @@ async def build_kpi_results(user: dict, tenant_id: Optional[str]) -> List[KpiRes
                 target=target,
                 score=score,
                 trend=None,
-                status=status_from_score(score, target),
+                status=status,
                 source=source,
                 description=spec["description"],
                 evidence_count=evidence_count,
                 auto_detail=auto_detail,
                 todo=todo,
-                improvement_actions=improvement_actions_for_kpi(kpi_id),
+                improvement_actions=[] if excluded else improvement_actions_for_kpi(kpi_id),
+                excluded=excluded,
             )
         )
     return results

@@ -7,7 +7,7 @@ KPI_IMPROVEMENT_ACTIONS: Dict[str, List[Dict[str, Any]]] = {
     "user_adoption": [
         {
             "label": "Collect latest measurements",
-            "description": "Refresh adoption metrics from live user activity.",
+            "description": "Compare active users this month with the prior 30-day window.",
             "path": "/settings/success-readiness",
         },
         {

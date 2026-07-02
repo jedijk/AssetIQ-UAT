@@ -45,6 +45,7 @@ export const STATUS_STYLES = {
   at_risk: "bg-amber-100 text-amber-800 border-amber-200",
   off_track: "bg-red-100 text-red-800 border-red-200",
   not_started: "bg-slate-100 text-slate-600 border-slate-200",
+  excluded: "bg-slate-100 text-slate-500 border-slate-200",
 };
 
 export const STATUS_LABELS = {
@@ -52,6 +53,7 @@ export const STATUS_LABELS = {
   at_risk: "At risk",
   off_track: "Off track",
   not_started: "Not started",
+  excluded: "Not in scope",
 };
 
 export const PULSE_STATUS_STYLES = {

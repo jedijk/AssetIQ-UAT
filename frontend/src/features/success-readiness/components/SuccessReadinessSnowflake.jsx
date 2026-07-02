@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { PILLAR_LABELS } from "../config/nav";
 
-const PILLAR_ORDER = ["people", "process", "technology"];
+export const PILLAR_ORDER = ["people", "process", "technology"];
 
 export const PILLAR_SNOWFLAKE_COLORS = {
   people: "#6366f1",

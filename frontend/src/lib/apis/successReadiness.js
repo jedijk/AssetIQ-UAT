@@ -2,7 +2,13 @@ import { api } from "../apiClient";
 
 export const successReadinessAPI = {
   getDashboard: async () => {
-    const response = await api.get("/success-readiness/dashboard");
+    const qs = new URLSearchParams({ _cb: String(Date.now()) });
+    const response = await api.get(`/success-readiness/dashboard?${qs.toString()}`, {
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    });
     return response.data;
   },
 
@@ -72,6 +78,11 @@ export const successReadinessAPI = {
 
   getConfiguration: async () => {
     const response = await api.get("/success-readiness/configuration");
+    return response.data;
+  },
+
+  updateConfiguration: async (payload) => {
+    const response = await api.patch("/success-readiness/configuration", payload);
     return response.data;
   },
 

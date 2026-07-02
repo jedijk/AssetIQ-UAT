@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -30,9 +30,18 @@ import { KpiTable, MaturityBadge } from "../components/SuccessReadinessShared";
 import SuccessReadinessSnowflake, {
   PILLAR_BG_COLORS,
   PILLAR_DESCRIPTIONS,
+  PILLAR_ORDER,
   PILLAR_SNOWFLAKE_COLORS,
   buildAllKpiDimensions,
 } from "../components/SuccessReadinessSnowflake";
+
+function pillarSectionId(pillar) {
+  return `success-readiness-pillar-${pillar}`;
+}
+
+function scrollToPillarSection(pillar) {
+  document.getElementById(pillarSectionId(pillar))?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 const PILLAR_ICONS = {
   people: Users,
@@ -50,11 +59,17 @@ function getHighlightKpi(kpis, direction) {
   return [...rows].sort((a, b) => (direction === "high" ? b.score - a.score : a.score - b.score))[0];
 }
 
-function PillarScoreCard({ pillar, score }) {
+function PillarScoreCard({ pillar, score, onNavigate }) {
   const Icon = PILLAR_ICONS[pillar];
   const color = PILLAR_SNOWFLAKE_COLORS[pillar];
   return (
-    <div className={`rounded-xl border border-slate-100 p-3 ${PILLAR_BG_COLORS[pillar]}`}>
+    <button
+      type="button"
+      onClick={() => onNavigate?.(pillar)}
+      className={`w-full rounded-xl border border-slate-100 p-3 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 cursor-pointer ${PILLAR_BG_COLORS[pillar]}`}
+      style={{ "--tw-ring-color": color }}
+      aria-label={`Go to ${PILLAR_LABELS[pillar]} KPIs`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2 min-w-0">
           <div
@@ -72,15 +87,21 @@ function PillarScoreCard({ pillar, score }) {
           {score == null ? "—" : `${score}%`}
         </p>
       </div>
-    </div>
+    </button>
   );
 }
 
-function SummaryPillarCard({ pillar, score }) {
+function SummaryPillarCard({ pillar, score, onNavigate }) {
   const Icon = PILLAR_ICONS[pillar];
   const color = PILLAR_SNOWFLAKE_COLORS[pillar];
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <button
+      type="button"
+      onClick={() => onNavigate?.(pillar)}
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-left w-full transition-shadow hover:shadow-md hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 cursor-pointer"
+      style={{ "--tw-ring-color": color }}
+      aria-label={`Go to ${PILLAR_LABELS[pillar]} KPIs`}
+    >
       <div className="flex items-center gap-2 mb-3">
         <div
           className="flex h-9 w-9 items-center justify-center rounded-xl"
@@ -96,6 +117,50 @@ function SummaryPillarCard({ pillar, score }) {
         </div>
       </div>
       <Progress value={score ?? 0} className="h-2" />
+    </button>
+  );
+}
+
+function PillarKpiSections({ kpis, pillars }) {
+  return (
+    <div className="space-y-8">
+      {PILLAR_ORDER.map((pillar) => {
+        const pillarKpis = (kpis || []).filter((kpi) => kpi.pillar === pillar);
+        const Icon = PILLAR_ICONS[pillar];
+        const color = PILLAR_SNOWFLAKE_COLORS[pillar];
+        const score = pillars[pillar]?.score;
+
+        return (
+          <section
+            key={pillar}
+            id={pillarSectionId(pillar)}
+            aria-labelledby={`${pillarSectionId(pillar)}-heading`}
+            className="scroll-mt-24"
+          >
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-xl"
+                style={{ backgroundColor: `${color}18`, color }}
+              >
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3
+                  id={`${pillarSectionId(pillar)}-heading`}
+                  className="text-lg font-semibold text-slate-900"
+                >
+                  {PILLAR_LABELS[pillar]}
+                </h3>
+                <p className="text-sm text-slate-500">{PILLAR_DESCRIPTIONS[pillar]}</p>
+              </div>
+              <p className="text-2xl font-bold tabular-nums" style={{ color }}>
+                {score == null ? "—" : `${score}%`}
+              </p>
+            </div>
+            <KpiTable kpis={pillarKpis} />
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -104,10 +169,16 @@ export default function SuccessReadinessDashboardPage() {
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState("snowflake");
 
-  const { data, isLoading, isFetching, refetch, error } = useQuery({
+  const { data, isLoading, isFetching, error } = useQuery({
     queryKey: ["success-readiness", "dashboard"],
     queryFn: successReadinessAPI.getDashboard,
+    staleTime: 0,
+    structuralSharing: false,
   });
+
+  const refreshDashboard = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["success-readiness", "dashboard"] });
+  }, [queryClient]);
 
   const collectMutation = useMutation({
     mutationFn: successReadinessAPI.collectMeasurements,
@@ -132,7 +203,7 @@ export default function SuccessReadinessDashboardPage() {
     return (
       <div className="p-6 text-center text-red-600">
         Failed to load dashboard.{" "}
-        <Button variant="link" onClick={() => refetch()}>
+        <Button variant="link" onClick={() => refreshDashboard()}>
           Retry
         </Button>
       </div>
@@ -188,7 +259,7 @@ export default function SuccessReadinessDashboardPage() {
               <Database className={`w-4 h-4 mr-2 ${collectMutation.isPending ? "animate-pulse" : ""}`} />
               Collect measurements
             </Button>
-            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            <Button variant="outline" onClick={() => refreshDashboard()} disabled={isFetching}>
               <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
               Refresh
             </Button>
@@ -256,11 +327,12 @@ export default function SuccessReadinessDashboardPage() {
               </div>
 
               <div className="space-y-2">
-                {Object.keys(PILLAR_LABELS).map((pillar) => (
+                {PILLAR_ORDER.map((pillar) => (
                   <PillarScoreCard
                     key={pillar}
                     pillar={pillar}
                     score={pillars[pillar]?.score}
+                    onNavigate={scrollToPillarSection}
                   />
                 ))}
               </div>
@@ -281,14 +353,23 @@ export default function SuccessReadinessDashboardPage() {
           </div>
         ) : (
           <div className="p-4 md:p-6">
-            <KpiTable kpis={data?.kpis} />
+            <PillarKpiSections kpis={data?.kpis} pillars={pillars} />
           </div>
         )}
       </div>
 
+      {viewMode === "snowflake" && (
+        <PillarKpiSections kpis={data?.kpis} pillars={pillars} />
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        {Object.keys(PILLAR_LABELS).map((pillar) => (
-          <SummaryPillarCard key={pillar} pillar={pillar} score={pillars[pillar]?.score} />
+        {PILLAR_ORDER.map((pillar) => (
+          <SummaryPillarCard
+            key={pillar}
+            pillar={pillar}
+            score={pillars[pillar]?.score}
+            onNavigate={scrollToPillarSection}
+          />
         ))}
 
         <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm">
