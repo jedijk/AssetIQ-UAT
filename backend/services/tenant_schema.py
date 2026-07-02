@@ -182,11 +182,17 @@ def tenant_read_filter(user: Optional[dict]) -> Dict[str, Any]:
     tid = tenant_id_from_user(user)
     if not tid:
         return {}
-    if TENANT_STRICT_MODE:
-        return {DEFAULT_TENANT_FIELD: tid}
-    return {
+    tenant_match: Dict[str, Any] = {
         "$or": [
             {DEFAULT_TENANT_FIELD: tid},
+            {"company_id": tid},
+        ]
+    }
+    if TENANT_STRICT_MODE:
+        return tenant_match
+    return {
+        "$or": [
+            *tenant_match["$or"],
             {DEFAULT_TENANT_FIELD: {"$exists": False}},
         ]
     }

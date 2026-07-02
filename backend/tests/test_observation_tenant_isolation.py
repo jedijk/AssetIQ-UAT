@@ -30,6 +30,8 @@ def _matches_tenant_clause(doc: dict, clause: dict) -> bool:
         if isinstance(val, dict) and "$exists" in val:
             return val["$exists"] is False and "tenant_id" not in doc
         return doc.get("tenant_id") == val
+    if "company_id" in clause:
+        return doc.get("company_id") == clause["company_id"]
     return True
 
 

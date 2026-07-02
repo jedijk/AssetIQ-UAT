@@ -17,6 +17,7 @@ from services.tenant_schema import (
 
 def test_tenant_id_from_user_prefers_company_id():
     assert tenant_id_from_user({"company_id": "co-1", "organization_id": "org-1"}) == "co-1"
+    assert tenant_id_from_user({"tenant_id": "co-2"}) == "co-2"
 
 
 def test_with_tenant_id_attaches_field():
@@ -74,6 +75,7 @@ def test_prepend_tenant_match():
     user = {"company_id": "co-1"}
     pip = prepend_tenant_match([{"$count": "c"}], user)
     assert pip[0]["$match"]["$or"][0]["tenant_id"] == "co-1"
+    assert pip[0]["$match"]["$or"][1]["company_id"] == "co-1"
 
 
 def test_tenant_read_filter_strict_mode(monkeypatch):
@@ -82,7 +84,12 @@ def test_tenant_read_filter_strict_mode(monkeypatch):
     import services.tenant_schema as ts
 
     importlib.reload(ts)
-    assert ts.tenant_read_filter({"company_id": "co-1"}) == {"tenant_id": "co-1"}
+    assert ts.tenant_read_filter({"company_id": "co-1"}) == {
+        "$or": [
+            {"tenant_id": "co-1"},
+            {"company_id": "co-1"},
+        ]
+    }
     monkeypatch.delenv("TENANT_STRICT_MODE", raising=False)
     importlib.reload(ts)
 
@@ -91,6 +98,7 @@ def test_tenant_read_filter_migration_safe():
     assert tenant_read_filter({"company_id": "co-1"}) == {
         "$or": [
             {"tenant_id": "co-1"},
+            {"company_id": "co-1"},
             {"tenant_id": {"$exists": False}},
         ]
     }
@@ -107,6 +115,7 @@ def test_merge_tenant_filter_composes_with_base_query():
             {
                 "$or": [
                     {"tenant_id": "co-1"},
+                    {"company_id": "co-1"},
                     {"tenant_id": {"$exists": False}},
                 ]
             },

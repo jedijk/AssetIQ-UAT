@@ -201,7 +201,7 @@ async def _calc_reliability_process(user: dict) -> tuple[Optional[int], Dict[str
         scoped(user, {"level": {"$in": list(OPERATIONAL_LEVELS)}})
     )
     if equipment_count <= 0:
-        return None, {"failure_modes": fm_count, "strategies": strategy_count, "equipment": 0}
+        return 0, {"failure_modes": fm_count, "strategies": strategy_count, "equipment": 0}
     fm_score = min(100, round((fm_count / max(equipment_count / 5, 1)) * 100))
     strategy_score = min(100, round((strategy_count / max(equipment_count / 10, 1)) * 100))
     score = round((fm_score + strategy_score) / 2)
@@ -216,7 +216,7 @@ async def _calc_data_quality(user: dict) -> tuple[Optional[int], Dict[str, Any]]
     equipment_query = scoped(user, {"level": {"$in": list(OPERATIONAL_LEVELS)}})
     total = await db.equipment_nodes.count_documents(equipment_query)
     if total <= 0:
-        return None, {"equipment": 0, "orphans": 0, "missing_type": 0}
+        return 0, {"equipment": 0, "orphans": 0, "missing_type": 0}
     missing_type = await db.equipment_nodes.count_documents(
         scoped(user, {
             "level": {"$in": list(OPERATIONAL_LEVELS)},
@@ -248,8 +248,6 @@ async def _calc_ai_readiness(user: dict) -> tuple[Optional[int], Dict[str, Any]]
     usage_count = await db.ai_usage.count_documents(query)
     active_users = len(await db.ai_usage.distinct("user_id", query))
     score = min(100, usage_count * 5 + active_users * 10) if usage_count or active_users else 0
-    if usage_count == 0 and active_users == 0:
-        return None, {"ai_events_30d": 0, "ai_users_30d": 0}
     return score, {"ai_events_30d": usage_count, "ai_users_30d": active_users}
 
 
@@ -257,7 +255,7 @@ async def _calc_integration_health(user: dict) -> tuple[Optional[int], Dict[str,
     query = merge_tenant_filter({"revoked": {"$ne": True}}, user)
     active_keys = await db.external_api_keys.count_documents(query)
     if active_keys <= 0:
-        return None, {"active_api_keys": 0}
+        return 0, {"active_api_keys": 0}
     return min(100, active_keys * 50), {"active_api_keys": active_keys}
 
 

@@ -63,6 +63,28 @@ export function PulseStatusBadge({ status }) {
   );
 }
 
+function formatAutoDetailValue(value) {
+  if (value == null) return "—";
+  if (Array.isArray(value)) {
+    if (!value.length) return "0";
+    if (typeof value[0] === "object") {
+      return value
+        .slice(0, 3)
+        .map((item) => item?.module || item?.name || item?.label || JSON.stringify(item))
+        .join(", ");
+    }
+    return value.join(", ");
+  }
+  if (typeof value === "object") {
+    const parts = Object.entries(value)
+      .filter(([, v]) => v != null && typeof v !== "object")
+      .slice(0, 4)
+      .map(([k, v]) => `${k}: ${v}`);
+    return parts.length ? parts.join("; ") : JSON.stringify(value);
+  }
+  return String(value);
+}
+
 function KpiImprovementInfo({ kpi }) {
   const actions = kpi?.improvement_actions || [];
   if (!actions.length) return null;
@@ -178,7 +200,7 @@ export function KpiTable({ kpis }) {
                 <td colSpan={8} className="px-4 py-2 text-xs text-slate-600">
                   {Object.entries(kpi.auto_detail).map(([key, value]) => (
                     <span key={key} className="mr-4">
-                      <span className="font-medium">{key}:</span> {String(value)}
+                      <span className="font-medium">{key}:</span> {formatAutoDetailValue(value)}
                     </span>
                   ))}
                 </td>
