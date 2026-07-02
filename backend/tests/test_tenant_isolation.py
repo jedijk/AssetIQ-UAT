@@ -22,7 +22,9 @@ def _matches_tenant_clause(doc: dict, clause: dict) -> bool:
         if isinstance(val, dict) and "$exists" in val:
             return val["$exists"] is False and "tenant_id" not in doc
         return doc.get("tenant_id") == val
-    return True
+    if "company_id" in clause:
+        return doc.get("company_id") == clause["company_id"]
+    return False
 
 
 def _doc_visible(doc: dict, user: dict, *, strict: bool) -> bool:

@@ -23,7 +23,17 @@ def test_tenant_a_cannot_read_tenant_b_via_merge_filter(monkeypatch):
 
     user_a = {"company_id": "tenant-a", "tenant_id": "tenant-a", "id": "a"}
     query = ts.merge_tenant_filter({"id": "proof-b-action"}, user_a)
-    assert query == {"$and": [{"id": "proof-b-action"}, {"tenant_id": "tenant-a"}]}
+    assert query == {
+        "$and": [
+            {"id": "proof-b-action"},
+            {
+                "$or": [
+                    {"tenant_id": "tenant-a"},
+                    {"company_id": "tenant-a"},
+                ]
+            },
+        ]
+    }
 
 
 def _mock_db(collections: dict):

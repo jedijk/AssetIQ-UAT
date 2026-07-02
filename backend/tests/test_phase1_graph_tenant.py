@@ -11,7 +11,12 @@ def test_edge_tenant_clause_strict_mode(monkeypatch):
 
     monkeypatch.setattr(tenant_schema, "TENANT_STRICT_MODE", True)
     clause = _edge_tenant_clause("Tyromer")
-    assert clause == {"tenant_id": "Tyromer"}
+    assert clause == {
+        "$or": [
+            {"tenant_id": "Tyromer"},
+            {"company_id": "Tyromer"},
+        ]
+    }
 
 
 def test_merge_edge_query_combines_status_and_tenant(monkeypatch):

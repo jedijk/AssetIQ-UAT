@@ -26,6 +26,7 @@ def test_scope_pipeline_prepends_tenant_match():
     pipeline = _scope_pipeline([{"$match": {"a": 1}}], {"company_id": "default"})
     assert pipeline[0]["$match"]["$or"] == [
         {"tenant_id": "default"},
+        {"company_id": "default"},
         {"tenant_id": {"$exists": False}},
     ]
 

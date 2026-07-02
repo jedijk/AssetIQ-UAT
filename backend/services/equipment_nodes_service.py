@@ -56,10 +56,13 @@ async def get_equipment_nodes(user: dict,
     # Get user's installation filter data
     installation_ids = await installation_filter.get_user_installation_ids(user)
     
+    unit_filter_active = bool((user.get("_equipment_unit_filter_ids") or []))
+
     # If no installations assigned, return empty list
     if not installation_ids:
         result = {"nodes": []}
-        query_cache.set(cache_key, result, ttl=60)
+        if not unit_filter_active:
+            query_cache.set(cache_key, result, ttl=60)
         return result
     
     # Get all equipment IDs under assigned installations (shared equipment - no created_by filter)
@@ -67,7 +70,8 @@ async def get_equipment_nodes(user: dict,
     
     if not equipment_ids:
         result = {"nodes": []}
-        query_cache.set(cache_key, result, ttl=60)
+        if not unit_filter_active:
+            query_cache.set(cache_key, result, ttl=60)
         return result
     
     # Get all nodes that belong to assigned installations (no created_by filter)

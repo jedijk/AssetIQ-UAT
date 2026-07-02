@@ -385,7 +385,58 @@ Workflow: create or clone template → create board → pair physical displays f
 
 ---
 
-## 12. Phase 10 — Go-live checklist
+## 12. Phase 10b — Success Readiness
+
+Use **Success Readiness** to measure go-live preparedness and ongoing adoption across People, Process, and Technology. Complements the [Go-Live Readiness Checklist](./ASSETIQ_GO_LIVE_READINESS_CHECKLIST.md).
+
+### UI path
+
+**Settings → Success Readiness** (`/settings/success-readiness`)
+
+Requires `success_readiness:read` (admin and owner by default).
+
+### Configuration (owner)
+
+**Settings → Success Readiness → Configuration** (`/settings/success-readiness/configuration`)
+
+| Setting | Purpose |
+|---------|---------|
+| **Integrations in scope** (`integrations_enabled`) | When off, Integration Health and related technology KPIs are excluded from scoring — use when external API / M2M integrations are not part of the rollout |
+
+### Registers (manual KPIs)
+
+**Settings → Success Readiness → Registers** (`/settings/success-readiness/registers`)
+
+Maintain evidence for manual KPIs:
+
+| Register type | KPI supported |
+|---------------|---------------|
+| **Training** | Training Completion |
+| **Champion** | Champion Program |
+| **Procedure** | Procedure Coverage |
+| **Governance** | Governance Maturity |
+
+Also supports Change Readiness and Infrastructure Readiness via assessments and evidence attachments.
+
+### Assessments and pulse surveys
+
+| Area | Path | Use |
+|------|------|-----|
+| **Assessments** | `.../assessments` | Structured readiness assessments per pillar |
+| **Pulse Surveys** | `.../pulse-surveys` | Short adoption pulse surveys; create from templates, track responses |
+
+Review the **snowflake dashboard** on the Success Readiness home page for overall maturity and per-pillar drill-down (`people`, `process`, `technology`).
+
+### Operator actions before go-live
+
+1. Owner confirms **Configuration** scope (integrations on/off).
+2. Admin registers **champions** and **training** records if manual KPIs apply.
+3. Run at least one **assessment** or **pulse survey** baseline before handoff.
+4. Cross-check KPI gaps against [ASSETIQ_GO_LIVE_READINESS_CHECKLIST.md](./ASSETIQ_GO_LIVE_READINESS_CHECKLIST.md).
+
+---
+
+## 13. Phase 10 — Go-live checklist
 
 Run before handing the tenant to the client for production use.
 
@@ -415,10 +466,18 @@ Review:
 - [ ] Translations seeded if multi-language deployment
 - [ ] External API keys created and integration guide shared (if integrations in scope)
 - [ ] Visual boards configured (if module enabled)
+- [ ] Success Readiness dashboard reviewed; champions/training registers populated where applicable (see Phase 10b)
+
+### Success Readiness
+
+- [ ] Success Readiness dashboard reviewed (`/settings/success-readiness`) — pillar scores and snowflake chart acceptable for go-live
+- [ ] Success Readiness **Configuration** confirmed by owner (integrations scope set correctly)
+- [ ] **Champions registered** in Success Readiness registers (if Champion Program KPI is in scope)
+- [ ] Baseline **assessment** or **pulse survey** completed (recommended)
 
 ---
 
-## 13. Template summary table
+## 14. Template summary table
 
 | Template / export | File path (if static) | Download method | Import supported |
 |-------------------|----------------------|-----------------|------------------|
@@ -431,7 +490,7 @@ Review:
 
 ---
 
-## 14. Recommended onboarding order
+## 15. Recommended onboarding order
 
 ```mermaid
 flowchart TD
@@ -452,7 +511,8 @@ flowchart TD
     L --> M[Phase 7: Translations seed]
     M --> N[Phase 8: External API optional]
     N --> O[Phase 9: Visual boards optional]
-    O --> P[Phase 10: Go-live checklist<br/>validate_tenant_onboarding.py]
+    O --> SR[Phase 10b: Success Readiness<br/>dashboard + registers + baseline survey]
+    SR --> P[Phase 10: Go-live checklist<br/>validate_tenant_onboarding.py]
     P --> Q[Tenant live]
 ```
 
@@ -465,8 +525,9 @@ flowchart TD
 | 5 | Reliability engineer (+ admin for approvals) |
 | 6–7 | Admin |
 | 8–9 | Admin (optional) |
+| 10b | Owner + admin |
 | 10 | Owner + admin |
 
 ---
 
-*Document version: 2026-06-30. Derived from AssetIQ codebase (`tenant_management_service.py`, `tenant_registry.py`, `equipment_import_excel.py`, `pm_import` routes, `failure_modes` routes, `spare_parts_import_service.py`, `translations` routes, and related frontend settings pages).*
+*Document version: 2026-06-14. Derived from AssetIQ codebase (`tenant_management_service.py`, `tenant_registry.py`, `success_readiness_models.py`, `equipment_import_excel.py`, `pm_import` routes, `failure_modes` routes, `spare_parts_import_service.py`, `translations` routes, and related frontend settings pages).*

@@ -78,6 +78,14 @@ export function EquipmentUnitFilterProvider({ children }) {
 
   const allNodes = useMemo(() => nodesData?.nodes || nodesData || [], [nodesData]);
 
+  useEffect(() => {
+    if (!selectedUnitIds.length || !allNodes.length) return;
+    const validIds = new Set(allNodes.map((n) => n.id));
+    if (selectedUnitIds.some((id) => !validIds.has(id))) {
+      clearFilter();
+    }
+  }, [allNodes, selectedUnitIds, clearFilter]);
+
   const equipmentUnitNodes = useMemo(
     () =>
       allNodes

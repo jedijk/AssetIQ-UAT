@@ -55,3 +55,31 @@ async def test_get_scoped_equipment_ids_intersects_unit_filter():
             scoped = await service.get_scoped_equipment_ids(user)
 
     assert scoped == {"unit-1", "equip-a"}
+
+
+@pytest.mark.asyncio
+async def test_get_scoped_equipment_ids_ignores_stale_unit_filter():
+    from services.installation_filter_service import InstallationFilterService
+
+    service = InstallationFilterService(MagicMock())
+    user = {
+        "id": "u1",
+        "role": "owner",
+        "_equipment_unit_filter_ids": ["stale-prod-unit-id"],
+    }
+
+    async def fake_installation_ids(_user):
+        return ["install-1"]
+
+    async def fake_all_ids(ids, user_id=None, user=None):
+        if ids == ["install-1"]:
+            return {"install-1", "unit-1", "equip-a"}
+        if ids == ["stale-prod-unit-id"]:
+            return set()
+        return set()
+
+    with patch.object(service, "get_user_installation_ids", side_effect=fake_installation_ids):
+        with patch.object(service, "get_all_equipment_ids_for_installations", side_effect=fake_all_ids):
+            scoped = await service.get_scoped_equipment_ids(user)
+
+    assert scoped == {"install-1", "unit-1", "equip-a"}

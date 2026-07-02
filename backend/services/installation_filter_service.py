@@ -61,11 +61,14 @@ class InstallationFilterService:
             if not assigned_installations:
                 return []
             
-            # Find installation nodes matching the assigned names
+            # Match by installation name or id (onboarding stores site UUID in assigned_installations)
             installation_nodes = await self.db.equipment_nodes.find(
                 scoped(user, {
                     "level": "installation",
-                    "name": {"$in": assigned_installations}
+                    "$or": [
+                        {"name": {"$in": assigned_installations}},
+                        {"id": {"$in": assigned_installations}},
+                    ],
                 }),
                 {"_id": 0, "id": 1, "name": 1}
             ).to_list(100)
@@ -440,7 +443,15 @@ class InstallationFilterService:
         unit_scope = await self.get_all_equipment_ids_for_installations(
             unit_filter_ids, user.get("id"), user=user
         )
-        return base_ids.intersection(unit_scope)
+        scoped_ids = base_ids.intersection(unit_scope)
+        if not scoped_ids and base_ids:
+            logger.debug(
+                "Ignoring stale equipment-unit filter %s; no overlap with %d installation-scoped nodes",
+                unit_filter_ids,
+                len(base_ids),
+            )
+            return base_ids
+        return scoped_ids
 
     async def get_scoped_equipment_names(self, user: dict) -> Set[str]:
         equipment_ids = await self.get_scoped_equipment_ids(user)
